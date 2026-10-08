@@ -24,6 +24,7 @@ from app.schemas.analytics import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.access import policy
+from app.utils.limits import active_inverts_query
 
 router = APIRouter()
 
@@ -169,15 +170,14 @@ async def get_collection_analytics(
     """
     
     # Get all the user's animals across EVERY taxon from the unified `inverts`
-    # table (tarantulas are mirrored there too), excluding transferred-out
-    # animals so the stats match the displayed collection + cap. The variable
-    # keeps the name `tarantulas` only to minimize churn below — it now holds
-    # all taxa. Polymorphic feeding/molt/substrate logs are matched on
-    # invert_id, which dual-write + backfill keep populated for every taxon.
-    tarantulas = db.query(Invert).filter(
-        Invert.user_id == current_user.id,
-        Invert.transferred_out_at.is_(None),
-    ).all()
+    # table (tarantulas are mirrored there too), ACTIVE only: transferred-out
+    # and deceased animals are excluded so the stats match the displayed
+    # collection + cap (dead animals used to count in totals, species and the
+    # sex split). The variable keeps the name `tarantulas` only to minimize
+    # churn below — it now holds all taxa. Polymorphic feeding/molt/substrate
+    # logs are matched on invert_id, which dual-write + backfill keep
+    # populated for every taxon.
+    tarantulas = active_inverts_query(db, current_user.id).all()
 
     total_count = len(tarantulas)
 

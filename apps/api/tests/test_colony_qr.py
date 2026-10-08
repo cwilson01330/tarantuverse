@@ -100,7 +100,7 @@ def make_colony(owner, **kw):
         last_substrate_change=None, target_temp_min=None, target_temp_max=None,
         target_humidity_min=None, target_humidity_max=None, water_dish=True,
         date_acquired=None, source="bought", notes="private note", sitter_note="sitter only",
-        location="Garage rack 2", visibility="public",
+        location="Garage rack 2", visibility="public", is_active=True,
     )
     defaults.update(kw)
     return SimpleNamespace(**defaults)

@@ -118,6 +118,19 @@ const POSITIVE_EVENTS = new Set<ColonyEventType>(['birth', 'added', 'merge']);
 /** Event types that reduce the population (negative delta by nature). */
 const NEGATIVE_EVENTS = new Set<ColonyEventType>(['death', 'removed', 'cannibalism', 'split']);
 
+/** The count change an event means from what was typed: a magnitude for every
+ *  signed type, the literal value for a count fix. Same rule as the API
+ *  (utils/colony_counts.py::signed_delta) and the web form. */
+function signedDelta(t: ColonyEventType, typed: number): number {
+  if (NEGATIVE_EVENTS.has(t)) return -Math.abs(typed);
+  if (POSITIVE_EVENTS.has(t)) return Math.abs(typed);
+  return typed;
+}
+
+function isSignedEvent(t: ColonyEventType): boolean {
+  return NEGATIVE_EVENTS.has(t) || POSITIVE_EVENTS.has(t);
+}
+
 function eventNeedsDelta(t: ColonyEventType): boolean {
   return POSITIVE_EVENTS.has(t) || NEGATIVE_EVENTS.has(t) || t === 'count_correction';
 }
@@ -301,9 +314,7 @@ export default function ColonyDetailScreen() {
       }
       // Normalize sign from the event's nature so the keeper only enters a
       // magnitude. count_correction keeps its literal sign (may be +/-).
-      let magnitude = Math.abs(parsed);
-      if (NEGATIVE_EVENTS.has(eventType)) magnitude = -magnitude;
-      deltaNum = eventType === 'count_correction' ? parsed : magnitude;
+      deltaNum = signedDelta(eventType, parsed);
     }
 
     if (eventType === 'observation' && !eventNotes.trim()) {
@@ -715,7 +726,13 @@ export default function ColonyDetailScreen() {
     if (kind === 'event') {
       setEDate(String(row.occurred_at).slice(0, 10));
       setEStage(row.stage ?? '');
-      setEDelta(row.count_delta != null ? String(row.count_delta) : '');
+      // A signed type (death, birth, ...) is edited as a plain number, the way
+      // it was entered; the sign is put back on save.
+      setEDelta(
+        row.count_delta != null
+          ? String(isSignedEvent(row.event_type) ? Math.abs(row.count_delta) : row.count_delta)
+          : '',
+      );
       setESeverity(row.severity ?? '');
     }
   };
@@ -755,7 +772,7 @@ export default function ColonyDetailScreen() {
         if (eventHasSeverity(ev.event_type)) payload.severity = eSeverity || null;
         if (ev.count_delta != null || eventNeedsDelta(ev.event_type)) {
           if (eDelta.trim() === '' && eventNeedsDelta(ev.event_type)) {
-            setEError('Enter a count change (use − to remove).');
+            setEError(isSignedEvent(ev.event_type) ? 'Enter how many.' : 'Enter a count change (use − to remove).');
             return;
           }
           const parsed = eDelta.trim() === '' ? null : parseInt(eDelta, 10);
@@ -763,11 +780,7 @@ export default function ColonyDetailScreen() {
             setEError('That doesn’t look like a number.');
             return;
           }
-          if (parsed !== null && parsed < 0 && ev.event_type !== 'count_correction' && POSITIVE_EVENTS.has(ev.event_type)) {
-            setEError('That amount must be positive.');
-            return;
-          }
-          payload.count_delta = parsed;
+          payload.count_delta = parsed === null ? null : signedDelta(ev.event_type, parsed);
           payload.stage = eStage.trim() || null;
         }
         if (ev.event_type === 'observation' && !note) {
@@ -1774,15 +1787,25 @@ export default function ColonyDetailScreen() {
                 <>
                   {(ev.count_delta != null || eventNeedsDelta(ev.event_type)) && (
                     <>
-                      <Text style={styles.fieldLabel}>Count change (use − to remove)</Text>
+                      <Text style={styles.fieldLabel}>
+                        {isSignedEvent(ev.event_type) ? 'How many' : 'Count change (use − to remove)'}
+                      </Text>
                       <TextInput
                         value={eDelta}
-                        onChangeText={(v) => { if (v === '' || /^-?\d*$/.test(v)) setEDelta(v); }}
-                        keyboardType="numbers-and-punctuation"
+                        onChangeText={(v) => {
+                          const ok = isSignedEvent(ev.event_type) ? /^\d*$/ : /^-?\d*$/;
+                          if (v === '' || ok.test(v)) setEDelta(v);
+                        }}
+                        keyboardType={isSignedEvent(ev.event_type) ? 'number-pad' : 'numbers-and-punctuation'}
                         placeholderTextColor={colors.textTertiary}
                         style={[styles.input, { borderRadius: layout.radius.sm }]}
                       />
                       <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                        {NEGATIVE_EVENTS.has(ev.event_type)
+                          ? 'Lowers the count. '
+                          : POSITIVE_EVENTS.has(ev.event_type)
+                            ? 'Raises the count. '
+                            : ''}
                         Changing this moves the population by the difference.
                       </Text>
                       <Text style={styles.fieldLabel}>Stage (blank = mixed)</Text>

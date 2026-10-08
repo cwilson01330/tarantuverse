@@ -39,6 +39,14 @@ from app.utils.limits import enforce_collection_limit
 from app.utils.locations import canonical_location
 from app.utils.access import access_helper, load_colony, policy, require_can_change, scope_collection
 from app.utils.photo_cleanup import collect_for_colony, delete_files
+from app.utils.colony_counts import (
+    STARTING_COUNT_NOTE,
+    STARTING_COUNT_NOTES,
+    bucket_for,
+    canonical_stage_counts,
+    signed_delta,
+)
+import uuid as _uuid
 
 router = APIRouter()
 
@@ -120,11 +128,16 @@ CHANGE_WINDOW_DAYS = 30
 
 def _apply_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -> None:
     """Adjust a bucket by delta (clamped at 0). Reassigns the JSONB dict so
-    SQLAlchemy detects the change. Missing stage defaults to 'mixed'."""
+    SQLAlchemy detects the change. Missing stage defaults to 'mixed'.
+
+    The bucket name is canonicalised, and so is the whole map on the way
+    through (utils/colony_counts): a colony still holding "Unsexed" from before
+    keys were canonical has it merged into "unsexed" by its next write, rather
+    than gaining a second bucket for the same animals."""
     if delta is None:
         return
-    bucket = (stage or "mixed").strip() or "mixed"
-    counts = dict(colony.stage_counts or {})
+    bucket = bucket_for(stage)
+    counts = canonical_stage_counts(colony.stage_counts) or {}
     counts[bucket] = max(0, int(counts.get(bucket, 0)) + int(delta))
     colony.stage_counts = counts
 
@@ -135,11 +148,75 @@ def _reverse_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -
     being taken back, e.g. the keeper corrected the count by hand since)."""
     if delta is None or int(delta) == 0:
         return False
-    bucket = (stage or "mixed").strip() or "mixed"
-    current = int((colony.stage_counts or {}).get(bucket, 0))
+    bucket = bucket_for(stage)
+    current = int((canonical_stage_counts(colony.stage_counts) or {}).get(bucket, 0))
     clamped = current - int(delta) < 0
     _apply_delta(colony, stage, -int(delta))
     return clamped
+
+
+def _starting_count_events(
+    colony: Colony,
+    owner_id,
+    logged_by_user_id=None,
+    note: str = STARTING_COUNT_NOTE,
+) -> List[ColonyEvent]:
+    """One 'added' event per non-zero bucket, recording the headcount a colony
+    started with, so its population history is complete from day one (audit-2
+    M6). The same shape a transfer claim writes for the buyer.
+
+    The events DESCRIBE counts `stage_counts` already holds; they are not
+    applied through _apply_delta, or the colony would start with double."""
+    today = date.today()
+    events = []
+    for stage, n in (colony.stage_counts or {}).items():
+        if not isinstance(n, int) or isinstance(n, bool) or n <= 0:
+            continue
+        events.append(ColonyEvent(
+            colony_id=colony.id,
+            user_id=owner_id,
+            logged_by_user_id=logged_by_user_id,
+            event_type="added",
+            stage=stage,
+            count_delta=n,
+            occurred_at=today,
+            notes=note,
+        ))
+    return events
+
+
+def _correction_events(
+    colony: Colony,
+    new_counts: Optional[dict],
+    owner_id,
+    logged_by_user_id=None,
+) -> List[ColonyEvent]:
+    """count_correction events for every bucket a direct stage_counts edit
+    changes (audit-2 M7), so the history explains the new numbers.
+
+    A bucket that disappears gets a correction down to zero; renaming a bucket
+    is therefore a move -- out of the old name, into the new one. Both maps are
+    compared canonically, so a pure re-spelling ("Adults" -> "adults") is no
+    change at all."""
+    old = canonical_stage_counts(colony.stage_counts) or {}
+    new = canonical_stage_counts(new_counts) or {}
+    today = date.today()
+    events = []
+    for bucket in list(old.keys()) + [k for k in new.keys() if k not in old]:
+        delta = int(new.get(bucket, 0)) - int(old.get(bucket, 0))
+        if delta == 0:
+            continue
+        events.append(ColonyEvent(
+            colony_id=colony.id,
+            user_id=owner_id,
+            logged_by_user_id=logged_by_user_id,
+            event_type="count_correction",
+            stage=bucket,
+            count_delta=delta,
+            occurred_at=today,
+            notes="Adjusted from the edit screen",
+        ))
+    return events
 
 
 # ---------- colony CRUD ----------
@@ -217,6 +294,12 @@ async def list_colonies(
                 ColonyEvent.count_delta.isnot(None),
                 ColonyEvent.count_delta != 0,
                 ColonyEvent.occurred_at >= since,
+                # A colony's starting headcount isn't growth: one added last
+                # week would otherwise read "+600 in 30 days".
+                or_(
+                    ColonyEvent.notes.is_(None),
+                    ColonyEvent.notes.notin_(STARTING_COUNT_NOTES),
+                ),
             )
             .group_by(ColonyEvent.colony_id)
             .all()
@@ -246,11 +329,13 @@ def create_colony_row(
     owner: User,
     payload: ColonyCreate,
     enforce_limit: bool = True,
+    logged_by_user_id=None,
+    starting_note: str = STARTING_COUNT_NOTE,
 ) -> Colony:
     """Create one colony for `owner`. Shared by the create endpoint and the bulk
     importer so both go through the same cap check, enclosure/species
-    validation, location canonicalisation, default visibility and species
-    times_kept bump.
+    validation, location canonicalisation, default visibility, species
+    times_kept bump and starting-count events.
 
     A colony counts as 1 animal toward the free-tier cap. enforce_limit=False
     lets a caller gate capacity itself; the importer leaves it on and stops at
@@ -264,8 +349,17 @@ def create_colony_row(
     colony_data = payload.model_dump()
     # One spelling per place per keeper — see utils/locations.
     colony_data["location"] = canonical_location(db, owner.id, colony_data.get("location"))
-    colony = Colony(user_id=owner.id, **colony_data)
+    # Bucket keys are already canonical (the schema validator); again here so
+    # a caller that built the payload some other way can't skip it.
+    colony_data["stage_counts"] = canonical_stage_counts(colony_data.get("stage_counts"))
+    # Id set up front so the starting-count events can point at it without a
+    # flush; the unit of work still inserts the colony first.
+    colony = Colony(id=_uuid.uuid4(), user_id=owner.id, **colony_data)
     db.add(colony)
+
+    # The population history starts with the headcount the keeper entered.
+    for ev in _starting_count_events(colony, owner.id, logged_by_user_id, starting_note):
+        db.add(ev)
 
     # Bump the species "times_kept" counter (parity with invert create).
     if colony.species_id:
@@ -288,7 +382,7 @@ async def create_colony(
 ):
     access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
     owner = access.owner  # the colony, its cap and its enclosure are the OWNER's
-    colony = create_colony_row(db, owner, payload)
+    colony = create_colony_row(db, owner, payload, logged_by_user_id=access.logged_by_user_id)
     return ColonyResponse(**_build_response(colony, db))
 
 
@@ -334,6 +428,15 @@ async def update_colony(
         and colony.transferred_out_at is None
     ):
         enforce_collection_limit(db, access.owner)
+
+    # A direct stage_counts edit is recorded as count_correction events, one
+    # per changed bucket, in this same transaction -- the history can't be
+    # left behind by the number it is meant to explain.
+    if "stage_counts" in data:
+        for ev in _correction_events(
+            colony, data["stage_counts"], access.owner.id, access.logged_by_user_id
+        ):
+            db.add(ev)
 
     for k, v in data.items():
         setattr(colony, k, v)
@@ -483,11 +586,16 @@ async def create_event(
 ):
     colony, access = load_colony(db, current_user, colony_id, "logger")
 
+    fields = payload.model_dump(exclude_unset=True)
+    # The event type decides the sign (utils/colony_counts): a death of "5"
+    # takes five away whichever client sent it, and whichever sign it used.
+    if fields.get("count_delta") is not None:
+        fields["count_delta"] = signed_delta(fields.get("event_type"), fields["count_delta"])
     log = ColonyEvent(
         colony_id=colony.id,
         user_id=access.owner.id,  # the collection's owner, whoever logged it
         logged_by_user_id=access.logged_by_user_id,
-        **payload.model_dump(exclude_unset=True),
+        **fields,
     )
     db.add(log)
 
@@ -515,11 +623,14 @@ async def update_event(
     data = payload.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(log, k, v)
+    # Same sign rule as create, re-applied after the edit: changing the type
+    # (count_correction -> death) or the number can't leave a death that adds.
+    log.count_delta = signed_delta(log.event_type, log.count_delta)
 
     # One transaction: take back what the event did, then apply what it now
     # does, so the stored population never drifts from the event history.
     if colony is not None and (
-        old_delta != log.count_delta or (old_stage or "mixed") != (log.stage or "mixed")
+        old_delta != log.count_delta or bucket_for(old_stage) != bucket_for(log.stage)
     ):
         _reverse_delta(colony, old_stage, old_delta)
         _apply_delta(colony, log.stage, log.count_delta)

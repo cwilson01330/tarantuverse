@@ -12,6 +12,7 @@ import apiClient from '@/lib/api'
 // socialUrl() rebuilds the canonical platform URL, tolerating legacy
 // full-URL entries too.
 import { socialUrl } from '@/lib/social-links'
+import { animalDisplayName, publicAnimalPath, taxonMeta } from '@/lib/inverts'
 
 interface KeeperProfile {
   id: number
@@ -33,10 +34,13 @@ interface KeeperProfile {
   created_at: string
 }
 
-interface Tarantula {
+// One public animal of any taxon, from /keepers/{username}/collection/.
+interface PublicAnimal {
   id: string
-  name: string
-  species_name?: string
+  taxon?: string | null
+  name?: string | null
+  common_name?: string | null
+  scientific_name?: string | null
   sex?: string
   photo_url?: string
   age_months?: number
@@ -65,7 +69,7 @@ export default function KeeperProfilePage() {
   const { user, token, isAuthenticated } = useAuth()
 
   const [profile, setProfile] = useState<KeeperProfile | null>(null)
-  const [collection, setCollection] = useState<Tarantula[]>([])
+  const [collection, setCollection] = useState<PublicAnimal[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [followStats, setFollowStats] = useState<FollowStats | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
@@ -527,7 +531,7 @@ export default function KeeperProfilePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
               <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.total_public}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Tarantulas</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Animals</div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.unique_species}</div>
@@ -587,39 +591,45 @@ export default function KeeperProfilePage() {
           {activeTab === 'collection' ? (
             collection.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {collection.map((tarantula) => (
-                  // Each card is a Link to the public tarantula profile
-                  // (/t/<id>). The sibling /keeper/<username> route already
-                  // does this; this page was missing it, so users landing
-                  // here from universal search or the community directory
-                  // saw a static grid of cards that did nothing on click.
-                  // Adding focus-visible ring for keyboard nav since the
-                  // <Link> is now the focusable element.
+                {collection.map((tarantula) => {
+                  const meta = taxonMeta(tarantula.taxon)
+                  const title = animalDisplayName(tarantula)
+                  const subtitle = tarantula.scientific_name && tarantula.scientific_name !== title
+                    ? tarantula.scientific_name
+                    : null
+                  return (
+                  // Each card links to the animal's public page: /t/<id> for
+                  // tarantulas, /i/<id> for every other taxon. Focus-visible
+                  // ring for keyboard nav since the <Link> is the focusable
+                  // element.
                   <Link
                     key={tarantula.id}
-                    href={`/t/${tarantula.id}`}
+                    href={publicAnimalPath(tarantula)}
                     className="group bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
-                    aria-label={`View ${tarantula.name || tarantula.species_name || 'tarantula'} profile`}
+                    aria-label={`View ${title} profile`}
                   >
                     {tarantula.photo_url ? (
                       <img
                         src={tarantula.photo_url}
-                        alt={tarantula.name}
+                        alt={title}
                         className="w-full h-48 object-cover"
                       />
                     ) : (
                       <div className="w-full h-48 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 flex items-center justify-center">
-                        <span className="text-6xl">🕷️</span>
+                        <span className="text-6xl" aria-hidden="true">{meta.glyph}</span>
                       </div>
                     )}
                     <div className="p-4">
                       <h3 className="font-bold text-lg mb-1 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                        {tarantula.name}
+                        {title}
                       </h3>
-                      {tarantula.species_name && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 italic mb-2">{tarantula.species_name}</p>
+                      {subtitle && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 italic mb-2">{subtitle}</p>
                       )}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded text-xs font-semibold">
+                          {meta.label}
+                        </span>
                         {tarantula.sex && (
                           <span className={`px-2 py-1 rounded text-xs font-semibold ${
                             tarantula.sex === 'female' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' :
@@ -637,7 +647,8 @@ export default function KeeperProfilePage() {
                       </div>
                     </div>
                   </Link>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-center py-12">

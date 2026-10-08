@@ -932,24 +932,45 @@ export const COLONY_EVENT_TYPES: {
   icon: string
   /** Adjusts a stage bucket (+/-). Non-count events are pure observations. */
   adjustsCount: boolean
-  /** Whether the delta may be negative. */
+  /** Whether the keeper types a sign. Only a count fix can go either way;
+   *  every other counted type takes a plain number and `sign` decides. */
   allowNegative: boolean
+  /** Which way the count moves: -1 lowers, +1 raises, 0 = the keeper's sign
+   *  (count fix). The API applies the same rule (utils/colony_counts.py), so
+   *  a death of 5 lowers the count whichever client logged it. */
+  sign: 1 | -1 | 0
   /** Severity picker is shown for aggression / cannibalism. */
   hasSeverity: boolean
   description: string
 }[] = [
-  { type: 'birth', label: 'Birth', icon: '🐣', adjustsCount: true, allowNegative: false, hasSeverity: false, description: 'New offspring joined the colony' },
-  { type: 'death', label: 'Death', icon: '💀', adjustsCount: true, allowNegative: true, hasSeverity: false, description: 'Lost individuals (enter a negative number)' },
-  { type: 'added', label: 'Added', icon: '➕', adjustsCount: true, allowNegative: false, hasSeverity: false, description: 'Added individuals to the colony' },
-  { type: 'removed', label: 'Removed', icon: '➖', adjustsCount: true, allowNegative: true, hasSeverity: false, description: 'Removed / sold individuals (negative)' },
-  { type: 'cannibalism', label: 'Cannibalism', icon: '🦴', adjustsCount: true, allowNegative: true, hasSeverity: true, description: 'Cannibalism loss (negative)' },
-  { type: 'aggression', label: 'Aggression', icon: '⚔️', adjustsCount: false, allowNegative: false, hasSeverity: true, description: 'Aggression incident (no count change)' },
-  { type: 'molt_found', label: 'Molt found', icon: '🐚', adjustsCount: false, allowNegative: false, hasSeverity: false, description: 'Found a molt (observation)' },
-  { type: 'split', label: 'Split', icon: '✂️', adjustsCount: true, allowNegative: true, hasSeverity: false, description: 'Split off part of the colony (negative)' },
-  { type: 'merge', label: 'Merge', icon: '🔗', adjustsCount: true, allowNegative: false, hasSeverity: false, description: 'Merged in another group (positive)' },
-  { type: 'observation', label: 'Observation', icon: '📝', adjustsCount: false, allowNegative: false, hasSeverity: false, description: 'Free-form note (no count change)' },
-  { type: 'count_correction', label: 'Count fix', icon: '✏️', adjustsCount: true, allowNegative: true, hasSeverity: false, description: 'Manual inventory correction (+/-)' },
+  { type: 'birth', label: 'Birth', icon: '🐣', adjustsCount: true, allowNegative: false, sign: 1, hasSeverity: false, description: 'New offspring joined the colony' },
+  { type: 'death', label: 'Death', icon: '💀', adjustsCount: true, allowNegative: false, sign: -1, hasSeverity: false, description: 'Lost individuals' },
+  { type: 'added', label: 'Added', icon: '➕', adjustsCount: true, allowNegative: false, sign: 1, hasSeverity: false, description: 'Added individuals to the colony' },
+  { type: 'removed', label: 'Removed', icon: '➖', adjustsCount: true, allowNegative: false, sign: -1, hasSeverity: false, description: 'Removed or sold individuals' },
+  { type: 'cannibalism', label: 'Cannibalism', icon: '🦴', adjustsCount: true, allowNegative: false, sign: -1, hasSeverity: true, description: 'Individuals lost to cannibalism' },
+  { type: 'aggression', label: 'Aggression', icon: '⚔️', adjustsCount: false, allowNegative: false, sign: 0, hasSeverity: true, description: 'Aggression incident (no count change)' },
+  { type: 'molt_found', label: 'Molt found', icon: '🐚', adjustsCount: false, allowNegative: false, sign: 0, hasSeverity: false, description: 'Found a molt (observation)' },
+  { type: 'split', label: 'Split', icon: '✂️', adjustsCount: true, allowNegative: false, sign: -1, hasSeverity: false, description: 'Split off part of the colony' },
+  { type: 'merge', label: 'Merge', icon: '🔗', adjustsCount: true, allowNegative: false, sign: 1, hasSeverity: false, description: 'Merged in another group' },
+  { type: 'observation', label: 'Observation', icon: '📝', adjustsCount: false, allowNegative: false, sign: 0, hasSeverity: false, description: 'Free-form note (no count change)' },
+  { type: 'count_correction', label: 'Count fix', icon: '✏️', adjustsCount: true, allowNegative: true, sign: 0, hasSeverity: false, description: 'Manual inventory correction (+/-)' },
 ]
+
+/** The count change an event of this type means, from what the keeper typed:
+ *  a magnitude for every counted type except a count fix, which keeps its
+ *  sign. Mirrors the API's signed_delta. */
+export function signedEventDelta(type: ColonyEventType, typed: number): number {
+  const meta = colonyEventMeta(type)
+  if (!meta || meta.sign === 0) return typed
+  return meta.sign * Math.abs(typed)
+}
+
+/** One spelling per bucket, as the API stores it (utils/colony_counts.py):
+ *  trimmed, lowercase, "_" read as a space, runs of whitespace collapsed.
+ *  "Unsexed" and "unsexed" are the same bucket. */
+export function stageKey(name: string): string {
+  return name.replace(/_/g, ' ').trim().split(/\s+/).filter(Boolean).join(' ').toLowerCase()
+}
 
 export function colonyEventMeta(type: ColonyEventType) {
   return COLONY_EVENT_TYPES.find((e) => e.type === type)

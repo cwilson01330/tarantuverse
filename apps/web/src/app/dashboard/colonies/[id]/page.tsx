@@ -25,6 +25,7 @@ import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
   COLONY_EVENT_TYPES,
   colonyEventMeta,
+  signedEventDelta,
   createColonyEvent,
   getColonyPopulationHistory,
   type PopulationHistory,
@@ -563,7 +564,7 @@ export default function ColonyDetailPage() {
         if (ev.count_delta != null || em?.adjustsCount) {
           const raw = text('count_delta')
           if (raw === '' && em?.adjustsCount) {
-            setEditError('Enter a count change (use − to remove).')
+            setEditError(em.allowNegative ? 'Enter a count change (use − to remove).' : 'Enter how many.')
             return
           }
           if (raw !== '') {
@@ -572,11 +573,8 @@ export default function ColonyDetailPage() {
               setEditError('That doesn’t look like a number.')
               return
             }
-            if (em && !em.allowNegative && parsed < 0) {
-              setEditError(`${em.label} amounts must be positive.`)
-              return
-            }
-            payload.count_delta = parsed
+            // Same direction rule as a new event: the type decides the sign.
+            payload.count_delta = signedEventDelta(ev.event_type, parsed)
           } else {
             payload.count_delta = null
           }
@@ -681,15 +679,26 @@ export default function ColonyDetailPage() {
       if (ev.count_delta != null || em?.adjustsCount) {
         fields.push(
           { key: 'stage', label: 'Stage', type: 'text', placeholder: 'Blank = mixed' },
-          {
-            key: 'count_delta',
-            label: 'Count change',
-            type: 'text',
-            hint: 'Changing this moves the population by the difference.',
-          },
+          em && em.sign !== 0
+            ? {
+                key: 'count_delta',
+                label: 'How many',
+                type: 'text',
+                hint: `${em.sign < 0 ? 'Lowers' : 'Raises'} the count. Changing this moves the population by the difference.`,
+              }
+            : {
+                key: 'count_delta',
+                label: 'Count change',
+                type: 'text',
+                hint: 'Use − to remove. Changing this moves the population by the difference.',
+              },
         )
         initial.stage = ev.stage ?? ''
-        initial.count_delta = ev.count_delta != null ? String(ev.count_delta) : ''
+        // A signed type is edited as a plain number, like it was entered.
+        initial.count_delta =
+          ev.count_delta != null
+            ? String(em && em.sign !== 0 ? Math.abs(ev.count_delta) : ev.count_delta)
+            : ''
       }
       if (em?.hasSeverity) {
         fields.push({
@@ -761,7 +770,7 @@ export default function ColonyDetailPage() {
     let deltaNum: number | null = null
     if (meta.adjustsCount) {
       if (evtDelta.trim() === '') {
-        setEvtError('Enter a count change (use − to remove).')
+        setEvtError(meta.allowNegative ? 'Enter a count change (use − to remove).' : 'Enter how many.')
         return
       }
       const parsed = Number.parseInt(evtDelta, 10)
@@ -769,11 +778,9 @@ export default function ColonyDetailPage() {
         setEvtError('That doesn’t look like a number.')
         return
       }
-      if (!meta.allowNegative && parsed < 0) {
-        setEvtError(`${meta.label} amounts must be positive.`)
-        return
-      }
-      deltaNum = parsed
+      // The type decides the direction (a death of 5 lowers the count by 5),
+      // the same rule mobile and the API apply.
+      deltaNum = signedEventDelta(evtType, parsed)
     }
 
     setEvtSubmitting(true)
@@ -2056,7 +2063,7 @@ export default function ColonyDetailPage() {
                     htmlFor="evt-delta"
                     className="block text-xs font-semibold uppercase tracking-wide text-theme-tertiary mb-1.5"
                   >
-                    Count change {meta.allowNegative ? '(use − to remove)' : ''}
+                    {meta.allowNegative ? 'Count change (use − to remove)' : 'How many'}
                   </label>
                   <input
                     id="evt-delta"
@@ -2074,8 +2081,20 @@ export default function ColonyDetailPage() {
                       }
                     }}
                     placeholder={meta.allowNegative ? 'e.g. -3' : 'e.g. 20'}
+                    aria-describedby={meta.sign !== 0 ? 'evt-delta-effect' : undefined}
                     className={inputCls}
                   />
+                  {meta.sign !== 0 && (
+                    <p id="evt-delta-effect" className="text-xs text-theme-tertiary mt-1">
+                      {(() => {
+                        const n = Number.parseInt(evtDelta, 10)
+                        const verb = meta.sign < 0 ? 'Lowers' : 'Raises'
+                        return Number.isFinite(n) && n > 0
+                          ? `${verb} the count by ${n.toLocaleString()}.`
+                          : `${verb} the count.`
+                      })()}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

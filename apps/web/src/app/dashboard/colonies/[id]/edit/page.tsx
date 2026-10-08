@@ -17,13 +17,12 @@ import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
-  createColonyEvent,
   getColony,
+  stageKey,
   updateColony,
   type ColonyResponse,
   type ColonySource,
 } from '@/lib/colonies'
-import { toISODateLocal } from '@/lib/date'
 import { showsEnclosureOrientation, enclosureSizePlaceholder } from '@/lib/colony-presets'
 
 interface StageRow {
@@ -157,11 +156,13 @@ export default function EditColonyPage() {
   const buildStageCounts = (): Record<string, number> => {
     const map: Record<string, number> = {}
     for (const row of stages) {
-      const key = row.name.trim()
+      // The API's spelling, so "Adults" and "adults" are one bucket (summed)
+      // here exactly as they would be on the server.
+      const key = stageKey(row.name)
       if (!key) continue
       if (row.count.trim() === '') continue
       const n = Number.parseInt(row.count, 10)
-      if (Number.isFinite(n) && n >= 0) map[key] = n
+      if (Number.isFinite(n) && n >= 0) map[key] = (map[key] ?? 0) + n
     }
     return map
   }
@@ -185,31 +186,21 @@ export default function EditColonyPage() {
 
     setSaving(true)
     try {
-      // Population changes go out as count_correction EVENTS, not as a
-      // stage_counts overwrite. Writing the map directly bypassed the event
-      // log, so a colony's population could move with nothing in its history
-      // to say when or why. One write path, and a trail worth reading.
-      const corrections = Object.entries(stageCounts)
-        .map(([bucket, next]) => ({ bucket, delta: next - (originalCounts[bucket] ?? 0) }))
-        .filter((c) => c.delta !== 0)
-
-      for (const { bucket, delta } of corrections) {
-        await createColonyEvent(token, colony.id, {
-          event_type: 'count_correction',
-          stage: bucket,
-          count_delta: delta,
-          occurred_at: toISODateLocal(new Date()),
-          notes: 'Adjusted from the edit screen',
-        })
-      }
-
-      // stage_counts only to DROP removed buckets — the events above already
-      // carry every number, so sending it otherwise double-applies the change.
-      const removedBuckets = Object.keys(originalCounts).filter((k) => !(k in stageCounts))
+      // The new bucket map goes in the same PUT, and only when it changed.
+      // The API writes a count_correction event for every bucket that moved
+      // (a removed bucket corrected to zero, a rename as a move out of the old
+      // name and into the new one) in the same transaction, so the history
+      // always explains the numbers -- one write path, one trail.
+      const original = Object.fromEntries(
+        Object.entries(originalCounts).map(([k, v]) => [stageKey(k), v]),
+      )
+      const countsChanged =
+        Object.keys(stageCounts).length !== Object.keys(original).length ||
+        Object.entries(stageCounts).some(([k, v]) => original[k] !== v)
 
       await updateColony(token, colony.id, {
         name: name.trim(),
-        ...(removedBuckets.length > 0
+        ...(countsChanged
           ? { stage_counts: Object.keys(stageCounts).length > 0 ? stageCounts : null }
           : {}),
         count_is_estimated: countEstimated,

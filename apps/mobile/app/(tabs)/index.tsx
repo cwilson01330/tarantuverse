@@ -242,7 +242,14 @@ function DashboardHubScreen() {
   // temporal dead zone and threw "Cannot access 'animalCount' before
   // initialization". tsc caught it (TS2448/TS2454); a comment I left claiming
   // it was safe did not.
-  const animalCount = totalAnimals ?? tarantulas.length;
+  //
+  // Colonies count too, each as 1 — the free-tier cap's rule and the total the
+  // Collection tab shows. /colonies/ already leaves out archived, ended and
+  // handed-off colonies, as the cap does. Without them a keeper with only a
+  // colony was shown the "add your first animal" welcome screen.
+  const individualCount = totalAnimals ?? tarantulas.length;
+  const colonyCount = colonies.length;
+  const animalCount = individualCount + colonyCount;
 
   // getImageUrl moved to src/utils/image-url.ts so dev/staging builds
   // honor EXPO_PUBLIC_API_URL instead of always hitting prod.
@@ -970,7 +977,8 @@ function DashboardHubScreen() {
               {firstName ? `, ${firstName}` : ''}
             </Text>
             <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {animalCount} {animalCount === 1 ? 'animal' : 'animals'}
+              {individualCount} {individualCount === 1 ? 'animal' : 'animals'}
+              {colonyCount > 0 ? ` · ${colonyCount} ${colonyCount === 1 ? 'colony' : 'colonies'}` : ''}
               {speciesCount !== null
                 ? ` · ${speciesCount} ${speciesCount === 1 ? 'species' : 'species'}`
                 : ''}

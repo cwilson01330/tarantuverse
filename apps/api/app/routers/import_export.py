@@ -23,6 +23,7 @@ from app.services import colony_import_service, import_service
 from app.services.export_service import ExportService
 from app.services.activity_service import create_activity
 from app.routers.colonies import create_colony_row
+from app.utils.colony_counts import STARTING_COUNT_IMPORTED_NOTE
 from app.routers.inverts import create_invert_row
 from app.schemas.colony import ColonyCreate
 from app.schemas.invert import InvertCreate
@@ -316,7 +317,12 @@ async def _import_commit_colonies(
             continue
 
         try:
-            colony = create_colony_row(db, current_user, create, enforce_limit=True)
+            # Starting-count events marked as imported, so the history says
+            # where the first numbers came from.
+            colony = create_colony_row(
+                db, current_user, create, enforce_limit=True,
+                starting_note=STARTING_COUNT_IMPORTED_NOTE,
+            )
         except HTTPException as he:
             if he.status_code == status.HTTP_402_PAYMENT_REQUIRED:
                 cap_reached = True

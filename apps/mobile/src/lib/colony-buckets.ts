@@ -59,8 +59,24 @@ export function suggestedBuckets(
   existing: Record<string, unknown> = {},
 ): string[] {
   const preset = (taxon && BUCKETS_BY_TAXON[taxon as InvertTaxon]) || GENERIC_BUCKETS;
-  const have = new Set(Object.keys(existing).map((k) => k.toLowerCase()));
-  return preset.filter((b) => !have.has(b.toLowerCase()));
+  const have = new Set(Object.keys(existing).map((k) => bucketKey(k)));
+  return preset.filter((b) => !have.has(bucketKey(b)));
+}
+
+/**
+ * The stored spelling of a bucket name — the API's rule
+ * (apps/api/app/utils/colony_counts.py): trimmed, lowercase, "_" read as a
+ * space, runs of whitespace collapsed. "Unsexed" and "unsexed" are one bucket.
+ * Send this; show `bucketLabel`.
+ */
+export function bucketKey(name: string): string {
+  return name.replace(/_/g, ' ').trim().split(/\s+/).filter(Boolean).join(' ').toLowerCase();
+}
+
+/** How a bucket key reads on screen: "adult females" -> "Adult females". */
+export function bucketLabel(key: string): string {
+  const s = key.replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /** One-line explanation shown under the chips, where the split isn't obvious. */

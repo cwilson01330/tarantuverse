@@ -9,6 +9,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
 import { socialUrl } from '../../src/utils/social-links';
+import { INVERT_TAXA, type InvertTaxon } from '../../src/lib/inverts';
 
 interface KeeperProfile {
   id: number;
@@ -35,7 +36,10 @@ interface KeeperProfile {
 interface Tarantula {
   id: string;
   name: string;
-  // The keeper collection endpoint returns full TarantulaResponse, so
+  // The keeper collection endpoint returns every taxon now (the invert
+  // shape, a superset of TarantulaResponse, plus `taxon`). Missing taxon =
+  // an older API that only listed tarantulas.
+  taxon?: string | null;
   // common_name and scientific_name are both available here. We use
   // them as fallbacks when pet name is missing — otherwise the card
   // would render as a blank title with just the sex badge.
@@ -339,13 +343,22 @@ export default function KeeperProfileScreen() {
     }
   };
 
-  // Tapping a tarantula card takes the visitor to that tarantula's
-  // public profile. Uses the existing /tarantula/public/[username]/[name]
-  // route. Pet name is URL-encoded to tolerate spaces and special chars.
+  // Tapping a card takes the visitor to that animal's public profile.
+  // Tarantulas use the existing /tarantula/public/[username]/[name] route
+  // (pet name URL-encoded to tolerate spaces and special chars); every other
+  // taxon opens its public label card at /i/<id>, as on web.
   const openTarantulaProfile = (tarantula: Tarantula) => {
+    if (tarantula.taxon && tarantula.taxon !== 'tarantula') {
+      router.push(`/i/${tarantula.id}` as never);
+      return;
+    }
     const slug = tarantula.name || tarantula.id;
     router.push(`/tarantula/public/${username}/${encodeURIComponent(slug)}` as never);
   };
+
+  // Registry entry for a card; unknown/missing taxon reads as tarantula.
+  const metaFor = (taxon?: string | null) =>
+    (taxon && INVERT_TAXA[taxon as InvertTaxon]) || INVERT_TAXA.tarantula;
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -1073,7 +1086,7 @@ export default function KeeperProfileScreen() {
                 <View style={styles.statsRow}>
                   <View style={styles.statCell}>
                     <Text style={styles.statValue}>{stats.total_public}</Text>
-                    <Text style={styles.statLabel}>Spiders</Text>
+                    <Text style={styles.statLabel}>Animals</Text>
                   </View>
                   <View style={styles.statCellDivider} />
                   <View style={styles.statCell}>
@@ -1132,14 +1145,14 @@ export default function KeeperProfileScreen() {
                     activeOpacity={0.85}
                     onPress={() => openTarantulaProfile(tarantula)}
                     accessibilityRole="link"
-                    accessibilityLabel={`View ${tarantula.name} profile`}
+                    accessibilityLabel={`View ${tarantula.name || tarantula.common_name || tarantula.scientific_name || metaFor(tarantula.taxon).label} profile`}
                   >
                     <View style={styles.tarantulaImageWrap}>
                       {tarantula.photo_url ? (
                         <Image source={{ uri: tarantula.photo_url }} style={styles.tarantulaImage} />
                       ) : (
                         <View style={styles.tarantulaPlaceholder}>
-                          <Text style={styles.tarantulaEmoji}>🐾</Text>
+                          <Text style={styles.tarantulaEmoji}>{metaFor(tarantula.taxon).glyph}</Text>
                         </View>
                       )}
                       {/* Sex badge overlaid on the image corner — frees up
@@ -1195,6 +1208,9 @@ export default function KeeperProfileScreen() {
                               tarantula.species_name}
                           </Text>
                         )}
+                      <Text style={styles.tarantulaSpecies} numberOfLines={1}>
+                        {metaFor(tarantula.taxon).label}
+                      </Text>
                       {tarantula.age_months !== undefined && (
                         <View style={styles.tarantulaMeta}>
                           <View style={styles.ageBadge}>

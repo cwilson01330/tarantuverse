@@ -40,6 +40,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.colony import Colony, ColonyEvent
+from app.utils.colony_counts import STARTING_COUNT_NOTE, bucket_for
 
 # A growth rate needs at least this many observations spanning at least this
 # many days before it means anything. Two points a day apart would produce an
@@ -58,7 +59,9 @@ def _replay(events: list[ColonyEvent]) -> list[dict]:
             # Observations, molts found, aggression notes — real history, but
             # they don't move the count, so they don't make a data point.
             continue
-        bucket = (ev.stage or "mixed").strip() or "mixed"
+        # Same canonical bucket as _apply_delta, so "Unsexed" events written
+        # before keys were canonical replay into "unsexed".
+        bucket = bucket_for(ev.stage)
         buckets[bucket] = max(0, buckets[bucket] + int(ev.count_delta))
         occurred = ev.occurred_at or (ev.created_at.date() if ev.created_at else None)
         points.append(
@@ -122,6 +125,10 @@ def _growth(points: list[dict]) -> dict:
     return out
 
 
+def _is_starting_count(e) -> bool:
+    return e.event_type == "added" and (getattr(e, "notes", None) or "") == STARTING_COUNT_NOTE
+
+
 def colony_population_history(db: Session, colony: Colony) -> dict:
     """Timeline + observed trend for one colony."""
     events = (
@@ -130,7 +137,18 @@ def colony_population_history(db: Session, colony: Colony) -> dict:
         .order_by(ColonyEvent.occurred_at.asc(), ColonyEvent.created_at.asc())
         .all()
     )
+    # The starting count is where the history begins, whatever date it got:
+    # it is stamped with the server's UTC date, so for a keeper west of UTC it
+    # can land "tomorrow", after a death they logged the same evening — which
+    # replay would then drop against an empty bucket.
+    events = sorted(events, key=lambda e: 0 if _is_starting_count(e) else 1)
     points = _replay(events)
+    # Keep the timeline's dates in order: a starting count moved to the front
+    # takes the date of the first event after it if that is earlier.
+    for i in range(len(points) - 2, -1, -1):
+        a_d, b_d = points[i].get("date"), points[i + 1].get("date")
+        if a_d and b_d and a_d > b_d:
+            points[i]["date"] = b_d
 
     current_total = sum((colony.stage_counts or {}).values())
     replayed_total = points[-1]["total"] if points else 0

@@ -744,6 +744,18 @@ async def get_feeding_stats(
     )
 
 
+def public_slug(animal) -> str:
+    """The `/keeper/{username}/{slug}` slug for an animal of any taxon.
+
+    Unchanged for tarantulas (name, else common name, else "tarantula") so
+    links already shared keep resolving; other taxa fall back to the
+    scientific name, then the taxon.
+    """
+    taxon = getattr(animal, "taxon", None) or "tarantula"
+    fallback = "tarantula" if taxon == "tarantula" else (animal.scientific_name or taxon)
+    return (animal.name or animal.common_name or fallback).lower().replace(" ", "-")
+
+
 @router.get("/{tarantula_id}/public-link")
 @policy("owner_only")
 async def get_public_link(
@@ -779,7 +791,7 @@ async def get_public_link(
         )
 
     user = current_user
-    tarantula_slug = (tarantula.name or tarantula.common_name or "tarantula").lower().replace(" ", "-")
+    tarantula_slug = public_slug(tarantula)
     public_url = f"/keeper/{user.username}/{tarantula_slug}"
 
     return {
@@ -796,11 +808,19 @@ async def get_public_tarantula(
     db: Session = Depends(get_db)
 ):
     """
-    Get a public tarantula profile (no authentication required)
+    Get a public animal profile by keeper + name slug (no authentication required)
 
-    Returns tarantula details, owner info, feeding history, molt timeline, and photos.
-    The tarantula must be public to be viewable.
+    Despite the path, this resolves an animal of ANY taxon: it reads the
+    unified `inverts` table, so a public mantis or scorpion resolves too
+    (`taxon` is in the response). The animal must be public, alive and not
+    transferred out, and the keeper's collection must be public — the same
+    rules as the keeper profile list. Notes are never returned: this route is
+    unauthenticated, and notes are owner-only on /t and /i.
     """
+    from app.models.invert import Invert
+    from app.models.invert_species import InvertSpecies
+    from app.utils.limits import active_inverts_query
+
     # Get user by username
     user = db.query(User).filter(
         User.username == username
@@ -811,38 +831,41 @@ async def get_public_tarantula(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Keeper not found"
         )
+    if user.collection_visibility != 'public':
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Animal not found or is not public"
+        )
 
-    # Find matching public tarantula by name slug.
+    # Find matching public animal by name slug.
     #
     # - Filter by `visibility == 'public'` (not the legacy is_public
     #   boolean) so this matches the rest of the visibility plumbing.
     # - Normalize the incoming slug the same way as the stored slug
     #   (lowercase + spaces → dashes) so clients that pass the raw
-    #   pet name ("Rampart") match tarantulas whose slug is "rampart".
+    #   pet name ("Rampart") match animals whose slug is "rampart".
     # - Also accept a direct UUID match so the mobile/web activity
-    #   feed can deep-link with either pet name OR the tarantula id
+    #   feed can deep-link with either pet name OR the animal id
     #   without the client having to decide.
     normalized_slug = tarantula_slug.lower().replace(" ", "-")
 
-    user_tarantulas = db.query(Tarantula).filter(
-        Tarantula.user_id == user.id,
-        Tarantula.visibility == 'public',
-    ).all()
+    public_animals = active_inverts_query(db, user.id).filter(
+        Invert.visibility == 'public',
+    ).order_by(Invert.created_at.desc()).all()
 
-    matching_tarantula = None
-    for t in user_tarantulas:
-        t_slug = (t.name or t.common_name or "tarantula").lower().replace(" ", "-")
-        if t_slug == normalized_slug or str(t.id) == tarantula_slug:
-            matching_tarantula = t
+    matching = None
+    for a in public_animals:
+        if str(a.id) == tarantula_slug or public_slug(a) == normalized_slug:
+            matching = a
             break
 
-    if not matching_tarantula:
+    if not matching:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tarantula not found or is not public"
+            detail="Animal not found or is not public"
         )
 
-    tarantula = matching_tarantula
+    tarantula = matching
 
     # Get feeding logs
     feeding_logs = db.query(FeedingLog).filter(
@@ -868,7 +891,9 @@ async def get_public_tarantula(
             "leg_span_after": float(molt.leg_span_after) if molt.leg_span_after else None,
             "weight_before": float(molt.weight_before) if molt.weight_before else None,
             "weight_after": float(molt.weight_after) if molt.weight_after else None,
-            "notes": molt.notes
+            # Anonymous route: a molt's free-text notes are the keeper's, like
+            # the animal's own notes (blanked above). /t and /i don't show them.
+            "notes": None,
         })
 
     # Get photos (limit to 10)
@@ -886,10 +911,10 @@ async def get_public_tarantula(
             "taken_at": photo.taken_at.isoformat() if photo.taken_at else None
         })
 
-    # Get species info if linked
+    # Get species info if linked (inverts link to the unified catalog)
     species_info = None
     if tarantula.species_id:
-        species = db.query(Species).filter(Species.id == tarantula.species_id).first()
+        species = db.query(InvertSpecies).filter(InvertSpecies.id == tarantula.species_id).first()
         if species:
             species_info = {
                 "id": str(species.id),
@@ -903,15 +928,18 @@ async def get_public_tarantula(
             }
 
     return {
+        # Key kept as "tarantula" for the existing web + mobile pages.
         "tarantula": {
             "id": str(tarantula.id),
+            "taxon": tarantula.taxon,
             "name": tarantula.name,
             "common_name": tarantula.common_name,
             "scientific_name": tarantula.scientific_name,
-            "sex": tarantula.sex,
+            "sex": tarantula.sex.value if tarantula.sex else None,
             "date_acquired": tarantula.date_acquired.isoformat() if tarantula.date_acquired else None,
             "photo_url": tarantula.photo_url,
-            "notes": tarantula.notes
+            # Owner-only everywhere else; this route has no auth.
+            "notes": None,
         },
         "owner": {
             "username": user.username,

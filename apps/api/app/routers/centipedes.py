@@ -36,7 +36,7 @@ from app.schemas.centipede import (
     CentipedeCreate, CentipedeResponse, CentipedeUpdate,
 )
 from app.utils.dependencies import get_current_user
-from app.utils.limits import enforce_collection_limit
+from app.utils.limits import active_inverts_query, enforce_collection_limit
 from app.utils.access import policy, require_own_enclosure
 from app.utils.photo_cleanup import collect_for_animal, delete_files
 
@@ -107,13 +107,17 @@ async def list_centipedes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List the authenticated user's centipedes, newest first."""
+    """List the authenticated user's ACTIVE centipedes, newest first.
+
+    Deceased and transferred-out animals are excluded, exactly like
+    `GET /inverts/` (default view) and `/tarantulas/`. The collection grids
+    read this list and derive their counts and cap notice from it, so a
+    centipede marked died (or handed off) used to stay there. The history
+    views live on `/inverts/?status=deceased|transferred`.
+    """
     return (
-        db.query(Invert)
-        .filter(
-            Invert.user_id == current_user.id,
-            Invert.taxon == TAXON,
-        )
+        active_inverts_query(db, current_user.id)
+        .filter(Invert.taxon == TAXON)
         .order_by(Invert.created_at.desc())
         .all()
     )

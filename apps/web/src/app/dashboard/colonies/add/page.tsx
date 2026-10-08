@@ -22,6 +22,7 @@ import { INVERT_TAXA, isInvertTaxon, PICKER_TAXA } from '@/lib/inverts'
 import {
   ColonyLimitError,
   createColony,
+  stageKey,
   type ColonySource,
   type ColonyTaxon,
 } from '@/lib/colonies'
@@ -176,11 +177,12 @@ function AddColonyForm() {
   const buildStageCounts = (): Record<string, number> => {
     const map: Record<string, number> = {}
     for (const row of stages) {
-      const key = row.name.trim()
+      // The API's spelling, so "Adults" and "adults" are one bucket (summed).
+      const key = stageKey(row.name)
       if (!key) continue
       if (row.count.trim() === '') continue
       const n = Number.parseInt(row.count, 10)
-      if (Number.isFinite(n) && n >= 0) map[key] = n
+      if (Number.isFinite(n) && n >= 0) map[key] = (map[key] ?? 0) + n
     }
     return map
   }

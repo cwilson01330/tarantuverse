@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { suggestedBuckets, bucketHint, showsEnclosureOrientation, enclosureSizePlaceholder } from '../../../src/lib/colony-buckets';
+import { bucketKey, suggestedBuckets, bucketHint, showsEnclosureOrientation, enclosureSizePlaceholder } from '../../../src/lib/colony-buckets';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../../src/contexts/ThemeContext';
@@ -33,7 +33,6 @@ import {
   type Source,
 } from '../../../src/lib/inverts';
 import {
-  createColonyEvent,
   getColony,
   updateColony,
   type StageCounts,
@@ -186,10 +185,14 @@ export default function EditColonyScreen() {
 
   /** Add a bucket by name. Shared by the suggestion chips and the free-text
    *  field so both normalise and dedupe identically. */
+  // Compared by stored spelling, so "Unsexed" is caught as a duplicate of
+  // "unsexed" (or of an older "Unsexed" bucket loaded from the server).
+  const hasBucket = (k: string) => Object.keys(stageCounts).some((x) => bucketKey(x) === k);
+
   const addNamedBucket = (name: string) => {
-    const k = name.trim().toLowerCase();
+    const k = bucketKey(name);
     if (!k) return;
-    if (stageCounts[k] !== undefined) {
+    if (hasBucket(k)) {
       Alert.alert('Duplicate bucket', `A "${k}" bucket already exists.`);
       return;
     }
@@ -197,9 +200,9 @@ export default function EditColonyScreen() {
   };
 
   const addBucket = () => {
-    const k = newStageName.trim().toLowerCase();
+    const k = bucketKey(newStageName);
     if (!k) return;
-    if (stageCounts[k] !== undefined) {
+    if (hasBucket(k)) {
       Alert.alert('Duplicate bucket', `A "${k}" bucket already exists.`);
       return;
     }
@@ -222,31 +225,21 @@ export default function EditColonyScreen() {
     // button simply did nothing, which is impossible to diagnose from the
     // outside. Anything that can throw belongs where it can be reported.
     try {
+      // Keyed by the stored spelling (bucketKey) so "Adults" and "adults" are
+      // one bucket here exactly as on the server.
       const edited: StageCounts = {};
-      for (const [k, v] of Object.entries(stageCounts)) edited[k] = parseCount(v);
-
-      // Population changes go out as count_correction EVENTS, not as a
-      // stage_counts overwrite.
-      //
-      // The old behaviour wrote the bucket map straight over the top, which
-      // silently bypassed the event log — a colony's population could move
-      // with nothing in its history to say when or why. (Every colony in
-      // production had zero events despite counts changing.) A correction per
-      // changed bucket keeps one write path and leaves a trail the keeper can
-      // actually read back.
-      const corrections = Object.entries(edited)
-        .map(([bucket, next]) => ({ bucket, delta: next - (originalCounts[bucket] ?? 0) }))
-        .filter((c) => c.delta !== 0);
-
-      for (const { bucket, delta } of corrections) {
-        await createColonyEvent(colonyId, {
-          event_type: 'count_correction',
-          stage: bucket,
-          count_delta: delta,
-          occurred_at: toISODateLocal(new Date()),
-          notes: 'Adjusted from the edit screen',
-        });
+      for (const [k, v] of Object.entries(stageCounts)) {
+        const key = bucketKey(k);
+        if (key) edited[key] = (edited[key] ?? 0) + parseCount(v);
       }
+      const original: StageCounts = {};
+      for (const [k, v] of Object.entries(originalCounts)) {
+        const key = bucketKey(k) || 'mixed';
+        original[key] = (original[key] ?? 0) + (Number(v) || 0);
+      }
+      const countsChanged =
+        Object.keys(edited).length !== Object.keys(original).length ||
+        Object.entries(edited).some(([k, v]) => original[k] !== v);
 
       const payload: Record<string, unknown> = {
         name: toStr(name).trim(),
@@ -269,11 +262,13 @@ export default function EditColonyScreen() {
         is_active: isActive,
       };
 
-      // stage_counts is sent ONLY to drop buckets the keeper removed — the
-      // events above already carry every number, so including it otherwise
-      // would apply the same change twice. Sent after them for the same reason.
-      const removed = Object.keys(originalCounts).filter((k) => !(k in edited));
-      if (removed.length > 0) payload.stage_counts = edited;
+      // The new bucket map goes in this one PUT, and only when it changed. The
+      // API writes a count_correction event for every bucket that moved (a
+      // removed bucket corrected to zero, a rename as a move out of the old
+      // name and into the new one) in the same transaction, so the history
+      // always explains the numbers. (Older builds posted those events
+      // themselves first; the server's diff then finds nothing left to log.)
+      if (countsChanged) payload.stage_counts = edited;
 
       // Species — write only if changed to a new pick or explicitly cleared.
       if (speciesId) payload.species_id = speciesId;

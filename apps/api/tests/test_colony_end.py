@@ -372,6 +372,7 @@ def _public_colony(owner, **kw):
         substrate_type=None, substrate_depth=None, last_substrate_change=None, target_temp_min=None,
         target_temp_max=None, target_humidity_min=None, target_humidity_max=None, water_dish=None,
         date_acquired=None, source=None, notes=None, sitter_note=None, location=None, visibility="public",
+        is_active=True,
     )
     d.update(kw)
     return NS(**d)

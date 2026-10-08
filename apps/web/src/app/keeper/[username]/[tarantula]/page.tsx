@@ -7,10 +7,14 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { useUnits } from '@/components/UnitsProvider'
 import { lengthValue, lengthUnit } from '@/lib/units'
+import { animalDisplayName, growthLengthLabel, taxonMeta } from '@/lib/inverts'
 
+// Served by /tarantulas/public/{username}/{slug}, which resolves an animal of
+// any taxon despite the path (the `tarantula` key is kept for older clients).
 interface TarantulaPublicProfile {
   tarantula: {
     id: string
+    taxon?: string | null
     name?: string
     common_name?: string
     scientific_name?: string
@@ -78,9 +82,9 @@ export default function PublicTarantulaProfile() {
 
         if (!response.ok) {
           if (response.status === 404) {
-            setError('Tarantula profile not found or is not public')
+            setError('This animal was not found or is not public')
           } else {
-            setError('Failed to load tarantula profile')
+            setError('Failed to load this profile')
           }
           return
         }
@@ -88,7 +92,7 @@ export default function PublicTarantulaProfile() {
         const data = await response.json()
         setProfile(data)
       } catch (err) {
-        setError('Error loading tarantula profile')
+        setError('Error loading this profile')
         console.error(err)
       } finally {
         setLoading(false)
@@ -126,7 +130,7 @@ export default function PublicTarantulaProfile() {
       <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading tarantula profile...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading profile...</p>
         </div>
       </div>
     )
@@ -141,7 +145,7 @@ export default function PublicTarantulaProfile() {
             Oops! Profile not found
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            {error || 'The tarantula profile you are looking for does not exist or is not public.'}
+            {error || 'The animal you are looking for does not exist or is not public.'}
           </p>
           <Link
             href="/register"
@@ -155,6 +159,8 @@ export default function PublicTarantulaProfile() {
   }
 
   const t = profile.tarantula
+  const meta = taxonMeta(t.taxon)
+  const title = animalDisplayName(t)
   const lastFedDate = profile.feeding_summary.last_fed_date
     ? new Date(profile.feeding_summary.last_fed_date)
     : null
@@ -194,13 +200,13 @@ export default function PublicTarantulaProfile() {
                 {t.photo_url ? (
                   <Image
                     src={t.photo_url}
-                    alt={t.name || t.common_name || 'Tarantula'}
+                    alt={title}
                     fill
                     className="object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-6xl">
-                    🕷️
+                  <div className="w-full h-full flex items-center justify-center text-6xl" aria-hidden="true">
+                    {meta.glyph}
                   </div>
                 )}
               </div>
@@ -208,8 +214,9 @@ export default function PublicTarantulaProfile() {
 
             {/* Quick Info Card */}
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 shadow">
-              <h1 className="text-3xl font-bold mb-2">{t.name}</h1>
-              {t.common_name && (
+              <h1 className="text-3xl font-bold mb-2">{title}</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{meta.label}</p>
+              {t.common_name && t.common_name !== title && (
                 <p className="text-lg text-gray-600 dark:text-gray-400 mb-4">
                   {t.common_name}
                 </p>
@@ -392,7 +399,7 @@ export default function PublicTarantulaProfile() {
                           molt.leg_span_after !== undefined && (
                             <div>
                               <p className="text-gray-600 dark:text-gray-400">
-                                Leg Span ({lengthUnit(units)})
+                                {growthLengthLabel(t.taxon || 'tarantula')} ({lengthUnit(units)})
                               </p>
                               <p className="font-semibold">
                                 {lengthValue(molt.leg_span_before, units)} →{' '}
@@ -441,7 +448,7 @@ export default function PublicTarantulaProfile() {
                 >
                   <Image
                     src={photo.thumbnail_url || photo.url}
-                    alt={photo.caption || 'Tarantula photo'}
+                    alt={photo.caption || `Photo of ${title}`}
                     fill
                     className="object-cover group-hover:scale-105 transition"
                   />
@@ -471,7 +478,7 @@ export default function PublicTarantulaProfile() {
         {/* CTA Banner */}
         <section className="mb-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-white text-center">
           <h2 className="text-3xl font-bold mb-3">
-            Track Your Own Tarantulas
+            Track Your Own Collection
           </h2>
           <p className="text-blue-100 mb-6">
             Join Tarantuverse and start tracking feeding, molts, and growth for

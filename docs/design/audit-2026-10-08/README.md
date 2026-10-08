@@ -22,6 +22,7 @@ finding was checked against the code (file:line in each report):
 ## Open — suggested order
 
 ### 1. Data correctness (keepers see wrong things)
+**[FIXED 2026-10-08 — every item below; plus the anonymous `/keeper/{u}/{slug}` route no longer returns animal or molt notes and 404s for private collections]**
 - Dead/sold centipedes, whip spiders, scorpions stay in collection lists, counts and the cap notice (legacy per-taxon list endpoints). *animals H1*
 - Public keeper profile + stats read only the legacy tarantula table: no other taxon shows; dead/sold tarantulas counted. *animals H2*
 - Unlinked millipedes/isopods/roaches get a 7-day feeding default and show as overdue on web/Feeding Day/digest. *animals M14*

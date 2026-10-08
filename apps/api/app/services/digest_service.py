@@ -67,9 +67,11 @@ def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
             # push notification becomes the loudest place we tell them they're
             # behind when they aren't.
             inv.feeding_interval_days,
+            # Grazers without a linked species are recognised by taxon.
+            taxon=inv.taxon,
         )
         if interval is None:
-            continue  # detritivore — no live-prey cadence
+            continue  # detritivore / omnivore — no live-prey cadence
         # Never-fed is NOT counted as due — no cadence established yet, so a
         # push nag would be noise. Consistent with /inverts/feeding-status +
         # /animals/feeding-status + the dashboard's overdue widget.

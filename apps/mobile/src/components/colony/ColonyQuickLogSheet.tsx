@@ -28,7 +28,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { TYPE } from '../../theme/tokens';
 import { createColonyEvent, type ColonyEventType, type StageCounts } from '../../lib/colonies';
-import { suggestedBuckets } from '../../lib/colony-buckets';
+import { bucketKey, bucketLabel, suggestedBuckets } from '../../lib/colony-buckets';
 import { PrimaryButton } from '../PrimaryButton';
 import { toISODateLocal } from '../../utils/date';
 
@@ -65,26 +65,39 @@ export default function ColonyQuickLogSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Buckets by their stored spelling (bucketKey), so a colony that still has
+  // "Unsexed" from before keys were canonical reads as one "unsexed" bucket,
+  // and the suggestion "Unsexed" is sent as "unsexed" — never as a second
+  // bucket for the same animals. Chips show bucketLabel.
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const [k, v] of Object.entries(stageCounts ?? {})) {
+      const key = bucketKey(k) || 'mixed';
+      m[key] = (m[key] ?? 0) + (Number(v) || 0);
+    }
+    return m;
+  }, [stageCounts]);
+
   // The colony's own buckets first (largest first), then the taxon's
   // suggestions it doesn't have yet. Recounts only make sense against a
   // bucket that exists or is being started.
   const stages = useMemo(() => {
-    const own = Object.entries(stageCounts ?? {})
-      .sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0))
+    const own = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
       .map(([k]) => k);
-    return [...own, ...suggestedBuckets(taxon, stageCounts ?? {})];
-  }, [stageCounts, taxon]);
+    return [...own, ...suggestedBuckets(taxon, counts).map(bucketKey)];
+  }, [counts, taxon]);
 
   useEffect(() => {
     if (!kind) return;
-    setStage(stages[0] ?? 'Mixed');
+    setStage(stages[0] ?? 'mixed');
     setCount('');
     setError(null);
   }, [kind, stages]);
 
   if (!kind) return null;
   const copy = COPY[kind];
-  const current = Number((stageCounts ?? {})[stage]) || 0;
+  const current = counts[stage] ?? 0;
 
   const save = async () => {
     const n = Number.parseInt(count, 10);
@@ -147,7 +160,7 @@ export default function ColonyQuickLogSheet({
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on }}
                 >
-                  <Text style={[TYPE.bodyStrong, on ? styles.onPrimary : { color: colors.textSecondary }]}>{s}</Text>
+                  <Text style={[TYPE.bodyStrong, on ? styles.onPrimary : { color: colors.textSecondary }]}>{bucketLabel(s)}</Text>
                 </TouchableOpacity>
               );
             })}

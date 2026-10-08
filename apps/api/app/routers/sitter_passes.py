@@ -424,7 +424,7 @@ def build_pass_payload(
             sp = species.get(inv.species_id) if inv.species_id else None
             feeds = inv_feedings.get(inv.id, [])
             interval, source = _recommended_feeding_interval_with_source(
-                inv.life_stage, sp, inv.feeding_interval_days
+                inv.life_stage, sp, inv.feeding_interval_days, taxon=inv.taxon
             )
             # Only a keeper-set or care-sheet cadence is stated. The resolver's
             # stage/generic defaults are guesses; a sitter isn't told to feed

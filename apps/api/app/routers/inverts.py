@@ -48,6 +48,7 @@ from app.schemas.invert import (
 from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
+from app.utils.feeding_mode import has_feeding_cadence
 from app.utils.limits import active_inverts_query, enforce_collection_limit
 from app.utils.locations import canonical_location, list_locations, rename_location
 from app.utils.access import (
@@ -302,8 +303,14 @@ def _recommended_feeding_interval_with_source(
     life_stage: Optional[str],
     species: Optional[InvertSpecies],
     keeper_interval: Optional[int] = None,
+    taxon: Optional[str] = None,
 ) -> tuple[Optional[int], Optional[str]]:
     """Days-between-feedings threshold plus WHERE that number came from.
+
+    `taxon` is the animal's taxon. Pass it from every caller: grazers
+    (millipede, isopod, roach) are recognised by taxon when no species is
+    linked (utils/feeding_mode.py). Without it an unlinked millipede gets the
+    generic 7-day default and is flagged overdue.
 
     Uses the species' per-stage feeding frequency when available (upper bound
     of the range = "should have fed by now"). Returns (None, None) for
@@ -323,13 +330,15 @@ def _recommended_feeding_interval_with_source(
 
     stage = (life_stage or "").lower().strip() or None
 
-    if species is not None:
-        if (species.feeding_mode or "predator") == "detritivore":
-            # No overdue concept for grazers. Checked AFTER the keeper override
-            # so someone who deliberately sets a cadence on a millipede gets it
-            # — an explicit choice beats our judgement that it's meaningless.
-            return None, None
+    if not has_feeding_cadence(taxon, species):
+        # No overdue concept for grazers (detritivores and omnivores, decided
+        # by the linked species or, failing that, the taxon). Checked AFTER the
+        # keeper override so someone who deliberately sets a cadence on a
+        # millipede gets it — an explicit choice beats our judgement that it's
+        # meaningless.
+        return None, None
 
+    if species is not None:
         by_stage = {
             "sling": species.feeding_frequency_sling,
             "juvenile": species.feeding_frequency_juvenile,
@@ -373,11 +382,12 @@ def _recommended_feeding_interval(
     life_stage: Optional[str],
     species: Optional[InvertSpecies],
     keeper_interval: Optional[int] = None,
+    taxon: Optional[str] = None,
 ) -> Optional[int]:
     """Interval only. Kept for callers that don't surface provenance (the
     digest decides overdue but never prints the number)."""
     return _recommended_feeding_interval_with_source(
-        life_stage, species, keeper_interval
+        life_stage, species, keeper_interval, taxon=taxon
     )[0]
 
 
@@ -446,7 +456,7 @@ async def list_feeding_status(
         )
         species = species_by_id.get(inv.species_id) if inv.species_id else None
         interval, interval_source = _recommended_feeding_interval_with_source(
-            inv.life_stage, species, inv.feeding_interval_days
+            inv.life_stage, species, inv.feeding_interval_days, taxon=inv.taxon
         )
         # Never-fed animals are NOT "overdue" — no feeding has established a
         # cadence yet, so flagging them (esp. in a push digest) is noise. Kept
@@ -853,7 +863,7 @@ async def get_invert_feeding_stats(
         if invert.species_id else None
     )
     interval_days, interval_source = _recommended_feeding_interval_with_source(
-        invert.life_stage, species, invert.feeding_interval_days
+        invert.life_stage, species, invert.feeding_interval_days, taxon=invert.taxon
     )
     is_overdue = (
         (not is_feeding_paused)

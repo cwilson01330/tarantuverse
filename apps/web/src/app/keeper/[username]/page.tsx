@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import AchievementBadge from '@/components/AchievementBadge'
 import { formatLocalDate } from '@/lib/date'
 import { socialUrl } from '@/lib/social-links'
+import { animalDisplayName, publicAnimalPath, taxonMeta } from '@/lib/inverts'
 
 interface Keeper {
   id: number
@@ -30,10 +31,14 @@ interface Keeper {
   }
 }
 
-interface Tarantula {
-  id: number
-  common_name: string
-  scientific_name: string
+// One public animal of any taxon (the keeper collection endpoint reads the
+// unified inverts table; `taxon` is missing only on very old API responses).
+interface PublicAnimal {
+  id: string
+  taxon?: string | null
+  name?: string | null
+  common_name?: string | null
+  scientific_name?: string | null
   photo_url?: string
   sex?: string
   date_acquired?: string
@@ -43,9 +48,11 @@ interface KeeperStats {
   username: string
   total_public: number
   unique_species: number
-  males: number
-  females: number
-  unsexed: number
+  // Older API responses only carried sex_distribution; read either.
+  males?: number
+  females?: number
+  unsexed?: number
+  sex_distribution?: { male: number; female: number; unknown: number }
 }
 
 interface FollowStats {
@@ -76,7 +83,7 @@ export default function KeeperProfilePage() {
   const router = useRouter()
   const { user, token } = useAuth()
   const [keeper, setKeeper] = useState<Keeper | null>(null)
-  const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
+  const [animals, setAnimals] = useState<PublicAnimal[]>([])
   const [stats, setStats] = useState<KeeperStats | null>(null)
   const [followStats, setFollowStats] = useState<FollowStats | null>(null)
   const [achievements, setAchievements] = useState<AchievementsResponse | null>(null)
@@ -135,7 +142,7 @@ export default function KeeperProfilePage() {
       const collectionResponse = await fetch(`${API_URL}/api/v1/keepers/${username}/collection/`)
       if (collectionResponse.ok) {
         const collectionData = await collectionResponse.json()
-        setTarantulas(collectionData)
+        setAnimals(collectionData)
       }
 
       // Fetch stats
@@ -590,7 +597,7 @@ export default function KeeperProfilePage() {
               <h2 className="text-xl font-bold mb-4">Collection Stats</h2>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-primary-100">Public Tarantulas</span>
+                  <span className="text-primary-100">Public animals</span>
                   <span className="text-2xl font-bold">{stats.total_public}</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -599,15 +606,15 @@ export default function KeeperProfilePage() {
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t border-white/20">
                   <span className="text-primary-100">♂️ Males</span>
-                  <span className="text-lg font-bold">{stats.males}</span>
+                  <span className="text-lg font-bold">{stats.males ?? stats.sex_distribution?.male ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-primary-100">♀️ Females</span>
-                  <span className="text-lg font-bold">{stats.females}</span>
+                  <span className="text-lg font-bold">{stats.females ?? stats.sex_distribution?.female ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-primary-100">? Unsexed</span>
-                  <span className="text-lg font-bold">{stats.unsexed}</span>
+                  <span className="text-lg font-bold">{stats.unsexed ?? stats.sex_distribution?.unknown ?? 0}</span>
                 </div>
               </div>
             </div>
@@ -651,25 +658,32 @@ export default function KeeperProfilePage() {
           <div className="bg-surface border border-theme rounded-xl shadow-sm p-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Public Collection</h2>
 
-            {tarantulas.length === 0 ? (
+            {animals.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <div className="text-5xl mb-3">🕷️</div>
                 <p>No public animals yet</p>
               </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {tarantulas.map((tarantula) => (
+                  {animals.map((tarantula) => {
+                    const meta = taxonMeta(tarantula.taxon)
+                    const title = animalDisplayName(tarantula)
+                    // Scientific name only when it isn't already the title.
+                    const subtitle = tarantula.scientific_name && tarantula.scientific_name !== title
+                      ? tarantula.scientific_name
+                      : null
+                    return (
                     <Link
                       key={tarantula.id}
-                      href={`/t/${tarantula.id}`}
+                      href={publicAnimalPath(tarantula)}
                       className="group bg-surface-elevated rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all duration-200 border border-theme block"
-                      aria-label={`View ${tarantula.common_name || tarantula.scientific_name || 'tarantula'} profile`}
+                      aria-label={`View ${title} profile`}
                     >
                       {tarantula.photo_url ? (
                         <div className="relative h-48">
                           <img
                             src={tarantula.photo_url}
-                            alt={tarantula.common_name}
+                            alt={title}
                             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -697,20 +711,23 @@ export default function KeeperProfilePage() {
                             </span>
                           )}
                           <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                            <h3 className="font-bold text-lg">{tarantula.common_name}</h3>
-                            <p className="text-sm italic opacity-90">{tarantula.scientific_name}</p>
+                            <h3 className="font-bold text-lg">{title}</h3>
+                            {subtitle && <p className="text-sm italic opacity-90">{subtitle}</p>}
                           </div>
                         </div>
                       ) : (
                         <div className="p-4">
-                          <div className="text-4xl mb-2 text-center">🕷️</div>
-                          <h3 className="font-bold text-gray-900 dark:text-white">{tarantula.common_name}</h3>
-                          <p className="text-sm italic text-gray-600 dark:text-gray-400">{tarantula.scientific_name}</p>
+                          <div className="text-4xl mb-2 text-center" aria-hidden="true">{meta.glyph}</div>
+                          <h3 className="font-bold text-gray-900 dark:text-white">{title}</h3>
+                          {subtitle && <p className="text-sm italic text-gray-600 dark:text-gray-400">{subtitle}</p>}
                         </div>
                       )}
 
                       <div className="p-4">
                         <div className="flex gap-2 flex-wrap">
+                          <span className="px-2 py-1 bg-surface rounded text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            {meta.glyph} {meta.label}
+                          </span>
                           {/* Sex pill kept in the footer only when there's
                               no image; with a photo the corner badge is
                               the primary sex indicator. */}
@@ -727,7 +744,8 @@ export default function KeeperProfilePage() {
                         </div>
                       </div>
                     </Link>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

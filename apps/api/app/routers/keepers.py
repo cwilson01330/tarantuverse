@@ -3,15 +3,17 @@ Community/Keeper routes - Public profiles and discovery
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_
 from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
 from app.utils.test_accounts import real_user_clause
-from app.models.tarantula import Tarantula
+from app.models.invert import Invert
+from app.models.tarantula import Sex
 from app.schemas.user import PublicKeeperResponse
-from app.schemas.tarantula import TarantulaResponse
+from app.schemas.invert import InvertResponse
 from app.utils.dependencies import get_current_user_optional
+from app.utils.limits import active_inverts_query
 
 router = APIRouter()
 
@@ -19,7 +21,24 @@ router = APIRouter()
 PRIVATE_ANIMAL_FIELDS_CLEARED = {
     "price_paid": None, "source": None, "notes": None, "enclosure_notes": None,
     "death_notes": None, "location": None, "enclosure_id": None,
+    "source_transfer_id": None,
 }
+
+
+def profile_animals_query(db: Session, user: User, is_own_profile: bool):
+    """The animals a keeper profile lists and counts, every taxon.
+
+    Reads the unified `inverts` table (the legacy `tarantulas` table only ever
+    held tarantulas, so every scorpion, mantis, isopod... was invisible here).
+    Always the ACTIVE collection: an animal that died or was transferred out is
+    not part of anyone's collection any more (ADR-015, BRIEF §4b). Visitors
+    additionally see only animals the keeper made public; the caller has
+    already refused a visitor when the collection itself is private.
+    """
+    query = active_inverts_query(db, user.id)
+    if not is_own_profile:
+        query = query.filter(Invert.visibility == "public")
+    return query
 
 
 @router.get("/", response_model=List[PublicKeeperResponse])
@@ -103,20 +122,23 @@ async def get_keeper_profile(
     return PublicKeeperResponse.model_validate(user)
 
 
-@router.get("/{username}/collection/", response_model=List[TarantulaResponse])
+@router.get("/{username}/collection/", response_model=List[InvertResponse])
 async def get_keeper_collection(
     username: str,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
-    Get a keeper's tarantula collection
+    Get a keeper's collection — every taxon, active animals only.
 
     - **username**: The keeper's username
 
-    If viewing own profile: Returns ALL tarantulas (public and private)
-    If viewing other's profile: Returns only public tarantulas if collection_visibility = 'public'
+    If viewing own profile: every living, untransferred animal (public and private)
+    If viewing other's profile: only animals set public, and only if collection_visibility = 'public'
     Returns 404 if user doesn't exist or collection is private (unless viewing own profile)
+
+    Each row is the invert shape, a superset of the old tarantula response,
+    plus `taxon`, so clients that read tarantula fields keep working.
     """
     # Find user by username
     user = db.query(User).filter(User.username == username).first()
@@ -137,20 +159,18 @@ async def get_keeper_collection(
             detail="This keeper's collection is private"
         )
 
-    # If viewing own profile, return ALL tarantulas; otherwise only public ones
-    if is_own_profile:
-        tarantulas = db.query(Tarantula).filter(
-            Tarantula.user_id == user.id
-        ).order_by(Tarantula.created_at.desc()).all()
-    else:
-        tarantulas = db.query(Tarantula).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.visibility == 'public'
-            )
-        ).order_by(Tarantula.created_at.desc()).all()
+    animals = (
+        profile_animals_query(db, user, bool(is_own_profile))
+        .order_by(Invert.created_at.desc())
+        .all()
+    )
 
-    rows = [TarantulaResponse.from_orm(t) for t in tarantulas]
+    rows = []
+    for animal in animals:
+        try:
+            rows.append(InvertResponse.model_validate(animal))
+        except Exception:  # noqa: BLE001 — one bad row must not blank a profile
+            continue
     if is_own_profile:
         return rows
     # Visitors see the animal, not the keeper's private records: what it cost,
@@ -170,8 +190,8 @@ async def get_keeper_stats(
 
     - **username**: The keeper's username
 
-    If viewing own profile: Returns stats for ALL tarantulas
-    If viewing other's profile: Returns stats for public tarantulas only (if collection is public)
+    If viewing own profile: stats for every active animal, every taxon
+    If viewing other's profile: stats for public active animals only (if collection is public)
     Returns 404 if user doesn't exist or collection is private (unless viewing own profile)
     """
     # Find user by username
@@ -193,77 +213,52 @@ async def get_keeper_stats(
             detail="This keeper's collection is private"
         )
 
-    # Build queries based on whether viewing own profile
-    if is_own_profile:
-        # Count ALL tarantulas
-        total_count = db.query(Tarantula).filter(
-            Tarantula.user_id == user.id
-        ).count()
+    # Same animals the collection endpoint lists (every taxon, active only,
+    # public-only for visitors), so the counts and the grid always agree.
+    rows = (
+        profile_animals_query(db, user, bool(is_own_profile))
+        .with_entities(Invert.taxon, Invert.sex, Invert.species_id, Invert.scientific_name)
+        .all()
+    )
+    return summarize_profile_animals(username, rows)
 
-        # Get unique species count
-        unique_species = db.query(Tarantula.species_id).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.species_id.isnot(None)
-            )
-        ).distinct().count()
 
-        # Count by sex
-        males = db.query(Tarantula).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.sex == 'male'
-            )
-        ).count()
+def _sex_value(sex) -> str:
+    value = getattr(sex, "value", sex)
+    return (value or "").lower()
 
-        females = db.query(Tarantula).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.sex == 'female'
-            )
-        ).count()
-    else:
-        # Count only public tarantulas
-        total_count = db.query(Tarantula).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.visibility == 'public'
-            )
-        ).count()
 
-        # Get unique species count
-        unique_species = db.query(Tarantula.species_id).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.visibility == 'public',
-                Tarantula.species_id.isnot(None)
-            )
-        ).distinct().count()
+def summarize_profile_animals(username: str, rows) -> dict:
+    """Counts for a profile from (taxon, sex, species_id, scientific_name) rows.
 
-        # Count by sex
-        males = db.query(Tarantula).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.visibility == 'public',
-                Tarantula.sex == 'male'
-            )
-        ).count()
-
-        females = db.query(Tarantula).filter(
-            and_(
-                Tarantula.user_id == user.id,
-                Tarantula.visibility == 'public',
-                Tarantula.sex == 'female'
-            )
-        ).count()
-
+    Unique species counts a linked species once, and an unlinked animal by its
+    scientific name, so a keeper who never linked a care sheet still gets a
+    sensible number.
+    """
+    total = len(rows)
+    males = sum(1 for r in rows if _sex_value(r[1]) == Sex.MALE.value)
+    females = sum(1 for r in rows if _sex_value(r[1]) == Sex.FEMALE.value)
+    species_keys = set()
+    by_taxon: dict = {}
+    for taxon, _sex, species_id, scientific_name in rows:
+        by_taxon[taxon] = by_taxon.get(taxon, 0) + 1
+        if species_id is not None:
+            species_keys.add(("id", str(species_id)))
+        elif scientific_name and scientific_name.strip():
+            species_keys.add(("name", " ".join(scientific_name.lower().split())))
+    unknown = total - males - females
     return {
         "username": username,
-        "total_public": total_count,  # Note: This is "total" when viewing own profile
-        "unique_species": unique_species,
+        "total_public": total,  # Note: this is "total" when viewing own profile
+        "unique_species": len(species_keys),
         "sex_distribution": {
             "male": males,
             "female": females,
-            "unknown": total_count - males - females
-        }
+            "unknown": unknown,
+        },
+        # Flat copies — the web keeper page has always read these names.
+        "males": males,
+        "females": females,
+        "unsexed": unknown,
+        "by_taxon": by_taxon,
     }

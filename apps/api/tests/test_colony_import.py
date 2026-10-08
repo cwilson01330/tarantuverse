@@ -276,10 +276,10 @@ def run_commit(text, created_calls, *, stop_after=None, existing=None, mapping=N
     user = NS(id=uuid.uuid4())
     seen_calls = []
 
-    def fake_create(db, owner, payload, enforce_limit=True):
+    def fake_create(db, owner, payload, enforce_limit=True, **kw):
         if stop_after is not None and len(created_calls) >= stop_after:
             raise HTTPException(status_code=402, detail={"message": "cap"})
-        created_calls.append((owner, payload, enforce_limit))
+        created_calls.append((owner, payload, enforce_limit, kw))
         return NS(id=uuid.uuid4(), name=payload.name, taxon=payload.taxon)
 
     async def fake_activity(**kw):
@@ -312,7 +312,13 @@ def test_commit_creates_rows_through_the_shared_helper(monkeypatch):
 
 def test_the_importer_and_the_create_route_share_one_helper():
     assert ie.create_colony_row is cr.create_colony_row
-    assert "create_colony_row(db, owner, payload)" in inspect.getsource(cr.create_colony)
+    assert "create_colony_row(db, owner, payload" in inspect.getsource(cr.create_colony)
+
+
+def test_imported_colonies_mark_their_starting_count_as_imported(monkeypatch):
+    calls = []
+    run_commit("Name,Count\nA,5\n", calls, monkeypatch=monkeypatch)
+    assert calls[0][3] == {"starting_note": "Starting count (imported)"}
 
 
 def test_cap_stops_the_run_and_is_reported(monkeypatch):
@@ -323,7 +329,7 @@ def test_cap_stops_the_run_and_is_reported(monkeypatch):
 
 
 def test_a_non_cap_http_error_is_not_swallowed(monkeypatch):
-    def boom(db, owner, payload, enforce_limit=True):
+    def boom(db, owner, payload, enforce_limit=True, **kw):
         raise HTTPException(status_code=404, detail="Enclosure not found")
 
     monkeypatch.setattr(ie, "create_colony_row", boom)

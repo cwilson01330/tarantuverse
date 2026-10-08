@@ -13,6 +13,7 @@ import uuid
 from app.models.invert_species import INVERT_TAXON_VALUES
 from app.models.colony import COLONY_EVENT_TYPES, COLONY_END_REASONS
 from app.schemas.death import latest_local_today
+from app.utils.colony_counts import canonical_stage, canonical_stage_counts
 
 _SOURCES = ("bought", "bred", "wild_caught")
 _VISIBILITY = ("private", "public")
@@ -26,7 +27,13 @@ def _validate_stage_counts(v: Optional[Dict[str, int]]) -> Optional[Dict[str, in
             raise ValueError("stage_counts keys must be non-empty strings")
         if not isinstance(n, int) or isinstance(n, bool) or n < 0:
             raise ValueError("stage_counts values must be non-negative integers")
-    return v
+    # One spelling per bucket (utils/colony_counts): "Unsexed" and "unsexed"
+    # are the same bucket, summed, on every path that takes a bucket map.
+    return canonical_stage_counts(v)
+
+
+def _canonical_event_stage(v: Optional[str]) -> Optional[str]:
+    return canonical_stage(v) if isinstance(v, str) else v
 
 
 # ---------- Colony ----------
@@ -299,6 +306,11 @@ class ColonyEventCreate(BaseModel):
             raise ValueError(f"event_type must be one of {COLONY_EVENT_TYPES}")
         return v
 
+    @field_validator("stage")
+    @classmethod
+    def _canonical_stage(cls, v):
+        return _canonical_event_stage(v)
+
 
 class ColonyEventUpdate(BaseModel):
     event_type: Optional[str] = None
@@ -315,6 +327,11 @@ class ColonyEventUpdate(BaseModel):
         if v is not None and v not in COLONY_EVENT_TYPES:
             raise ValueError(f"event_type must be one of {COLONY_EVENT_TYPES}")
         return v
+
+    @field_validator("stage")
+    @classmethod
+    def _canonical_stage(cls, v):
+        return _canonical_event_stage(v)
 
 
 class ColonyEventResponse(BaseModel):

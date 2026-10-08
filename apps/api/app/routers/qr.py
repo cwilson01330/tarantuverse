@@ -1115,6 +1115,10 @@ async def get_public_colony_profile(
     # a printed QR label scanned by anyone else gets a 404.
     if not is_owner and colony.ended_at is not None:
         raise HTTPException(status_code=404, detail="Colony not found")
+    # Archived is "hidden from your collection" -- a printed label must not
+    # keep showing it to strangers either (audit-2 M3).
+    if not is_owner and colony.is_active is False:
+        raise HTTPException(status_code=404, detail="Colony not found")
 
     species_data = None
     common_name = None

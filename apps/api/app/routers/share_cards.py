@@ -50,7 +50,7 @@ PUBLIC_FIELDS = {
 # anyone (population and per-stage counts; never the acquisition date).
 PUBLIC_COLONY_FIELDS = ["photo", "name", "species", "population", "stages"]
 
-COLONY_CLOSED = "This colony has ended or been handed off, so it can't be shared."
+COLONY_CLOSED = "This colony has ended, been handed off or been archived, so it can't be shared."
 
 
 # ── DB access (monkeypatched in tests) ──────────────────────────────────────
@@ -158,7 +158,14 @@ def _colony_subject(db: Session, col) -> CardSubject:
 
 
 def _colony_closed(col) -> bool:
-    return col.ended_at is not None or col.transferred_out_at is not None
+    """Ended, handed off or archived. An archived colony is "hidden from your
+    collection" in the UI, so a link preview or card link that kept showing
+    its headcount would break that promise (audit-2 M3)."""
+    return (
+        col.ended_at is not None
+        or col.transferred_out_at is not None
+        or col.is_active is False
+    )
 
 
 def _load_colony_subject(db: Session, user, colony_id: UUID, need: str):
@@ -491,7 +498,7 @@ async def get_card_link(code: str, response: Response, db: Session = Depends(get
     if link is None:
         raise HTTPException(status_code=404, detail="Card not found")
     # A colony link (kind "colony": animal_id holds the colony id) also goes
-    # once the colony has ended or been handed off.
+    # once the colony has ended, been handed off or been archived.
     alive = _colony_live(db, link.animal_id) if link.kind == "colony" else _animal_exists(db, link.app, link.animal_id)
     if link.revoked_at is not None or not alive:
         raise HTTPException(status_code=410, detail="This card is no longer shared")

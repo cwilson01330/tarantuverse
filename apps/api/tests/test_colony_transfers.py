@@ -493,3 +493,10 @@ def test_migration_chains_from_share_card_kinds_and_widens_the_check():
     script = ScriptDirectory.from_config(cfg)
     assert len(script.get_heads()) == 1
     assert m.revision in {r.revision for r in script.walk_revisions()}
+
+
+def test_partial_counts_match_buckets_whatever_their_casing():
+    """A link made with "Unsexed" still claims after keys became "unsexed"."""
+    assert tr.partial_counts_error({"unsexed": 30, "adults": 5}, {"Unsexed": 25}, at_claim=True) is None
+    assert tr.partial_counts_error({"Unsexed": 30, "adults": 5}, {"unsexed": 25}, at_claim=False) is None
+    assert "no longer has 40" in tr.partial_counts_error({"unsexed": 30}, {"Unsexed": 40}, at_claim=True)

@@ -13,6 +13,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -110,11 +111,14 @@ async def list_scorpions(
     pattern-free enum overrides accept the uppercase casing inverts stores).
     """
     from app.models.invert import Invert
+    from app.utils.limits import active_inverts_query
 
-    invert_q = db.query(Invert).filter(
-        Invert.user_id == current_user.id,
+    # ACTIVE scorpions only: deceased and transferred-out animals are excluded,
+    # exactly like `GET /inverts/` (default view) and `/tarantulas/`. This used
+    # to filter transferred only, so a scorpion marked died stayed in the
+    # collection grid, its chip count and the cap notice.
+    invert_q = active_inverts_query(db, current_user.id).filter(
         Invert.taxon == "scorpion",
-        Invert.transferred_out_at.is_(None),
     )
     if colony_id is not None:
         invert_q = invert_q.filter(Invert.colony_id == colony_id)
@@ -123,13 +127,17 @@ async def list_scorpions(
 
     # Legacy stragglers: scorpions still only in the legacy table (a dual-write /
     # backfill gap). Served from the legacy row so they never disappear.
-    transferred_ids = db.query(Invert.id).filter(
+    archived_ids = db.query(Invert.id).filter(
         Invert.user_id == current_user.id,
-        Invert.transferred_out_at.isnot(None),
+        or_(
+            Invert.transferred_out_at.isnot(None),
+            Invert.died_at.isnot(None),
+        ),
     )
     legacy_q = db.query(Scorpion).filter(
         Scorpion.user_id == current_user.id,
-        Scorpion.id.notin_(transferred_ids),
+        Scorpion.id.notin_(archived_ids),
+        Scorpion.died_at.is_(None),
     )
     if colony_id is not None:
         legacy_q = legacy_q.filter(Scorpion.colony_id == colony_id)

@@ -27,7 +27,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
-import { suggestedBuckets, bucketHint, showsEnclosureOrientation, enclosureSizePlaceholder } from '../../src/lib/colony-buckets';
+import { bucketKey, suggestedBuckets, bucketHint, showsEnclosureOrientation, enclosureSizePlaceholder } from '../../src/lib/colony-buckets';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import {
@@ -119,7 +119,8 @@ export default function AddColonyScreen() {
   };
 
   const addBucket = (rawKey?: string) => {
-    const k = (rawKey ?? newStageName).trim().toLowerCase();
+    // The stored spelling (lowercase, single spaces) — the API's rule.
+    const k = bucketKey(rawKey ?? newStageName);
     if (!k) return;
     if (stageCounts[k] !== undefined) {
       if (!rawKey) Alert.alert('Duplicate bucket', `A "${k}" bucket already exists.`);

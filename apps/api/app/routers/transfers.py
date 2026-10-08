@@ -142,14 +142,54 @@ def _build_snapshot(db: Session, invert: Invert, seller: User) -> dict:
     }
 
 
+def _resolve_animal_lineage(db: Session, animal_id) -> dict:
+    """HV twin of `_resolve_lineage`: dam/sire/clutch-date from
+    reptile_offspring → clutch → reptile_pairing.
+
+    Only populated when the animal was hatched on-platform AND linked to a
+    ReptileOffspring row (its hold-back link). All-None otherwise, and the
+    provenance block degrades exactly as an unlinked invert's does. The
+    clutch's laid date rides in `sac_laid_date` so both apps' preview and
+    provenance readers use one key. Genotypes are not carried.
+    """
+    from app.models.clutch import Clutch
+    from app.models.reptile_offspring import ReptileOffspring
+    from app.models.reptile_pairing import ReptilePairing
+
+    out = {"dam_scientific_name": None, "sire_scientific_name": None, "sac_laid_date": None}
+    offspring = db.query(ReptileOffspring).filter(ReptileOffspring.animal_id == animal_id).first()
+    if not offspring or not offspring.clutch_id:
+        return out
+    clutch = db.query(Clutch).filter(Clutch.id == offspring.clutch_id).first()
+    if not clutch:
+        return out
+    out["sac_laid_date"] = clutch.laid_date.isoformat() if clutch.laid_date else None
+    pairing = db.query(ReptilePairing).filter(ReptilePairing.id == clutch.pairing_id).first()
+    if not pairing:
+        return out
+
+    def _parent_sci(parent_id):
+        if not parent_id:
+            return None
+        parent = db.query(Animal).filter(Animal.id == parent_id).first()
+        return parent.scientific_name if parent else None
+
+    out["dam_scientific_name"] = _parent_sci(pairing.female_animal_id)
+    out["sire_scientific_name"] = _parent_sci(pairing.male_animal_id)
+    return out
+
+
 def _build_animal_snapshot(db: Session, animal: Animal, seller: User) -> dict:
     """Freeze pedigree facts for an HV animal transfer.
 
-    Reptile/amphibian lineage (reptile_pairings + genotypes) isn't resolved
-    yet — the snapshot degrades to a plain provenance block (honesty-first),
-    same contract as an invert with no linked Offspring. Weight/length + last
-    shed are carried so the buyer's record starts pre-populated.
+    Lineage (dam/sire scientific names + clutch laid date) comes from the
+    animal's ReptileOffspring link when it has one, the same way the invert
+    snapshot reads its Offspring link; otherwise those keys stay None and the
+    provenance block degrades (honesty-first). Genotypes are not copied.
+    Weight/length + last shed are carried so the buyer's record starts
+    pre-populated.
     """
+    lineage = _resolve_animal_lineage(db, animal.id)
     return {
         "domain": "animal",
         "taxon": animal.taxon,
@@ -162,9 +202,9 @@ def _build_animal_snapshot(db: Session, animal: Animal, seller: User) -> dict:
         "breeder_handle": seller.username,
         "bred_by_user_id": str(seller.id),
         "origin_keeper_name": seller.display_name or seller.username,
-        "dam_scientific_name": None,
-        "sire_scientific_name": None,
-        "sac_laid_date": None,
+        "dam_scientific_name": lineage["dam_scientific_name"],
+        "sire_scientific_name": lineage["sire_scientific_name"],
+        "sac_laid_date": lineage["sac_laid_date"],
         "dob_or_acquired": (
             animal.date_acquired.isoformat() if animal.date_acquired
             else (animal.hatch_date.isoformat() if animal.hatch_date else None)
@@ -211,7 +251,11 @@ def partial_counts_error(stage_counts: Optional[dict], counts: dict, *, at_claim
     made and the buyer is owed what was promised); at create time it isn't --
     taking every animal is a whole-colony transfer.
     """
-    have = dict(stage_counts or {})
+    # Compare by the one spelling of each bucket ("Unsexed" == "unsexed"), so a
+    # link made before keys were canonicalised still matches after.
+    from app.utils.colony_counts import canonical_stage_counts
+    have = canonical_stage_counts(dict(stage_counts or {})) or {}
+    counts = canonical_stage_counts(dict(counts or {})) or {}
     for stage, n in counts.items():
         if stage not in have:
             if at_claim:
@@ -453,7 +497,8 @@ async def create_colony_transfer(
 
     counts = None
     if body.mode == "partial":
-        counts = {k: int(v) for k, v in (body.counts or {}).items()}
+        from app.utils.colony_counts import canonical_stage_counts
+        counts = canonical_stage_counts({k: int(v) for k, v in (body.counts or {}).items()}) or {}
         err = partial_counts_error(colony.stage_counts, counts, at_claim=False)
         if err:
             raise HTTPException(status_code=400, detail=err)
@@ -564,6 +609,21 @@ class ClaimBody(BaseModel):
     new_signup: Optional[bool] = None
 
 
+def mark_reptile_offspring_sold(db: Session, animal_id, buyer_username: str, on_date) -> bool:
+    """Flip the ReptileOffspring row linked to `animal_id` to SOLD with the
+    buyer recorded. Returns True when a row was updated. The HV twin of the
+    Offspring update in the invert claim."""
+    from app.models.reptile_offspring import ReptileOffspring, ReptileOffspringStatus
+
+    offspring = db.query(ReptileOffspring).filter(ReptileOffspring.animal_id == animal_id).first()
+    if not offspring:
+        return False
+    offspring.status = ReptileOffspringStatus.SOLD
+    offspring.status_date = on_date
+    offspring.buyer_info = buyer_username
+    return True
+
+
 async def _claim_animal_transfer(
     db: Session,
     transfer: AnimalTransfer,
@@ -644,6 +704,11 @@ async def _claim_animal_transfer(
 
     # Badge the source record handed off — drops from active collection + reminders.
     source.transferred_out_at = _now()
+
+    # If the source was a tracked hatchling, flip it SOLD — the same
+    # bookkeeping the invert claim does for Offspring. Without it a sold
+    # hatchling stayed "kept"/"available" in the breeder's clutch.
+    mark_reptile_offspring_sold(db, source.id, current_user.username, _now().date())
 
     db.commit()
     db.refresh(new_animal)
@@ -777,7 +842,8 @@ async def _claim_colony_transfer(
 
     partial = bool(transfer.transfer_counts)
     if partial:
-        handed = {k: int(v) for k, v in transfer.transfer_counts.items()}
+        from app.utils.colony_counts import canonical_stage_counts
+        handed = canonical_stage_counts({k: int(v) for k, v in transfer.transfer_counts.items()}) or {}
         err = partial_counts_error(source.stage_counts, handed, at_claim=True)
         if err:
             raise HTTPException(status_code=409, detail=err)

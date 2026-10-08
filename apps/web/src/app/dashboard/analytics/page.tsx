@@ -159,13 +159,15 @@ export default function AnalyticsPage() {
           <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <CardContent className="p-6 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                No tarantulas in your collection yet!
+                No animals in your collection yet.
               </p>
+              {/* The collection page carries the add menu for every taxon;
+                  the old target was the tarantula-only form. */}
               <button
-                onClick={() => router.push("/dashboard/tarantulas/add")}
+                onClick={() => router.push("/dashboard/tarantulas")}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Add Your First Tarantula
+                Add your first animal
               </button>
             </CardContent>
           </Card>
@@ -262,7 +264,7 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Sex Distribution and Notable Tarantulas */}
+      {/* Sex Distribution and Notable Animals */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Sex Distribution */}
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
@@ -310,7 +312,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Notable Tarantulas */}
+        {/* Notable Animals */}
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
             <CardTitle className="text-gray-900 dark:text-white">Notable Animals</CardTitle>
@@ -398,7 +400,7 @@ export default function AnalyticsPage() {
                   ? (analytics.total_feedings / analytics.total_tarantulas).toFixed(1)
                   : 0}
               </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Feedings Per Tarantula</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Feedings Per Animal</p>
             </div>
           </div>
         </CardContent>

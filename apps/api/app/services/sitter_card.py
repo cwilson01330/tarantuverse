@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable, List, Optional, Sequence
 
+from app.utils.feeding_mode import has_feeding_cadence
 from app.utils.units import f_to_c, normalize_units
 
 # ── line sources ──────────────────────────────────────────────────────────────
@@ -356,7 +357,9 @@ def compose_invert_card(
     units: Optional[str] = None,
 ) -> dict:
     now = now or datetime.now(timezone.utc)
-    detritivore = (getattr(species, "feeding_mode", None) or "predator") == "detritivore" if species else False
+    # Grazers (detritivores and omnivores like roaches) by species, else by
+    # taxon -- an unlinked millipede used to get the live-prey card.
+    detritivore = not has_feeding_cadence(getattr(invert, "taxon", None), species)
     state = feeding_state(
         paused_reason=_clean(getattr(invert, "feeding_paused_reason", None)),
         paused_until=getattr(invert, "feeding_paused_until", None),

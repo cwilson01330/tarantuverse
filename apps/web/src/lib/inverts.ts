@@ -70,6 +70,34 @@ export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
   return t != null && t in INVERT_TAXA
 }
 
+/**
+ * Registry entry for a taxon string off the wire. A missing taxon is read as
+ * tarantula (older responses carried no taxon and were tarantula-only); an
+ * unknown one falls back to "Other invertebrate".
+ */
+export function taxonMeta(taxon: string | null | undefined): InvertTaxonMeta {
+  if (!taxon) return INVERT_TAXA.tarantula
+  return isInvertTaxon(taxon) ? INVERT_TAXA[taxon] : INVERT_TAXA.other
+}
+
+/**
+ * Public page for one animal. Tarantulas keep /t (printed QR labels point
+ * there); every other taxon uses /i, which /t can't resolve.
+ */
+export function publicAnimalPath(animal: { id: string | number; taxon?: string | null }): string {
+  return !animal.taxon || animal.taxon === 'tarantula' ? `/t/${animal.id}` : `/i/${animal.id}`
+}
+
+/** Name to show for an animal: its own name, then common, then scientific. */
+export function animalDisplayName(animal: {
+  name?: string | null
+  common_name?: string | null
+  scientific_name?: string | null
+  taxon?: string | null
+}): string {
+  return animal.name || animal.common_name || animal.scientific_name || taxonMeta(animal.taxon).label
+}
+
 // ---------------------------------------------------------------------------
 // Feature-module registry (ADR-008) — web mirror of
 // apps/mobile/src/lib/taxon-modules.ts. Keep the two in lockstep.

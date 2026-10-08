@@ -396,7 +396,7 @@ export default function AnalyticsScreen() {
             <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
             <Text style={styles.emptyTitle}>No Analytics Available</Text>
             <Text style={styles.emptyText}>
-              Add tarantulas to your collection to see analytics
+              Add animals to your collection to see analytics
             </Text>
           </View>
         </ScrollView>
@@ -498,7 +498,7 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
-      {/* Notable Tarantulas */}
+      {/* Notable Animals */}
       {(analytics.most_active_molter || analytics.newest_acquisition || analytics.oldest_acquisition) && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Notable Animals</Text>

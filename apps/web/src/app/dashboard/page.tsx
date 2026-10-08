@@ -338,9 +338,18 @@ export default function DashboardHub() {
     )
   }
 
-  // Cross-taxon collection size — falls back to tarantulas.length if the
-  // /inverts/ count hasn't loaded.
-  const animalCount = totalAnimals ?? tarantulas.length
+  // Cross-taxon collection size, as the free-tier cap counts it: every
+  // individual animal (falls back to tarantulas.length if the /inverts/ count
+  // hasn't loaded) plus each active colony as 1 — the same total the
+  // Collection page and the server's cap use. /colonies/ already leaves out
+  // archived, ended and handed-off colonies, as the cap does.
+  const individualCount = totalAnimals ?? tarantulas.length
+  const colonyCount = colonies.length
+  const animalCount = individualCount + colonyCount
+  const collectionBreakdown =
+    colonyCount > 0
+      ? `${individualCount} ${individualCount === 1 ? 'animal' : 'animals'} + ${colonyCount} ${colonyCount === 1 ? 'colony' : 'colonies'}`
+      : null
 
   // Opens the collection page's taxon picker (the generic add flow) instead of
   // jumping straight into the tarantula form.
@@ -417,7 +426,7 @@ export default function DashboardHub() {
           {/* Total Collection */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
-            aria-label={`My collection: ${animalCount} animals. View all.`}
+            aria-label={`My collection: ${collectionBreakdown ?? `${animalCount} animals`}. View all.`}
             className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all text-left group"
           >
             <div className="flex items-center gap-3">
@@ -429,6 +438,9 @@ export default function DashboardHub() {
                 <p className="text-3xl font-bold text-theme-primary">{animalCount}</p>
               </div>
             </div>
+            {collectionBreakdown && (
+              <p className="mt-2 text-xs text-theme-secondary">{collectionBreakdown}</p>
+            )}
             <p className="mt-3 text-sm text-theme-tertiary group-hover:text-theme-secondary transition-colors">
               View all →
             </p>
