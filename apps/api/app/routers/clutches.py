@@ -262,6 +262,16 @@ async def get_clutch_parent_genotypes(
             "predictions need at least one shared gene."
         )
 
+    if _has_poss_het(pairing.male_animal_id, db) or _has_poss_het(
+        pairing.female_animal_id, db
+    ):
+        poss = (
+            "Possible-het genes are left out of these predictions — a "
+            "possible het is a probability, not a known genotype. The full "
+            "calculator can model them."
+        )
+        note = f"{note} {poss}" if note else poss
+
     taxon_str = (
         pairing.taxon.value
         if hasattr(pairing.taxon, "value")
@@ -300,25 +310,86 @@ def _genotypes_for_animal(animal_id, db: Session) -> List[GenotypeEntry]:
     )
 
 
+# animal_genotypes stores the hobby vocabulary (het / visual / poss_het /
+# super, see schemas/animal_genotype.py); the clutch predictor speaks allele
+# copies (wild=0 / het=1 / hom=2, see GenotypeEntry). The translation depends
+# on the gene's inheritance mode — same model as the morph calculator's
+# stateToCount (apps/web-herpetoverse/src/lib/genes.ts):
+#
+#   het                         -> het   (one copy, any inheritance mode)
+#   visual, recessive           -> hom   (a recessive only shows with two)
+#   visual, co/incomplete-dom.  -> het   (one copy shows; two is the super)
+#   visual, dominant            -> het   (see below)
+#   super                       -> hom
+#   poss_het                    -> left out (see below)
+#
+# Visual dominant: the genotype picker offers only "visual" for dominants, so
+# one copy and two copies are stored the same way. One copy is by far the
+# usual case and is the conservative reading (it predicts 50 % where a
+# homozygous parent would give 100 %), so that is what we send.
+#
+# Possible het: a poss-het parent is a probability ("66 % het"), not a
+# genotype. The response vocabulary can't carry a probability; sending het
+# would overstate the odds and sending wild would understate them, so the
+# gene is left out of the prediction and the response note says so. The
+# full calculator (which does model poss-het %) is one tap away.
+_VISUAL_IS_HOM = {"recessive"}
+_VISUAL_IS_HET = {"dominant", "codominant", "incomplete_dominant"}
+
+
+def _entry_zygosity(stored: str, gene_type: str):
+    """Stored zygosity + gene type -> 'wild' | 'het' | 'hom', or None when
+    the row can't be expressed honestly as a definite genotype."""
+    z = (stored or "").lower().strip()
+    t = (gene_type or "").lower().strip()
+    if z == "het":
+        return "het"
+    if z == "super":
+        return "hom"
+    if z == "visual":
+        if t in _VISUAL_IS_HOM:
+            return "hom"
+        if t in _VISUAL_IS_HET:
+            return "het"
+        return None  # unknown inheritance mode: no guess
+    # Pre-vocabulary rows written in the predictor's own terms.
+    if z in ("wild", "hom"):
+        return z
+    return None  # poss_het, or anything malformed
+
+
 def _genotype_rows_to_entries(rows) -> List[GenotypeEntry]:
     """Map (AnimalGenotype, Gene) tuples into the slim schema entries
-    the morph calculator expects. Skips any rows whose zygosity is
-    outside the canonical wild/het/hom set so a malformed DB row never
-    surfaces 422 errors at the response boundary.
+    the morph calculator expects (see the table above). Rows that can't be
+    expressed as a definite genotype — poss_het, malformed values — are
+    skipped so a bad DB row never surfaces a 422 at the response boundary.
 
     `gene_key` carries the gene's `common_name` — the front-end
     calculator's existing identifier for genes (the genes table has no
     slug column). Using common_name avoids forcing a schema migration
     for a label we already use everywhere else in the breeding UI.
     """
-    valid = {"wild", "het", "hom"}
     out: List[GenotypeEntry] = []
     for genotype, gene in rows:
-        z = (genotype.zygosity or "").lower().strip()
-        if z not in valid:
+        z = _entry_zygosity(genotype.zygosity, getattr(gene, "gene_type", None))
+        if z is None:
             continue
         key = getattr(gene, "common_name", None)
         if not key:
             continue
         out.append(GenotypeEntry(gene_key=key, zygosity=z))  # type: ignore[arg-type]
     return out
+
+
+def _has_poss_het(animal_id, db: Session) -> bool:
+    if not animal_id:
+        return False
+    return (
+        db.query(AnimalGenotype)
+        .filter(
+            AnimalGenotype.animal_id == animal_id,
+            AnimalGenotype.zygosity == "poss_het",
+        )
+        .first()
+        is not None
+    )

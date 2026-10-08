@@ -650,6 +650,19 @@ async def export_preview(
     clutch_count = db.query(Clutch).filter(Clutch.user_id == current_user.id).count()
     reptile_offspring_count = db.query(ReptileOffspring).filter(ReptileOffspring.user_id == current_user.id).count()
 
+    # Herpetoverse feeder stock — same owner rule as export_service.
+    from app.models.hv_feeder import HvFeederLog, HvFeederStock
+    hv_stock_ids = select(HvFeederStock.id).where(HvFeederStock.user_id == current_user.id)
+    hv_feeder_stock_count = db.query(HvFeederStock).filter(HvFeederStock.user_id == current_user.id).count()
+    hv_feeder_log_count = db.query(HvFeederLog).filter(HvFeederLog.hv_feeder_stock_id.in_(hv_stock_ids)).count()
+
+    # Tarantuverse feeder colonies — same owner rule as export_service.
+    from app.models.feeder_colony import FeederColony
+    from app.models.feeder_care_log import FeederCareLog
+    feeder_colony_ids = select(FeederColony.id).where(FeederColony.user_id == current_user.id)
+    feeder_colony_count = db.query(FeederColony).filter(FeederColony.user_id == current_user.id).count()
+    feeder_care_log_count = db.query(FeederCareLog).filter(FeederCareLog.feeder_colony_id.in_(feeder_colony_ids)).count()
+
     counts = {
             # Every TV animal of every taxon (tarantulas included). This key
             # used to be "animals", which the Herpetoverse count below then
@@ -676,6 +689,10 @@ async def export_preview(
             "reptile_pairings": reptile_pairing_count,
             "clutches": clutch_count,
             "reptile_offspring": reptile_offspring_count,
+            "hv_feeder_stocks": hv_feeder_stock_count,
+            "hv_feeder_logs": hv_feeder_log_count,
+            "feeder_colonies": feeder_colony_count,
+            "feeder_care_logs": feeder_care_log_count,
     }
     return {
         "username": current_user.username,

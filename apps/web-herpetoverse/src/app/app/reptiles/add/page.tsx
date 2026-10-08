@@ -35,6 +35,10 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
+import AddGenesField, {
+  type PickedGene,
+  pickedGenesToPayloads,
+} from '@/components/AddGenesField'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import { LocationField } from '@/components/LocationPicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
@@ -42,6 +46,7 @@ import UpgradeModal from '@/components/UpgradeModal'
 import { ApiError } from '@/lib/apiClient'
 import { useUnits } from '@/components/UnitsProvider'
 import { lengthInput, lengthUnit, parseLengthInput } from '@/lib/units'
+import { addAnimalGenotype } from '@/lib/genotype'
 import {
   ANIMAL_TAXA,
   ANIMAL_TAXON_ORDER,
@@ -203,6 +208,11 @@ function AddReptileForm() {
   )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Genes picked before the animal exists — attached after create (H2).
+  const [genes, setGenes] = useState<PickedGene[]>([])
+  // Snakes only, and not in a shared collection — the same gate as HV
+  // mobile (the gene catalog is snake-scoped; genotype routes are owner-only).
+  const offerGenes = form.taxon === 'snake' && !collection
   // Free-tier cap (HTTP 402) surfaces an upgrade modal instead of an inline
   // error. `capInfo` holds the parsed 402 detail body; null = modal closed.
   const [capInfo, setCapInfo] = useState<{ message: string | null; limit: number | null } | null>(null)
@@ -279,6 +289,24 @@ function AddReptileForm() {
     setSubmitting(true)
     try {
       const animal = await createAnimal(payload, collection)
+
+      // Genotypes are a second call — the genotype endpoint is keyed on an
+      // animal that must already exist. Deliberately NOT fatal: the animal
+      // is saved, so failures are counted and reported, not thrown.
+      if (offerGenes && genes.length > 0) {
+        const results = await Promise.allSettled(
+          pickedGenesToPayloads(genes).map((g) => addAnimalGenotype(animal.id, g)),
+        )
+        const genesFailed = results.filter((r) => r.status === 'rejected').length
+        if (genesFailed > 0) {
+          window.alert(
+            `${form.name.trim() || 'This animal'} was saved. ${genesFailed} of ${
+              genes.length
+            } genes couldn't be recorded — you can add them from the Genetics section.`,
+          )
+        }
+      }
+
       // ADR-003: one taxon-agnostic detail route for every taxon.
       router.push(`/app/reptiles/${animal.id}`)
     } catch (err) {
@@ -618,6 +646,24 @@ function AddReptileForm() {
             </p>
           </Field>
         </section>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* Genetics — snakes only, matching the detail page's gate (the  */}
+        {/* gene catalog is ball-python-scoped for now). Without this,    */}
+        {/* recording a morph meant save → reopen → add genes.            */}
+        {/* ------------------------------------------------------------- */}
+        {offerGenes && (
+          <section className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
+            <h2 className={SECTION_HDR_CLS}>Genetics</h2>
+            <Field label="Genes" hint="Optional. Click a gene to change het / visual.">
+              <AddGenesField
+                scientificName={form.scientificName}
+                picked={genes}
+                onChange={setGenes}
+              />
+            </Field>
+          </section>
         )}
 
         {/* ------------------------------------------------------------- */}

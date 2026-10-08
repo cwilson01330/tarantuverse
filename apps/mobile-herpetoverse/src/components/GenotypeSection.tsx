@@ -17,6 +17,9 @@
  * trait list, and avoids a third UI mode.
  *
  * Lizards are NOT supported yet — the gene catalog is ball-python only.
+ *
+ * `readOnly` (died or transferred: the record is history and the API answers
+ * 409 on genotype writes) shows the chips without remove / add.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -55,9 +58,11 @@ interface Props {
   snakeId: string;
   /** Snake's scientific_name from the parent. Fallback to ball python. */
   scientificName?: string | null;
+  /** Died or transferred: show the genes, offer no add / remove. */
+  readOnly?: boolean;
 }
 
-export function GenotypeSection({ snakeId, scientificName, onSummary }: Props) {
+export function GenotypeSection({ snakeId, scientificName, onSummary, readOnly = false }: Props) {
   const { colors, layout } = useTheme();
 
   const [rows, setRows] = useState<AnimalGenotype[] | null>(null);
@@ -163,8 +168,9 @@ export function GenotypeSection({ snakeId, scientificName, onSummary }: Props) {
     <View style={{ gap: 10 }}>
       {sortedRows.length === 0 ? (
         <Text style={[styles.note, { color: colors.textSecondary }]}>
-          No genes recorded yet. Add what you know to fuel pairing
-          predictions in the morph calculator.
+          {readOnly
+            ? 'No genes were recorded for this animal.'
+            : 'No genes recorded yet. Add what you know to fuel pairing predictions in the morph calculator.'}
         </Text>
       ) : (
         <View style={styles.chipsWrap}>
@@ -172,21 +178,16 @@ export function GenotypeSection({ snakeId, scientificName, onSummary }: Props) {
             const gene = geneById[row.gene_id];
             const name = gene?.common_name ?? 'Unknown gene';
             const zygText = zygosityLabel(row.zygosity, row.poss_het_percentage);
-            return (
-              <TouchableOpacity
-                key={row.id}
-                onPress={() => handleDelete(row)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: colors.surfaceRaised,
-                    borderColor: colors.border,
-                    borderRadius: layout.radius.md,
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`${name}, ${zygText}. Tap to remove.`}
-              >
+            const chipStyle = [
+              styles.chip,
+              {
+                backgroundColor: colors.surfaceRaised,
+                borderColor: colors.border,
+                borderRadius: layout.radius.md,
+              },
+            ];
+            const chipBody = (
+              <>
                 <Text
                   style={[styles.chipPrimary, { color: colors.textPrimary }]}
                   numberOfLines={1}
@@ -206,13 +207,36 @@ export function GenotypeSection({ snakeId, scientificName, onSummary }: Props) {
                     proven
                   </Text>
                 ) : null}
+              </>
+            );
+            if (readOnly) {
+              return (
+                <View
+                  key={row.id}
+                  style={chipStyle}
+                  accessible
+                  accessibilityLabel={`${name}, ${zygText}`}
+                >
+                  {chipBody}
+                </View>
+              );
+            }
+            return (
+              <TouchableOpacity
+                key={row.id}
+                onPress={() => handleDelete(row)}
+                style={chipStyle}
+                accessibilityRole="button"
+                accessibilityLabel={`${name}, ${zygText}. Tap to remove.`}
+              >
+                {chipBody}
               </TouchableOpacity>
             );
           })}
         </View>
       )}
 
-      <TouchableOpacity
+      {!readOnly && <TouchableOpacity
         onPress={() => setAdding(true)}
         style={[
           styles.addButton,
@@ -232,10 +256,10 @@ export function GenotypeSection({ snakeId, scientificName, onSummary }: Props) {
         <Text style={[styles.addButtonText, { color: colors.primary }]}>
           Add gene
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity>}
 
       <AddGeneModal
-        visible={adding}
+        visible={adding && !readOnly}
         onClose={() => setAdding(false)}
         snakeId={snakeId}
         genes={genes ?? []}

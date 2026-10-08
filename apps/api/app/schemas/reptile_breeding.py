@@ -201,8 +201,10 @@ class GenotypeEntry(BaseModel):
     """One gene's recorded genotype on an offspring without a live FK.
 
     `gene_key` matches the slug we use throughout the morph calculator
-    (e.g. 'pied', 'albino'). `zygosity` mirrors the same vocabulary as
-    the animal_genotypes table: 'wild', 'het', 'hom'.
+    (e.g. 'pied', 'albino'). `zygosity` counts copies of the morph allele:
+    'wild' (0), 'het' (1), 'hom' (2). This is NOT the animal_genotypes
+    vocabulary (het / visual / poss_het / super) — routers/clutches.py
+    translates between the two by gene inheritance mode.
     """
     gene_key: str
     zygosity: Literal["wild", "het", "hom"]

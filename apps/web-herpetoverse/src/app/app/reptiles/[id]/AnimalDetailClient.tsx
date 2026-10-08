@@ -45,6 +45,8 @@ import { FeedingCadenceDialog } from '@/components/FeedingCadenceDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
 import ShareCardModal from '@/components/ShareCardModal'
 import DeleteAnimalModal from '@/components/DeleteAnimalModal'
+import AnimalEventsSection from '@/components/AnimalEventsSection'
+import GenotypeSection from '@/components/GenotypeSection'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatLength } from '@/lib/units'
 import {
@@ -558,6 +560,33 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           onShare={(id) => setShareEvent({ kind: 'shed', id })}
         />
       </Section>
+
+      {/* Health & events (ADR-015 D5, audit-2 M12) — injuries, illnesses,
+          escapes, recoveries, vet visits. Same permissions as the other
+          logs: loggers add and change only their own entries; nothing is
+          added or changed once the animal died or was handed off. */}
+      <Section title="Health & events">
+        <AnimalEventsSection
+          animalId={animal.id}
+          canAdd={access.canLog}
+          canChange={(e) => canChangeEntry(access, e)}
+        />
+      </Section>
+
+      {/* Genetics (audit-2 H2) — same gate as HV mobile: the owner and a
+          snake (the gene catalog is ball-python-scoped for now). Genotype
+          routes are owner-only, so co-keepers don't see it. A died or
+          transferred animal is history — the API answers 409 on genotype
+          writes — so its genes show read-only. */}
+      {access.isOwner && animal.taxon === 'snake' && (
+        <Section title="Genetics">
+          <GenotypeSection
+            animalId={animal.id}
+            scientificName={animal.scientific_name}
+            readOnly={access.closed}
+          />
+        </Section>
+      )}
 
       {/* Provenance — only when the animal arrived via a claimed transfer.
           Honest & plain: origin keeper, breeder handle, date acquired, and

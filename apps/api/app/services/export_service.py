@@ -45,6 +45,11 @@ from app.models.animal_genotype import AnimalGenotype
 from app.models.reptile_pairing import ReptilePairing
 from app.models.clutch import Clutch
 from app.models.reptile_offspring import ReptileOffspring
+# Herpetoverse feeder stock (ADR-012) — live colonies and frozen inventory.
+from app.models.hv_feeder import HvFeederLog, HvFeederStock
+# Tarantuverse feeder colonies (crickets, roaches, ...) and their care log.
+from app.models.feeder_colony import FeederColony
+from app.models.feeder_care_log import FeederCareLog
 from app.utils.units import EXPORT_UNITS
 
 
@@ -271,6 +276,35 @@ REPTILE_OFFSPRING_FIELDS = [
     "updated_at",
 ]
 
+# Herpetoverse feeder stock (ADR-012). `species_scientific_name` is not a
+# column: it is filled from the catalog row so the export is readable without
+# the catalog's ids.
+HV_FEEDER_STOCK_FIELDS = [
+    "id", "user_id", "hv_feeder_species_id", "species_scientific_name", "name",
+    "form", "inventory_mode", "count", "sized_counts", "storage_location",
+    "last_restocked", "last_used", "last_cleaned", "low_threshold", "notes",
+    "is_active", "created_at", "updated_at",
+]
+
+HV_FEEDER_LOG_FIELDS = [
+    "id", "hv_feeder_stock_id", "user_id", "log_type", "size", "count_delta",
+    "logged_at", "notes", "created_at",
+]
+
+# Tarantuverse feeder colonies. `species_scientific_name` is not a column:
+# it is filled from the feeder_species catalog row, as for HV stock.
+FEEDER_COLONY_FIELDS = [
+    "id", "user_id", "feeder_species_id", "species_scientific_name",
+    "enclosure_id", "name", "inventory_mode", "count", "life_stage_counts",
+    "last_restocked", "last_cleaned", "last_fed_date", "food_notes", "notes",
+    "low_threshold", "is_active", "created_at", "updated_at",
+]
+
+FEEDER_CARE_LOG_FIELDS = [
+    "id", "feeder_colony_id", "user_id", "log_type", "logged_at",
+    "count_delta", "notes", "created_at",
+]
+
 
 # ---------------------------------------------------------------------------
 # Query helpers
@@ -437,6 +471,60 @@ def _get_reptile_offspring(db: Session, user_id: UUID) -> List[ReptileOffspring]
     return db.query(ReptileOffspring).filter(ReptileOffspring.user_id == user_id).order_by(ReptileOffspring.created_at).all()
 
 
+def _get_hv_feeder_stocks(db: Session, user_id: UUID) -> List[HvFeederStock]:
+    """Every feeder stock the keeper owns, archived (is_active=False) included."""
+    return db.query(HvFeederStock).filter(HvFeederStock.user_id == user_id).order_by(HvFeederStock.created_at).all()
+
+
+def _get_hv_feeder_logs(db: Session, user_id: UUID) -> List[HvFeederLog]:
+    """Logs on the keeper's own stocks — by stock owner, so a log can't be
+    exported to anyone but the owner of the stock it belongs to."""
+    return (
+        db.query(HvFeederLog)
+        .filter(
+            HvFeederLog.hv_feeder_stock_id.in_(
+                select(HvFeederStock.id).where(HvFeederStock.user_id == user_id)
+            )
+        )
+        .order_by(HvFeederLog.logged_at, HvFeederLog.created_at)
+        .all()
+    )
+
+
+def _get_feeder_colonies(db: Session, user_id: UUID) -> List[FeederColony]:
+    """Every TV feeder colony the keeper owns, archived (is_active=False) included."""
+    return db.query(FeederColony).filter(FeederColony.user_id == user_id).order_by(FeederColony.created_at).all()
+
+
+def _get_feeder_care_logs(db: Session, user_id: UUID) -> List[FeederCareLog]:
+    """Care logs on the keeper's own colonies — by colony owner, like HV
+    feeder logs, so a log is only ever exported to its colony's owner."""
+    return (
+        db.query(FeederCareLog)
+        .filter(
+            FeederCareLog.feeder_colony_id.in_(
+                select(FeederColony.id).where(FeederColony.user_id == user_id)
+            )
+        )
+        .order_by(FeederCareLog.logged_at, FeederCareLog.created_at)
+        .all()
+    )
+
+
+def _feeder_colony_dict(colony: FeederColony) -> Dict[str, Any]:
+    row = _row_to_dict(colony, [f for f in FEEDER_COLONY_FIELDS if f != "species_scientific_name"])
+    species = colony.feeder_species
+    row["species_scientific_name"] = species.scientific_name if species else None
+    return {f: row.get(f) for f in FEEDER_COLONY_FIELDS}
+
+
+def _hv_feeder_stock_dict(stock: HvFeederStock) -> Dict[str, Any]:
+    row = _row_to_dict(stock, [f for f in HV_FEEDER_STOCK_FIELDS if f != "species_scientific_name"])
+    species = stock.hv_feeder_species
+    row["species_scientific_name"] = species.scientific_name if species else None
+    return {f: row.get(f) for f in HV_FEEDER_STOCK_FIELDS}
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -487,6 +575,12 @@ class ExportService:
             "reptile_pairings": [_row_to_dict(p, REPTILE_PAIRING_FIELDS) for p in _get_reptile_pairings(db, user.id)],
             "clutches": [_row_to_dict(c, CLUTCH_FIELDS) for c in _get_clutches(db, user.id)],
             "reptile_offspring": [_row_to_dict(o, REPTILE_OFFSPRING_FIELDS) for o in _get_reptile_offspring(db, user.id)],
+            # --- Herpetoverse feeder stock (ADR-012) ---
+            "hv_feeder_stocks": [_hv_feeder_stock_dict(s) for s in _get_hv_feeder_stocks(db, user.id)],
+            "hv_feeder_logs": [_row_to_dict(lg, HV_FEEDER_LOG_FIELDS) for lg in _get_hv_feeder_logs(db, user.id)],
+            # --- Tarantuverse feeder colonies ---
+            "feeder_colonies": [_feeder_colony_dict(c) for c in _get_feeder_colonies(db, user.id)],
+            "feeder_care_logs": [_row_to_dict(lg, FEEDER_CARE_LOG_FIELDS) for lg in _get_feeder_care_logs(db, user.id)],
             # --- Colony mode (ADR-010) ---
             "colonies": [_row_to_dict(c, COLONY_FIELDS) for c in colonies],
             "colony_events": [_row_to_dict(e, COLONY_EVENT_FIELDS) for e in _get_colony_events(db, c_ids)],
@@ -536,6 +630,17 @@ class ExportService:
                 "clutches": data["clutches"],
                 "offspring": data["reptile_offspring"],
             },
+            # Herpetoverse feeder stock (live colonies + frozen inventory)
+            "hv_feeders": {
+                "stocks": data["hv_feeder_stocks"],
+                "logs": data["hv_feeder_logs"],
+            },
+            # Tarantuverse feeder colonies (crickets, roaches, ...) + care logs.
+            # .get(): callers that build `data` by hand may predate them.
+            "feeders": {
+                "colonies": data.get("feeder_colonies") or [],
+                "care_logs": data.get("feeder_care_logs") or [],
+            },
             # Colony mode (ADR-010) population entries + their event log
             "colonies": data["colonies"],
             "colony_events": data["colony_events"],
@@ -559,6 +664,10 @@ class ExportService:
                 "reptile_pairings": len(data["reptile_pairings"]),
                 "clutches": len(data["clutches"]),
                 "reptile_offspring": len(data["reptile_offspring"]),
+                "hv_feeder_stocks": len(data["hv_feeder_stocks"]),
+                "hv_feeder_logs": len(data["hv_feeder_logs"]),
+                "feeder_colonies": len(data.get("feeder_colonies") or []),
+                "feeder_care_logs": len(data.get("feeder_care_logs") or []),
                 "colonies": len(data["colonies"]),
                 "colony_events": len(data["colony_events"]),
                 "care_logs": len(data["care_logs"]),
@@ -613,6 +722,16 @@ class ExportService:
                 zf.writestr("reptile_pairings.csv", ExportService._to_csv_bytes(data["reptile_pairings"], REPTILE_PAIRING_FIELDS))
                 zf.writestr("clutches.csv", ExportService._to_csv_bytes(data["clutches"], CLUTCH_FIELDS))
                 zf.writestr("reptile_offspring.csv", ExportService._to_csv_bytes(data["reptile_offspring"], REPTILE_OFFSPRING_FIELDS))
+
+            # Herpetoverse feeder stock — only when the keeper has any.
+            if data["hv_feeder_stocks"]:
+                zf.writestr("hv_feeder_stocks.csv", ExportService._to_csv_bytes(data["hv_feeder_stocks"], HV_FEEDER_STOCK_FIELDS))
+                zf.writestr("hv_feeder_logs.csv", ExportService._to_csv_bytes(data["hv_feeder_logs"], HV_FEEDER_LOG_FIELDS))
+
+            # Tarantuverse feeder colonies — only when the keeper has any.
+            if data.get("feeder_colonies"):
+                zf.writestr("feeder_colonies.csv", ExportService._to_csv_bytes(data["feeder_colonies"], FEEDER_COLONY_FIELDS))
+                zf.writestr("feeder_care_logs.csv", ExportService._to_csv_bytes(data.get("feeder_care_logs") or [], FEEDER_CARE_LOG_FIELDS))
 
             # Colony mode CSVs — only when the keeper has colonies.
             if data["colonies"]:
@@ -828,6 +947,29 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, 
             }
             if any(reptile_breeding.values()):
                 zf.writestr("reptile_breeding.json", json.dumps(reptile_breeding, indent=2, default=str))
+
+            # Herpetoverse feeder stock: one file, each stock with its logs.
+            # .get(): callers that build `data` by hand may predate feeders.
+            hv_stocks = data.get("hv_feeder_stocks") or []
+            if hv_stocks:
+                logs_by_stock = _group(data.get("hv_feeder_logs") or [], "hv_feeder_stock_id")
+                zf.writestr("hv_feeders.json", json.dumps(
+                    [{**s, "logs": logs_by_stock.get(str(s["id"]), [])} for s in hv_stocks],
+                    indent=2, default=str,
+                ))
+                zf.writestr("all_hv_feeder_stocks.csv", ExportService._to_csv_bytes(hv_stocks, HV_FEEDER_STOCK_FIELDS))
+                zf.writestr("all_hv_feeder_logs.csv", ExportService._to_csv_bytes(data.get("hv_feeder_logs") or [], HV_FEEDER_LOG_FIELDS))
+
+            # Tarantuverse feeder colonies: one file, each colony with its logs.
+            feeder_colonies = data.get("feeder_colonies") or []
+            if feeder_colonies:
+                logs_by_colony = _group(data.get("feeder_care_logs") or [], "feeder_colony_id")
+                zf.writestr("feeders.json", json.dumps(
+                    [{**c, "care_logs": logs_by_colony.get(str(c["id"]), [])} for c in feeder_colonies],
+                    indent=2, default=str,
+                ))
+                zf.writestr("all_feeder_colonies.csv", ExportService._to_csv_bytes(feeder_colonies, FEEDER_COLONY_FIELDS))
+                zf.writestr("all_feeder_care_logs.csv", ExportService._to_csv_bytes(data.get("feeder_care_logs") or [], FEEDER_CARE_LOG_FIELDS))
             if data["enclosures"]:
                 zf.writestr("enclosures.json", json.dumps(data["enclosures"], indent=2, default=str))
             breeding = {
@@ -879,6 +1021,10 @@ Files included:
   offspring.csv         – Offspring records
   colonies.csv          – Colony/population records (if any)
   colony_events.csv     – Colony population events (if any)
+  hv_feeder_stocks.csv  – Herpetoverse feeder stock, live and frozen (if any)
+  hv_feeder_logs.csv    – Feeder restock / used / cleaned records (if any)
+  feeder_colonies.csv   – Feeder colonies: crickets, roaches, ... (if any)
+  feeder_care_logs.csv  – Feeder colony care / restock records (if any)
   profile.json          – Your profile information
 
 Units: every number is in the units it is stored in, whatever your
@@ -910,12 +1056,19 @@ Structure:
   animals/<name>_<id>/        – Herpetoverse reptiles and amphibians (if any)
   enclosures.json             – Enclosure data (if any)
   breeding.json               – Pairings, egg sacs, offspring (if any)
+  reptile_breeding.json       – Reptile pairings, clutches, offspring (if any)
+  hv_feeders.json             – Herpetoverse feeder stock with its logs (if any)
+  feeders.json                – Feeder colonies with their care logs (if any)
   all_animals.csv             – Every animal, every taxon, in one sheet
   all_feeding_logs.csv        – Feeding logs in spreadsheet format
   all_molt_logs.csv           – Molt logs in spreadsheet format
   all_substrate_changes.csv   – Substrate changes in spreadsheet format
   all_care_logs.csv           – Water, overflow and misting records
   all_colonies.csv            – Colonies (if any)
+  all_hv_feeder_stocks.csv    – Herpetoverse feeder stock (if any)
+  all_hv_feeder_logs.csv      – Feeder stock logs (if any)
+  all_feeder_colonies.csv     – Feeder colonies (if any)
+  all_feeder_care_logs.csv    – Feeder colony care logs (if any)
 
 Units: every number is in the units it is stored in, whatever your
 Settings > Units choice is. Lengths are in inches (molt leg span / body

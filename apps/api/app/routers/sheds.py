@@ -30,6 +30,7 @@ from app.models.shed_log import ShedLog
 from app.schemas.shed_log import ShedLogCreate, ShedLogUpdate, ShedLogResponse
 from app.utils.dependencies import get_current_user
 from app.utils.access import access_helper, load_animal, load_log_parent, policy, require_can_change
+from app.routers.animals import refuse_if_closed
 
 router = APIRouter()
 
@@ -81,6 +82,7 @@ async def create_shed(
     """Log a shed. Denormalizes `animals.last_shed_at` so the dashboard
     "X days since shed" badge doesn't re-scan the shed history."""
     animal, access = load_animal(db, current_user, animal_id, "logger")
+    refuse_if_closed(animal)  # no new logs on a died / transferred animal
 
     new_shed = ShedLog(animal_id=animal_id, logged_by_user_id=access.logged_by_user_id, **shed_data.model_dump())
     db.add(new_shed)

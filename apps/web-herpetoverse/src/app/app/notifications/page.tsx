@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import { useAuth } from '@/lib/auth'
@@ -185,6 +186,12 @@ export default function NotificationsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Link
+            href="/app/settings/notifications"
+            className="px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-neutral-200 hover:bg-neutral-900 transition-colors"
+          >
+            Settings
+          </Link>
           {hasUnread && (
             <button
               onClick={handleMarkAllRead}

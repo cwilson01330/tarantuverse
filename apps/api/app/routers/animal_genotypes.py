@@ -22,6 +22,7 @@ from app.models.animal import Animal
 from app.models.animal_genotype import AnimalGenotype
 from app.models.gene import Gene
 from app.models.user import User
+from app.routers.animals import refuse_if_closed
 from app.schemas.animal_genotype import (
     AnimalGenotypeCreate,
     AnimalGenotypeResponse,
@@ -35,7 +36,8 @@ router = APIRouter()
 
 
 def _get_owned_animal(db: Session, animal_id: UUID, user: User) -> Animal:
-    """Fetch an animal owned by the current user, or 404."""
+    """Fetch an animal owned by the current user, or 404. Reads only — the
+    write routes go through _get_writable_animal."""
     animal = (
         db.query(Animal)
         .filter(Animal.id == animal_id, Animal.user_id == user.id)
@@ -43,6 +45,15 @@ def _get_owned_animal(db: Session, animal_id: UUID, user: User) -> Animal:
     )
     if not animal:
         raise HTTPException(status_code=404, detail="Animal not found")
+    return animal
+
+
+def _get_writable_animal(db: Session, animal_id: UUID, user: User) -> Animal:
+    """An owned animal that is still a living record. 409 when it died or
+    was transferred — its genotype is history, like the rest of the record
+    (routers/animals.py::refuse_if_closed)."""
+    animal = _get_owned_animal(db, animal_id, user)
+    refuse_if_closed(animal)
     return animal
 
 
@@ -109,7 +120,7 @@ async def add_genotype(
     het for one phenotype, visual for another combined morph), so we
     don't enforce uniqueness on (animal_id, gene_id).
     """
-    _get_owned_animal(db, animal_id, current_user)
+    _get_writable_animal(db, animal_id, current_user)
     _validate_gene_exists(db, payload.gene_id)
     _validate_poss_het_consistency(payload.zygosity, payload.poss_het_percentage)
 
@@ -133,7 +144,7 @@ async def update_genotype(
     current_user: User = Depends(get_current_user),
 ):
     """Update a genotype row. Auth + ownership (on the parent animal)."""
-    _get_owned_animal(db, animal_id, current_user)
+    _get_writable_animal(db, animal_id, current_user)
 
     row = (
         db.query(AnimalGenotype)
@@ -178,7 +189,7 @@ async def delete_genotype(
     current_user: User = Depends(get_current_user),
 ):
     """Remove a gene record from an owned animal. Auth + ownership."""
-    _get_owned_animal(db, animal_id, current_user)
+    _get_writable_animal(db, animal_id, current_user)
 
     row = (
         db.query(AnimalGenotype)

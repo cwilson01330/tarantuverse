@@ -51,6 +51,7 @@ from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.config import settings
 from app.utils.access import policy
 from app.utils.legacy_logs import tarantula_logs
+from app.routers.animals import refuse_if_closed
 
 logger = logging.getLogger(__name__)
 
@@ -633,7 +634,12 @@ async def upload_photo_via_token(
     # Free-plan photo limit for Tarantuverse animals. A QR upload used to be a
     # way round it. Herpetoverse animals ('animal' sessions) and colonies
     # aren't capped (by design) — they fall outside the tuple below.
-    qr_kind, _ = _session_parent(session)
+    qr_kind, qr_parent = _session_parent(session)
+    # The session was opened while the animal was live; it may have been
+    # marked died or transferred in the 20 minutes since. Herpetoverse
+    # animals only — the TV invert routes don't refuse closed records.
+    if qr_kind == "animal" and qr_parent is not None:
+        refuse_if_closed(qr_parent)
     if qr_kind in ("tarantula", "scorpion", "invert") and session.user is not None:
         from app.utils.limits import enforce_photo_cap
         enforce_photo_cap(

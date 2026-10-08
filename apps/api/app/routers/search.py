@@ -1,6 +1,11 @@
 """
 Global search router - search across the keeper's animals (every taxon and
-colonies), species (both catalogs), keepers, and forums
+colonies), species (both catalogs), keepers, and forums.
+
+`app=herpetoverse` searches the keeper's own Herpetoverse animals instead of
+their Tarantuverse inverts/colonies (results under the `animals` key, with HV
+web URLs). Animals are only ever the CURRENT USER's own rows — never another
+keeper's, and nothing at all when signed out.
 """
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -12,6 +17,7 @@ from app.models.user import User
 from app.utils.test_accounts import real_user_clause
 from app.models.invert import Invert
 from app.models.colony import Colony
+from app.models.animal import Animal
 from app.models.invert_species import InvertSpecies
 from app.models.species import Species
 from app.models.forum import ForumThread
@@ -43,6 +49,11 @@ def get_current_user_optional(
 async def global_search(
     q: str = Query(..., min_length=2, description="Search query"),
     type: Optional[str] = Query(None, description="Filter by type: tarantulas, species, keepers, or forums"),
+    app: Optional[str] = Query(
+        None,
+        pattern="^(tarantuverse|herpetoverse)$",
+        description="Which app's collection to search; herpetoverse = the keeper's own HV animals",
+    ),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ) -> SearchResponse:
@@ -63,7 +74,33 @@ async def global_search(
     # scorpion or isopod could never be found.) Results stay under the
     # `tarantulas` key so existing clients keep working; the URL routes each
     # one to the right detail screen.
-    if not type or type in ("tarantulas", "animals"):
+    if app == "herpetoverse":
+        if (not type or type == "animals") and current_user:
+            # Own animals only (user_id), never co-kept or other keepers'
+            # rows. Transferred-out animals belong to the buyer now; died
+            # ones stay findable but sort last, as on TV.
+            animals = db.query(Animal).filter(
+                Animal.user_id == current_user.id,
+                Animal.transferred_out_at.is_(None),
+                or_(
+                    Animal.name.ilike(search_term),
+                    Animal.common_name.ilike(search_term),
+                    Animal.scientific_name.ilike(search_term),
+                )
+            ).order_by(Animal.died_at.isnot(None), Animal.name).limit(5).all()
+
+            for animal in animals:
+                results.animals.append(
+                    SearchResult(
+                        id=str(animal.id),
+                        type=animal.taxon,
+                        title=animal.name or animal.common_name or animal.scientific_name or "Unnamed",
+                        subtitle=animal.scientific_name or animal.common_name,
+                        image_url=animal.photo_url,
+                        url=f"/app/reptiles/{animal.id}",
+                    )
+                )
+    elif not type or type in ("tarantulas", "animals"):
         if current_user:
             inverts = db.query(Invert).filter(
                 Invert.user_id == current_user.id,
@@ -201,6 +238,7 @@ async def global_search(
 
     # Calculate total results
     results.total_results = (
+        len(results.animals) +
         len(results.tarantulas) +
         len(results.species) +
         len(results.keepers) +

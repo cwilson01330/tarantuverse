@@ -42,6 +42,7 @@ from app.services.feeding_reminder_service import get_user_feeding_reminders
 # ADR-005 Phase A2 — opportunistically populate invert_id on new logs.
 from app.services.inverts_dualwrite import invert_id_if_exists
 from app.utils.legacy_logs import tarantula_logs
+from app.routers.animals import refuse_if_closed
 
 router = APIRouter()
 
@@ -177,6 +178,9 @@ async def create_animal_feeding_log(
     herp icons — tarantula feedings still emit via create_activity.
     """
     animal, access = load_animal(db, current_user, animal_id, "logger")
+    # A died or transferred animal's record is history: no new logs. Editing
+    # or deleting an existing entry stays open (TV parity, tests/test_hv_closed_logs.py).
+    refuse_if_closed(animal)
 
     new_feeding = FeedingLog(
         animal_id=animal_id,
@@ -214,6 +218,7 @@ async def quick_feed_animal(
     daily); precise details can still be edited on the log afterward.
     """
     animal, access = load_animal(db, current_user, animal_id, "logger")
+    refuse_if_closed(animal)  # no new logs on a died / transferred animal
 
     # Remember the last meal (most recent feeding of any outcome).
     last = (

@@ -31,6 +31,7 @@ from app.utils.photo_cleanup import delete_files
 from app.utils.limits import enforce_photo_cap
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.utils.legacy_logs import tarantula_logs
+from app.routers.animals import refuse_if_closed
 
 
 class PhotoUpdate(BaseModel):
@@ -205,6 +206,10 @@ async def upload_animal_photo(
     gate here keyed off `Photo.animal_id == animal_id`.
     """
     animal, access = load_animal(db, current_user, animal_id, "logger", not_found="Animal not found")
+    # No new photos on a died / transferred animal (same rule as the QR
+    # session route). Captions, hero choice and deletes on existing photos
+    # stay open — TV parity.
+    refuse_if_closed(animal)
 
     try:
         file_data = await file.read()

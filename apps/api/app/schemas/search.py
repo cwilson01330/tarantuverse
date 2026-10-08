@@ -23,6 +23,9 @@ class SearchResponse(BaseModel):
     query: str
     total_results: int
     tarantulas: List[SearchResult] = []
+    # Herpetoverse animals — only filled when the request passes
+    # app=herpetoverse, so Tarantuverse clients never see (or count) them.
+    animals: List[SearchResult] = []
     species: List[SearchResult] = []
     keepers: List[SearchResult] = []
     forums: List[SearchResult] = []

@@ -67,6 +67,9 @@ interface ReptileRow {
   taxon: Taxon
   id: string
   title: string
+  /** Keeper's own name and the common name — searched, not displayed. */
+  name: string | null
+  common_name: string | null
   scientific_name: string | null
   sex: Animal['sex']
   current_weight_g: string | null
@@ -83,6 +86,8 @@ function animalRow(a: Animal): ReptileRow {
     taxon: a.taxon,
     id: a.id,
     title: animalTitle(a),
+    name: a.name,
+    common_name: a.common_name,
     scientific_name: a.scientific_name,
     sex: a.sex,
     current_weight_g: a.current_weight_g,
@@ -91,6 +96,22 @@ function animalRow(a: Animal): ReptileRow {
     location: a.location ?? null,
     created_at: a.created_at,
   }
+}
+
+/**
+ * Local search, same rule as HV mobile's Collection tab: case-insensitive
+ * substring over the keeper's name for the animal, the common name and the
+ * scientific name — the fields the keeper sees. Empty query matches all.
+ */
+function matchesQuery(
+  a: { name: string | null; common_name: string | null; scientific_name: string | null },
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return [a.name, a.common_name, a.scientific_name].some((v) =>
+    (v ?? '').toLowerCase().includes(q),
+  )
 }
 
 /** Detail page URL — ADR-003 collapsed the per-taxon route trees, so
@@ -111,6 +132,8 @@ export default function ReptilesPage() {
   const [error, setError] = useState<string | null>(null)
   // null = "All"; otherwise the active taxon filter.
   const [activeTaxon, setActiveTaxon] = useState<Taxon | null>(null)
+  // Local search — filters the rows already loaded (no endpoint, no debounce).
+  const [query, setQuery] = useState('')
   // Free-tier usage counter (X / N). null until loaded; hidden for premium.
   const [limits, setLimits] = useState<AnimalLimits | null>(null)
   // The "Deceased" archive (ADR-015, handoff §14.5). The default list above
@@ -247,8 +270,9 @@ export default function ReptilesPage() {
 
   const visibleRows = useMemo(() => {
     if (!rows) return rows
-    return activeTaxon ? rows.filter((r) => r.taxon === activeTaxon) : rows
-  }, [rows, activeTaxon])
+    const byTaxon = activeTaxon ? rows.filter((r) => r.taxon === activeTaxon) : rows
+    return byTaxon.filter((r) => matchesQuery(r, query))
+  }, [rows, activeTaxon, query])
 
   const hasAnyLocation =
     keeperLocations.length > 0 || (rows ?? []).some((r) => !!r.location)
@@ -395,8 +419,31 @@ export default function ReptilesPage() {
         </div>
       )}
 
+      {/* Search — once there is anything to search. */}
+      {rows !== null && (rows.length > 0 || deceased.length > 0) && (
+        <div className="mb-4 relative max-w-md">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+            </svg>
+          </span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or species"
+            aria-label="Search your collection by name or species"
+            autoComplete="off"
+            className="w-full pl-9 pr-3 py-2 rounded-md bg-neutral-950 border border-neutral-800 focus:border-herp-teal focus:outline-none focus:ring-1 focus:ring-herp-teal/50 text-sm text-neutral-100 placeholder-neutral-600"
+          />
+        </div>
+      )}
+
       {view === 'deceased' && deceased.length > 0 ? (
-        <DeceasedArchive items={deceased} />
+        <DeceasedArchive items={deceased} query={query} />
       ) : (
       <>
       {/* Group by location — only once a location exists anywhere. */}
@@ -457,7 +504,9 @@ export default function ReptilesPage() {
         <EmptyState />
       ) : visibleRows && visibleRows.length === 0 ? (
         <div className="p-8 rounded-lg border border-dashed border-neutral-800 bg-neutral-900/30 text-center text-sm text-neutral-400">
-          No {activeTaxon ? ANIMAL_TAXA[activeTaxon].plural.toLowerCase() : 'animals'} in your collection yet.
+          {query.trim()
+            ? `Nothing matches “${query.trim()}”.`
+            : `No ${activeTaxon ? ANIMAL_TAXA[activeTaxon].plural.toLowerCase() : 'animals'} in your collection yet.`}
         </div>
       ) : grouped ? (
         <div className="space-y-8">
@@ -521,17 +570,19 @@ function tenureMs(a: Animal): number {
  *  (§14.5). Flat and factual: a neutral dot, the date, and how long the animal
  *  was in the keeper's care. "Longest in your care" is a sort, never the
  *  default — it must not read as a leaderboard. */
-function DeceasedArchive({ items }: { items: Animal[] }) {
+function DeceasedArchive({ items, query }: { items: Animal[]; query: string }) {
   const [sort, setSort] = useState<ArchiveSort>('recent')
 
   const rows = useMemo(
     () =>
-      [...items].sort((a, b) =>
-        sort === 'tenure'
-          ? tenureMs(b) - tenureMs(a)
-          : (b.died_at ?? '').localeCompare(a.died_at ?? ''),
-      ),
-    [items, sort],
+      items
+        .filter((a) => matchesQuery(a, query))
+        .sort((a, b) =>
+          sort === 'tenure'
+            ? tenureMs(b) - tenureMs(a)
+            : (b.died_at ?? '').localeCompare(a.died_at ?? ''),
+        ),
+    [items, sort, query],
   )
 
   const sortChip = (value: ArchiveSort, label: string) => {
@@ -559,6 +610,11 @@ function DeceasedArchive({ items }: { items: Animal[] }) {
         {sortChip('recent', 'Most recent')}
         {sortChip('tenure', 'Longest in your care')}
       </div>
+      {rows.length === 0 && query.trim() && (
+        <p className="p-6 rounded-lg border border-dashed border-neutral-800 bg-neutral-900/30 text-center text-sm text-neutral-400">
+          Nothing matches “{query.trim()}”.
+        </p>
+      )}
       <ul className="space-y-2">
         {rows.map((a) => {
           const name = animalTitle(a)

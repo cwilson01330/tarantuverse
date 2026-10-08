@@ -76,10 +76,10 @@ import {
   listWeightLogs,
 } from '../lib/animals';
 import { type Photo, listPhotos } from '../lib/photos';
+import { type AnimalEvent, eventTitle, listAnimalEvents } from '../lib/animal-events';
 import { useAuth } from '../contexts/AuthContext';
 import { TYPE } from '../theme/type';
-import { ROLE_HELP, ROLE_LABEL, can, canChangeEntry, useCollectionRole } from '../lib/co-keepers';
-
+import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../lib/co-keepers';
 /** Empty-state glyph for the hero card when there's no photo. */
 /**
  * Glyph from the taxon registry. The previous ternary only knew snake and
@@ -104,6 +104,9 @@ export function AnimalDetailScreen() {
   const [feedings, setFeedings] = useState<FeedingLog[]>([]);
   const [sheds, setSheds] = useState<ShedLog[]>([]);
   const [photos, setPhotos] = useState<Photo[] | null>(null);
+  // Health & events (ADR-015 D5, audit-2 M12). null until the first load.
+  const [events, setEvents] = useState<AnimalEvent[] | null>(null);
+  const [eventsError, setEventsError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
@@ -157,14 +160,18 @@ export function AnimalDetailScreen() {
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
-    const [animalR, weightsR, feedingsR, shedsR, photosR] =
+    const [animalR, weightsR, feedingsR, shedsR, photosR, eventsR] =
       await Promise.allSettled([
         getAnimal(id),
         listWeightLogs(id),
         listFeedings(id),
         listSheds(id),
         listPhotos(id),
+        listAnimalEvents(id),
       ]);
+    // A failed fetch must not read as "nothing recorded" (§14).
+    if (eventsR.status === 'fulfilled') setEvents(eventsR.value);
+    setEventsError(eventsR.status === 'rejected');
 
     if (animalR.status === 'fulfilled') {
       setAnimal(animalR.value);
@@ -443,6 +450,94 @@ export function AnimalDetailScreen() {
           />
         </Section>
 
+        {/* Health & events (ADR-015 D5, audit-2 M12) — injuries, illnesses,
+            escapes, recoveries, vet visits. HV twin of TV's events log. Same
+            permissions as the other logs: loggers add and change only their
+            own entries; nothing is added or changed once the animal died or
+            was handed off (canLog / mayChange already fold in `closed`).
+            Tapping a row opens it for edit, where Delete lives — the same
+            pattern as feedings / weights / sheds here. */}
+        <Section title="Health & events">
+          {eventsError ? (
+            <View
+              style={[styles.historyError, { borderColor: colors.danger + '55', backgroundColor: colors.danger + '12' }]}
+              accessibilityRole="alert"
+            >
+              <Text style={[TYPE.body, { color: colors.textPrimary }]}>
+                This animal&apos;s events didn&apos;t load.
+              </Text>
+              <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+                <Text style={[TYPE.bodyStrong, { color: colors.accent }]}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : events && events.length === 0 ? (
+            <Text style={[TYPE.body, { color: colors.textTertiary }]}>
+              No events recorded. Injuries, illnesses, escapes and recoveries go here.
+            </Text>
+          ) : events ? (
+            <View style={[styles.eventList, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              {events.map((e, i) => {
+                const sub = [e.notes, attribution(e)].filter(Boolean).join(' · ');
+                const editable = mayChange(e);
+                const row = (
+                  <>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.eventHead}>
+                        <Text
+                          style={[
+                            TYPE.bodyStrong,
+                            { flex: 1, color: e.event_type === 'recovered' ? colors.success : colors.textPrimary },
+                          ]}
+                        >
+                          {eventTitle(e)}
+                        </Text>
+                        <Text style={[TYPE.caption, { color: colors.textTertiary }]}>{fmtDay(e.occurred_at)}</Text>
+                      </View>
+                      {sub ? (
+                        <Text style={[TYPE.caption, { color: colors.textSecondary }]}>{sub}</Text>
+                      ) : null}
+                    </View>
+                    {editable ? (
+                      <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textTertiary} />
+                    ) : null}
+                  </>
+                );
+                const rowStyle = [
+                  styles.eventRow,
+                  i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null,
+                ];
+                return editable ? (
+                  <TouchableOpacity
+                    key={e.id}
+                    style={rowStyle}
+                    onPress={() => router.push(`/reptile/log-event/${animal.id}?eventId=${e.id}` as never)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${eventTitle(e)}, ${fmtDay(e.occurred_at)}. Edit or delete.`}
+                  >
+                    {row}
+                  </TouchableOpacity>
+                ) : (
+                  <View key={e.id} style={rowStyle}>
+                    {row}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <ActivityIndicator color={colors.primary} />
+          )}
+          {canLog && (
+            <TouchableOpacity
+              onPress={() => router.push(`/reptile/log-event/${animal.id}` as never)}
+              style={styles.textAction}
+              accessibilityRole="button"
+              accessibilityLabel={`Log an event for ${animalTitle(animal)}`}
+            >
+              <Text style={[TYPE.bodyStrong, { color: colors.accent }]}>+ Log event</Text>
+            </TouchableOpacity>
+          )}
+        </Section>
+
         {/* Provenance + Transfer/Rehome. The section renders a Provenance
             card only when the animal carries a claimed snapshot, and either a
             "Transferred" badge or the rehome action depending on
@@ -509,8 +604,10 @@ export function AnimalDetailScreen() {
         {/* Genetics — gated to snakes for now: the gene catalog is
             ball-python-scoped. When the catalog gains lizard/frog genes
             this `taxon === 'snake'` check loosens. */}
-        {/* Genetics stay with the owner for now (rung 3 v1 surface). */}
-        {isOwner && !dead && animal.taxon === 'snake' && (
+        {/* Genetics stay with the owner for now (rung 3 v1 surface). A died
+            or transferred animal is history — the API answers 409 on
+            genotype writes — so its genes show read-only (same as HV web). */}
+        {isOwner && animal.taxon === 'snake' && (
           <View style={[styles.collapsible, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
               onPress={() => setGeneticsOpen((o) => !o)}
@@ -541,8 +638,9 @@ export function AnimalDetailScreen() {
                 snakeId={animal.id}
                 scientificName={animal.scientific_name}
                 onSummary={setGeneSummary}
+                readOnly={closed}
               />
-              <TouchableOpacity
+              {!closed && <TouchableOpacity
                 onPress={() => router.push(`/morph-calculator?snakeId=${animal.id}` as never)}
                 style={[styles.calculatorLink, { borderColor: colors.border, borderRadius: 8 }]}
                 accessibilityRole="button"
@@ -551,7 +649,7 @@ export function AnimalDetailScreen() {
                 <MaterialCommunityIcons name="calculator-variant" size={18} color={colors.primary} />
                 <Text style={[TYPE.bodyStrong, { color: colors.primary, flex: 1 }]}>Open morph calculator</Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textTertiary} />
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
           </View>
         )}
@@ -659,6 +757,9 @@ const styles = StyleSheet.create({
   belowHero: { paddingHorizontal: 16, gap: 16 },
   linkRow: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  eventList: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, minHeight: 44 },
+  eventHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
 
   // Pinned log bar
   logBar: {

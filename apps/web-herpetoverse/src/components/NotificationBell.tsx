@@ -271,15 +271,24 @@ export default function NotificationBell() {
             </div>
 
             {/* Footer */}
-            <div className="p-2 border-t border-neutral-800">
+            <div className="p-2 border-t border-neutral-800 flex gap-1">
               <button
                 onClick={() => {
                   setOpen(false)
                   router.push('/app/notifications')
                 }}
-                className="w-full text-center text-sm font-medium text-herp-teal hover:text-herp-lime hover:bg-neutral-900 rounded-lg py-2 transition-colors"
+                className="flex-1 text-center text-sm font-medium text-herp-teal hover:text-herp-lime hover:bg-neutral-900 rounded-lg py-2 transition-colors"
               >
                 See all
+              </button>
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  router.push('/app/settings/notifications')
+                }}
+                className="flex-1 text-center text-sm font-medium text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900 rounded-lg py-2 transition-colors"
+              >
+                Settings
               </button>
             </div>
           </div>

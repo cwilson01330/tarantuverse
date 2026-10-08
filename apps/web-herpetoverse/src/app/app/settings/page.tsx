@@ -10,13 +10,15 @@
  * on the mobile side; keeping web and mobile at parity means the same
  * controls live here.
  *
- * Avatar upload, username change (30-day cooldown), and notification
- * preferences are tracked for later bundles. Data export is live below
+ * Avatar upload and username change (30-day cooldown) are tracked for
+ * later bundles. Notification preferences live at /app/settings/notifications
+ * (linked below). Data export is live below
  * (reptile-aware — the shared exporter now includes animals + sheds +
  * weights + reptile breeding).
  */
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { clearSession, getToken, setSession } from '@/lib/auth'
@@ -408,6 +410,21 @@ export default function SettingsPage() {
           {/* ---------- Units ---------- */}
           <UnitsCard />
 
+          {/* ---------- Notifications ---------- */}
+          <div className={CARD_CLS}>
+            <h2 className={SECTION_HDR_CLS}>Notifications</h2>
+            <p className="text-sm text-neutral-500 mt-1">
+              Daily feeding digest, phone reminders, sitter activity and quiet
+              hours. Shared with Tarantuverse.
+            </p>
+            <Link
+              href="/app/settings/notifications"
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-md border border-neutral-700 text-sm font-medium text-neutral-200 hover:bg-neutral-800 transition-colors"
+            >
+              Notification settings <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+
           {/* ---------- Support & legal ---------- */}
           <div className={CARD_CLS}>
             <h2 className={SECTION_HDR_CLS}>Support &amp; legal</h2>
@@ -426,7 +443,7 @@ export default function SettingsPage() {
             <h2 className={SECTION_HDR_CLS}>Data export</h2>
             <p className="text-sm text-neutral-500 mt-1">
               Download everything in your account — animals, feeding, shed and
-              weight logs, breeding records, and photo metadata. Your data is
+              weight logs, breeding records, feeder stock, and photo metadata. Your data is
               yours to keep.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">

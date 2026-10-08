@@ -38,6 +38,7 @@ from app.models.animal import Animal
 from app.models.reptile_species import ReptileSpecies
 from app.models.weight_log import WeightLog
 from app.services.feeding_reminder_service import parse_frequency_string
+from app.routers.animals import refuse_if_closed
 from app.schemas.weight_log import (
     WeightLogCreate,
     WeightLogUpdate,
@@ -264,6 +265,7 @@ async def create_weight_log(
     new entry is the most recent one — backfilling older weights leaves
     the current-weight hint untouched."""
     animal, access = load_animal(db, current_user, animal_id, "logger")
+    refuse_if_closed(animal)  # no new logs on a died / transferred animal
 
     new_log = WeightLog(animal_id=animal_id, logged_by_user_id=access.logged_by_user_id, **payload.model_dump())
     db.add(new_log)

@@ -36,9 +36,15 @@ finding was checked against the code (file:line in each report):
 
 > **Groups 2–4 done and verified 2026-10-09** (2280 API tests pass; tsc clean on
 > all four apps after one HV mobile type fix; token gate and lint clean).
-> Still open after this batch: HV web genetics UI (hv H2), HV web notifications
-> page + search (hv M9), HV per-animal events client (hv M12), HV feeder-stock
-> export (hv M11), and the two decisions in section 5.
+> **HV batch done 2026-10-09** (2386 API tests, tsc ×4, token gate): HV web
+> genetics + hold-back copies the hatch genotype (H2); per-animal events on HV
+> web + mobile (M12); HV web notification settings + collection search, API
+> search `app=herpetoverse` (M9); HV and TV feeder stock in exports (M11);
+> clutch predictions read visual/super genes; HV events, genotype, feeding,
+> shed, weight and photo creates refuse closed animals (edits/deletes of old
+> logs stay open, as on TV). Still open: the two decisions in section 5, TV has
+> no server-side closed-animal rule, and dominant genes stored as "visual" are
+> read as one copy by predictions but two by the morph calculator.
 
 ### 2. Safety / destructive actions
 - Deleting an HV animal silently cascades to its pairings, clutches and offspring; neither confirm says so. *hv H1*

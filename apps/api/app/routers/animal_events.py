@@ -27,6 +27,7 @@ from app.schemas.animal_event import (
     AnimalEventResponse,
     AnimalEventUpdate,
 )
+from app.routers.animals import refuse_if_closed
 from app.utils.dependencies import get_current_user
 from app.utils.access import access_helper, load_animal, load_invert, load_log_parent, policy, require_can_change
 
@@ -39,8 +40,21 @@ def _event_for(event_id: uuid.UUID, db: Session, user: User, need: str):
     co-keeper). 404 for missing and for no access alike — the old helper
     answered 403 for someone else's event, confirming it existed."""
     event = db.query(AnimalEvent).filter(AnimalEvent.id == event_id).first()
-    _parent, access = load_log_parent(db, user, event, need, not_found="Event not found")
-    return event, access
+    parent, access = load_log_parent(db, user, event, need, not_found="Event not found")
+    return event, access, parent
+
+
+def _refuse_if_closed_hv(event: AnimalEvent, parent) -> None:
+    """A Herpetoverse animal that died or was transferred is history: its
+    event log is frozen like the rest of the record (routers/animals.py::
+    refuse_if_closed). TV inverts are not covered here — this rule is HV's.
+
+    Invert events follow the TV invert log routes (feedings / molts /
+    substrate changes / care logs / photos), which don't refuse a died or
+    transferred invert server-side; the TV clients hide "add" on a died
+    invert. Pinned by tests/test_hv_closed_logs.py — change both together."""
+    if event.animal_id:
+        refuse_if_closed(parent)
 
 
 def _ordered(query):
@@ -133,8 +147,11 @@ async def create_animal_event(
     current_user: User = Depends(get_current_user),
 ):
     """Record something that happened to this animal. See the TV twin for why
-    a `death` event doesn't touch the animal's lifecycle."""
-    _animal, access = load_animal(db, current_user, animal_id, "logger")
+    a `death` event doesn't touch the animal's lifecycle.
+
+    409 for a died or transferred animal — its record is history."""
+    animal, access = load_animal(db, current_user, animal_id, "logger")
+    refuse_if_closed(animal)
     event = AnimalEvent(
         animal_id=animal_id,
         user_id=access.owner.id,
@@ -168,8 +185,9 @@ async def update_animal_event(
     read-only would push keepers into deleting and re-adding, which loses the
     original date.
     """
-    event, access = _event_for(event_id, db, current_user, "logger")
+    event, access, parent = _event_for(event_id, db, current_user, "logger")
     require_can_change(access, event)
+    _refuse_if_closed_hv(event, parent)
 
     # exclude_unset so a PATCH-style body can't null fields it never mentioned.
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -187,8 +205,9 @@ async def delete_animal_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    event, access = _event_for(event_id, db, current_user, "logger")
+    event, access, parent = _event_for(event_id, db, current_user, "logger")
     require_can_change(access, event)
+    _refuse_if_closed_hv(event, parent)
 
     db.delete(event)
     db.commit()
