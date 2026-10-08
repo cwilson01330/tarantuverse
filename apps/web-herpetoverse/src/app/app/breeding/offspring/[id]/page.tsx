@@ -29,12 +29,16 @@ import {
   type ReptileOffspring,
   type UpdateOffspringPayload,
   OFFSPRING_STATUS_LABEL,
+  breedingVocab,
   deleteOffspring,
   getClutch,
   getOffspring,
   getPairing,
   updateOffspring,
 } from '@/lib/breeding'
+import { useUnits } from '@/components/UnitsProvider'
+import { useUnitField } from '@/hooks/useUnitField'
+import { toNum } from '@/lib/units'
 // ADR-003: snake/lizard libs collapsed into lib/animals — one create
 // call + one getter, taxon rides in the payload / on the record.
 import {
@@ -102,6 +106,18 @@ export default function OffspringDetailPage({
   // Offspring no longer carries a taxon — it's on the linked animal
   // record. We resolve it for the "linked to collection" card's href.
   const [linkedTaxon, setLinkedTaxon] = useState<AnimalTaxon | null>(null)
+  // The pairing's taxon — drives the wording and is REQUIRED for hold-back
+  // (it used to fall back to 'snake', creating a snake under a frog pairing
+  // whenever the lookup failed).
+  const [pairingTaxon, setPairingTaxon] = useState<AnimalTaxon | null>(null)
+  const vocab = breedingVocab(pairingTaxon)
+
+  // Hatch measurements — weight in grams (never converted), length stored
+  // in inches and typed in the keeper's units.
+  const { units } = useUnits()
+  const [weightDraft, setWeightDraft] = useState('')
+  const hatchLength = useUnitField('length')
+  const { load: loadHatchLength } = hatchLength
 
   useEffect(() => {
     let cancelled = false
@@ -114,6 +130,12 @@ export default function OffspringDetailPage({
         setBuyerDraft(next.buyer_info ?? '')
         setPriceDraft(next.price_sold ?? '')
         setGenotypeDraft(genotypeToText(next.recorded_genotype))
+        setWeightDraft(next.hatch_weight_g ?? '')
+        loadHatchLength(next.hatch_length_in)
+        getClutch(next.clutch_id)
+          .then((c) => getPairing(c.pairing_id))
+          .then((p) => { if (!cancelled) setPairingTaxon(p.taxon) })
+          .catch(() => { /* wording falls back to neutral; hold-back re-fetches */ })
       })
       .catch((err) => {
         if (cancelled) return
@@ -126,7 +148,7 @@ export default function OffspringDetailPage({
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [id, loadHatchLength])
 
   async function applyUpdate(patch: UpdateOffspringPayload) {
     setUpdating(true)
@@ -134,6 +156,8 @@ export default function OffspringDetailPage({
     try {
       const next = await updateOffspring(id, patch)
       setO(next)
+      if ('hatch_length_in' in patch) loadHatchLength(next.hatch_length_in)
+      if ('hatch_weight_g' in patch) setWeightDraft(next.hatch_weight_g ?? '')
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Couldn't save changes.",
@@ -205,6 +229,7 @@ export default function OffspringDetailPage({
         herp_species_id,
         hatch_date: clutch.hatch_date,
       })
+      setPairingTaxon(taxon)
     } catch (err) {
       setHoldBackPrefillError(
         err instanceof ApiError
@@ -228,8 +253,16 @@ export default function OffspringDetailPage({
    */
   async function handleHoldBackSubmit() {
     if (!o || holdBackCreating) return
+    // The taxon comes from the pairing, never a guess — without it we'd be
+    // filing a frog or turtle hatchling as a snake.
+    if (!holdBackPrefill) {
+      setHoldBackError(
+        "We couldn't load this clutch's parents, so we don't know which group to file it under. Close this and try again.",
+      )
+      return
+    }
     if (!holdBackName.trim()) {
-      setHoldBackError('Give your new reptile a name first.')
+      setHoldBackError(`Give your new ${vocab.animal} a name first.`)
       return
     }
     setHoldBackError(null)
@@ -243,17 +276,16 @@ export default function OffspringDetailPage({
         (l): l is string => Boolean(l),
       )
 
-      // ADR-003: one create call — taxon rides in the payload. The
-      // pairing is taxon-locked so holdBackPrefill.taxon is reliable;
-      // default to snake only if the prefill fetch failed entirely.
+      // ADR-003: one create call — taxon rides in the payload, taken from
+      // the taxon-locked pairing (checked above; no fallback).
       const payload: CreateAnimalPayload = {
-        taxon: holdBackPrefill?.taxon ?? 'snake',
+        taxon: holdBackPrefill.taxon,
         name: holdBackName.trim(),
         sex: holdBackSex,
         source: 'bred',
-        hatch_date: holdBackPrefill?.hatch_date ?? null,
-        scientific_name: holdBackPrefill?.scientific_name ?? null,
-        herp_species_id: holdBackPrefill?.herp_species_id ?? null,
+        hatch_date: holdBackPrefill.hatch_date ?? null,
+        scientific_name: holdBackPrefill.scientific_name ?? null,
+        herp_species_id: holdBackPrefill.herp_species_id ?? null,
         notes: noteLines.join('\n'),
         current_weight_g: o.hatch_weight_g ?? null,
         current_length_in: o.hatch_length_in ?? null,
@@ -336,7 +368,7 @@ export default function OffspringDetailPage({
 
       <header>
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
-          Hatchling
+          {vocab.young}
         </p>
         <input
           value={labelDraft}
@@ -347,7 +379,7 @@ export default function OffspringDetailPage({
               applyUpdate({ morph_label: trimmed })
             }
           }}
-          placeholder="Hatchling name or morph label"
+          placeholder={`${vocab.young} name or morph label`}
           className="w-full bg-transparent border-0 border-b border-transparent focus:border-herp-teal/40 focus:outline-none text-2xl sm:text-3xl font-bold text-white tracking-wide pb-1"
         />
       </header>
@@ -433,8 +465,8 @@ export default function OffspringDetailPage({
                 Holding this one back?
               </p>
               <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                Promote this hatchling to a live reptile record. Species,
-                hatch date, and weight prefill from this clutch.
+                Promote this {vocab.youngLower} to a live {vocab.animal} record.
+                Species, hatch date, and weight prefill from this clutch.
               </p>
             </div>
             <button
@@ -446,6 +478,55 @@ export default function OffspringDetailPage({
             </button>
           </div>
         ) : null}
+      </section>
+
+      {/* Hatch measurements — were create-only and never shown here. Saved
+          on blur like the rest of the page. */}
+      <section className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 space-y-3">
+        <h2 className="text-sm uppercase tracking-[0.2em] text-herp-lime font-medium">
+          At hatch
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Weight (g)">
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.1}
+              value={weightDraft}
+              disabled={updating}
+              onChange={(e) => setWeightDraft(e.target.value)}
+              onBlur={() => {
+                const next = toNum(weightDraft)
+                if (next !== null && next < 0) return
+                if (next !== toNum(o.hatch_weight_g)) {
+                  applyUpdate({ hatch_weight_g: next })
+                }
+              }}
+              placeholder="e.g. 6.5"
+              className={INPUT_CLS}
+            />
+          </Field>
+          <Field label={`Length (${hatchLength.unit})`}>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.1}
+              value={hatchLength.value}
+              disabled={updating}
+              onChange={(e) => hatchLength.setValue(e.target.value)}
+              onBlur={() => {
+                const next = hatchLength.toStorage()
+                if (next !== toNum(o.hatch_length_in)) {
+                  applyUpdate({ hatch_length_in: next })
+                }
+              }}
+              placeholder={units === 'metric' ? 'e.g. 25' : 'e.g. 10'}
+              className={INPUT_CLS}
+            />
+          </Field>
+        </div>
       </section>
 
       {/* Sale block — only meaningful when status implies it. We render
@@ -571,14 +652,14 @@ export default function OffspringDetailPage({
           >
             <div className="px-5 py-4 border-b border-neutral-800">
               <h3 className="text-base font-semibold text-white">
-                Add hatchling to collection
+                Add {vocab.youngLower} to collection
               </h3>
               <p className="text-xs text-neutral-500 mt-1">
                 Creates a live{' '}
                 {holdBackPrefill?.taxon
                   ? (ANIMAL_TAXA[holdBackPrefill.taxon]?.label.toLowerCase() ??
                     holdBackPrefill.taxon)
-                  : 'reptile'}{' '}
+                  : vocab.animal}{' '}
                 record and links it back to this offspring entry.
               </p>
             </div>
@@ -590,8 +671,9 @@ export default function OffspringDetailPage({
                   <p className="text-neutral-500">Loading parent info…</p>
                 ) : holdBackPrefillError ? (
                   <p className="text-amber-400">
-                    {holdBackPrefillError} You can still create the record
-                    — it just won&rsquo;t auto-fill the species.
+                    {holdBackPrefillError} The record needs the parents&rsquo;
+                    group (snake, frog, turtle…), so it can&rsquo;t be created
+                    until this loads. Close this and try again.
                   </p>
                 ) : (
                   <>
@@ -665,7 +747,7 @@ export default function OffspringDetailPage({
                 </div>
                 <p className="text-[11px] text-neutral-500 mt-1.5">
                   Set to <code>unknown</code> if it&rsquo;s too young to
-                  sex — you can update on the reptile detail page later.
+                  sex — you can update it on its detail page later.
                 </p>
               </div>
 
@@ -691,7 +773,7 @@ export default function OffspringDetailPage({
               <button
                 type="button"
                 onClick={handleHoldBackSubmit}
-                disabled={holdBackCreating || !holdBackName.trim()}
+                disabled={holdBackCreating || holdBackLoading || !holdBackPrefill || !holdBackName.trim()}
                 className="px-4 py-2 text-xs font-semibold rounded-md herp-gradient-bg text-herp-dark disabled:opacity-50"
               >
                 {holdBackCreating ? 'Creating…' : 'Create & link'}

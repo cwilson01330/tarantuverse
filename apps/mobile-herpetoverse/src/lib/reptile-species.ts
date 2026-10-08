@@ -104,6 +104,8 @@ export interface ReptileSpecies {
   slug: string;
   scientific_name: string;
   common_names: string[];
+  /** Taxon group (ADR-011); null on older catalog rows. */
+  taxon?: string | null;
   genus: string | null;
   family: string | null;
   order_name: string | null;

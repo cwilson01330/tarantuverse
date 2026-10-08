@@ -13,15 +13,16 @@
  * coerced at submit time so empty inputs serialize cleanly to null.
  *
  * Honesty-first: we surface the constraint ranges (temp 40-120°F / 5-48°C,
- * humidity 0-100, count 0-200) as hint text rather than silently
- * clamping. If a keeper types 250, we reject with an explicit message.
+ * humidity 0-100, count 0-CLUTCH_COUNT_MAX) as hint text rather than
+ * silently clamping. Out-of-range input is rejected with an explicit message.
+ * Wording (eggs vs spawn, slugs vs infertile) follows the pairing's taxon.
  *
  * Hermes-prod safety: static JSX branches only — no dynamic component
  * variables. See feedback_dynamic_component_hermes_prod_crash memory.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -50,7 +51,10 @@ import { parseTempInput, tempUnit } from '../../../../../src/lib/units';
 import UpgradeModal from '../../../../../src/components/UpgradeModal';
 import {
   type CreateClutchPayload,
+  CLUTCH_COUNT_MAX,
+  breedingVocab,
   createClutch,
+  getPairing,
 } from '../../../../../src/lib/breeding';
 
 /** Parse a numeric text input into number | null, with range check. */
@@ -114,6 +118,19 @@ function NewClutchScreen() {
   // Breeding is HV-premium: a 402 opens the upgrade modal.
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [capMessage, setCapMessage] = useState<string | null>(null);
+  // The pairing's taxon picks the wording. Neutral set until it loads (or
+  // if it can't).
+  const [taxon, setTaxon] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pairingId) return;
+    let cancelled = false;
+    getPairing(pairingId)
+      .then((p) => { if (!cancelled) setTaxon(p.taxon); })
+      .catch(() => { /* neutral wording is fine */ });
+    return () => { cancelled = true; };
+  }, [pairingId]);
+  const vocab = breedingVocab(taxon);
+  const countHint = `0–${CLUTCH_COUNT_MAX}`;
 
   async function handleSubmit() {
     if (submitting) return;
@@ -165,11 +182,11 @@ function NewClutchScreen() {
       { raw: tempMax, field: 'Temp max', min: tempLo, max: tempHi, allowDecimal: true, key: 'incubation_temp_max_f' },
       { raw: humMin, field: 'Humidity min', min: 0, max: 100, allowDecimal: false, key: 'incubation_humidity_min_pct' },
       { raw: humMax, field: 'Humidity max', min: 0, max: 100, allowDecimal: false, key: 'incubation_humidity_max_pct' },
-      { raw: expectedCount, field: 'Initial egg count', min: 0, max: 200, allowDecimal: false, key: 'expected_count' },
-      { raw: fertileCount, field: 'Fertile count', min: 0, max: 200, allowDecimal: false, key: 'fertile_count' },
-      { raw: slugCount, field: 'Slug count', min: 0, max: 200, allowDecimal: false, key: 'slug_count' },
-      { raw: hatchedCount, field: 'Hatched count', min: 0, max: 200, allowDecimal: false, key: 'hatched_count' },
-      { raw: viableCount, field: 'Viable count', min: 0, max: 200, allowDecimal: false, key: 'viable_count' },
+      { raw: expectedCount, field: vocab.initialCountLabel, min: 0, max: CLUTCH_COUNT_MAX, allowDecimal: false, key: 'expected_count' },
+      { raw: fertileCount, field: 'Fertile count', min: 0, max: CLUTCH_COUNT_MAX, allowDecimal: false, key: 'fertile_count' },
+      { raw: slugCount, field: `${vocab.infertileLabel} count`, min: 0, max: CLUTCH_COUNT_MAX, allowDecimal: false, key: 'slug_count' },
+      { raw: hatchedCount, field: 'Hatched count', min: 0, max: CLUTCH_COUNT_MAX, allowDecimal: false, key: 'hatched_count' },
+      { raw: viableCount, field: 'Viable count', min: 0, max: CLUTCH_COUNT_MAX, allowDecimal: false, key: 'viable_count' },
     ];
     const numericValues: Record<string, number | null> = {};
     for (const f of numericFields) {
@@ -276,13 +293,13 @@ function NewClutchScreen() {
           </Field>
 
           <Field
-            label="Initial egg count"
-            hint="Total eggs laid — fertile + slug + anything in-between. 0–200."
+            label={vocab.initialCountLabel}
+            hint={`${vocab.initialCountHint} ${countHint}.`}
           >
             <ThemedInput
               value={expectedCount}
               onChangeText={setExpectedCount}
-              placeholder="e.g. 8"
+              placeholder={vocab.countPlaceholder}
               keyboardType="number-pad"
             />
           </Field>
@@ -410,7 +427,7 @@ function NewClutchScreen() {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Field label="Fertile" hint="0–200">
+                  <Field label="Fertile" hint={countHint}>
                     <ThemedInput
                       value={fertileCount}
                       onChangeText={setFertileCount}
@@ -420,7 +437,7 @@ function NewClutchScreen() {
                   </Field>
                 </View>
                 <View style={styles.col}>
-                  <Field label="Slugs (infertile)" hint="0–200">
+                  <Field label={vocab.infertileFormLabel} hint={countHint}>
                     <ThemedInput
                       value={slugCount}
                       onChangeText={setSlugCount}
@@ -433,7 +450,7 @@ function NewClutchScreen() {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Field label="Hatched" hint="0–200">
+                  <Field label="Hatched" hint={countHint}>
                     <ThemedInput
                       value={hatchedCount}
                       onChangeText={setHatchedCount}
@@ -443,7 +460,7 @@ function NewClutchScreen() {
                   </Field>
                 </View>
                 <View style={styles.col}>
-                  <Field label="Viable" hint="0–200, survived to weaning">
+                  <Field label="Viable" hint={`${countHint}, alive past the first week`}>
                     <ThemedInput
                       value={viableCount}
                       onChangeText={setViableCount}
@@ -460,7 +477,7 @@ function NewClutchScreen() {
             <ThemedInput
               value={notes}
               onChangeText={setNotes}
-              placeholder="Cutting strategy, problem eggs, observations…"
+              placeholder={vocab.clutchNotesPlaceholder}
               multiline
               numberOfLines={3}
               style={{ minHeight: 80, paddingTop: 12 }}

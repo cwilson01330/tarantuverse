@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { ChangeTaxonSheet } from '../../src/components/ChangeTaxonSheet';
 import DateInput from '../../src/components/DateInput';
@@ -17,10 +18,11 @@ import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import { LocationPicker } from '../../src/components/LocationPicker';
 import {
   INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, getInvert, updateInvert,
-  type Invert, type InvertTaxon, type Sex, type Source,
+  type Invert, type InvertTaxon, type InvertUpdate, type Sex, type Source,
 } from '../../src/lib/inverts';
 import { stageCountLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
+import { SPACING, TYPE } from '../../src/theme/tokens';
 import { useUnitField } from '../../src/hooks/useUnitField';
 import { useUnits } from '../../src/hooks/useUnits';
 import { withMmUnit } from '../../src/lib/units';
@@ -40,6 +42,7 @@ export default function EditInvertScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { colors, layout } = useTheme();
+  const { user } = useAuth();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [loading, setLoading] = useState(true);
@@ -111,11 +114,23 @@ export default function EditInvertScreen() {
     }
   };
 
+  // Visibility is the owner's call alone (the API also strips it from a
+  // co-keeper's write). `visibility` is what the keeper profile and the public
+  // /i page read; is_public is the older flag and follows it, as on web.
+  const isOwner = !!form?.user_id && !!user?.id && String(form.user_id) === String(user.id);
+  const isPublic = form?.visibility ? form.visibility === 'public' : !!form?.is_public;
+  const setPublic = (pub: boolean) =>
+    setForm((p) => (p ? { ...p, visibility: pub ? 'public' : 'private', is_public: pub } : p));
+
   const handleSave = async () => {
     if (!form || !id) return;
     try {
       setSaving(true);
-      await updateInvert(id, {
+      const visibilityFields: Partial<InvertUpdate> & { is_public?: boolean } = isOwner
+        ? { visibility: isPublic ? 'public' : 'private', is_public: isPublic }
+        : {};
+      const payload: InvertUpdate & { is_public?: boolean } = {
+        ...visibilityFields,
         name: form.name, common_name: form.common_name, scientific_name: form.scientific_name,
         species_id: form.species_id, sex: form.sex, life_stage: form.life_stage, current_instar: form.current_instar, current_length_mm: toApi(sizeField.toStorage()),
         date_acquired: form.date_acquired, source: form.source, price_paid: form.price_paid,
@@ -124,7 +139,8 @@ export default function EditInvertScreen() {
         water_dish: form.water_dish, misting_schedule: form.misting_schedule, last_enclosure_cleaning: form.last_enclosure_cleaning,
         last_substrate_change: form.last_substrate_change, enclosure_notes: form.enclosure_notes, notes: form.notes,
         location: form.location ?? null,
-      });
+      };
+      await updateInvert(id, payload);
       router.back();
     } catch (err) {
       Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.');
@@ -226,6 +242,28 @@ export default function EditInvertScreen() {
           <Field label="Enclosure notes"><TextInput style={[styles.input, styles.textArea]} value={form.enclosure_notes ?? ''} onChangeText={(t) => update('enclosure_notes', t || null)} placeholder="Decor, modifications, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <Field label="Notes"><TextInput style={[styles.input, styles.textArea]} value={form.notes ?? ''} onChangeText={(t) => update('notes', t)} multiline /></Field>
 
+          {isOwner && (
+            <>
+              <SectionHeader title="Visibility" colors={colors} />
+              <View style={styles.switchRow}>
+                <View style={styles.visibilityText}>
+                  <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Public</Text>
+                  <Text style={[styles.visibilityHint, { color: colors.textTertiary }]}>
+                    {isPublic
+                      ? 'Shown on your keeper profile and on its public page while your collection is public.'
+                      : 'Hidden from your keeper profile and its public page, even when your collection is public.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={isPublic}
+                  onValueChange={setPublic}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  accessibilityLabel="Show this animal publicly"
+                />
+              </View>
+            </>
+          )}
+
           <TouchableOpacity style={[styles.saveButton, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
             <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save changes'}</Text>
           </TouchableOpacity>
@@ -281,6 +319,8 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     textArea: { minHeight: 80, textAlignVertical: 'top' },
     fieldLabel: { fontSize: 14, fontWeight: '500' },
     switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, marginBottom: 12 },
+    visibilityText: { flex: 1, marginRight: SPACING.md },
+    visibilityHint: { ...TYPE.caption, marginTop: SPACING.xs },
     saveButton: { marginTop: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
     saveText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     taxonRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },

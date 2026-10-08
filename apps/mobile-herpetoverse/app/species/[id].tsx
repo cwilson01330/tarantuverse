@@ -44,7 +44,13 @@ import {
   type ReptileSpecies,
   getReptileSpecies,
 } from '../../src/lib/reptile-species';
-import { ANIMAL_TAXA, type AnimalTaxon } from '../../src/lib/animals';
+import { ANIMAL_TAXA, type AnimalTaxon, isAnimalTaxon } from '../../src/lib/animals';
+
+/** The species' own taxon when it's a registry value, else the family
+ *  guess, else null (the add screen then asks). */
+function speciesTaxon(species: ReptileSpecies): AnimalTaxon | null {
+  return (isAnimalTaxon(species.taxon) ? species.taxon : null) ?? taxonFromFamily(species.family);
+}
 
 // Seeded herp families bucketed by clade. Drives the taxon inference
 // for the "Add to my collection" CTA — most keepers shouldn't have to
@@ -261,23 +267,25 @@ function SpeciesDetailScreen() {
         </View>
 
         {/* Add to my collection — primary CTA right under the hero so it
-            never gets buried under the care sections. Taxon is inferred
-            from family when possible; if unknown, the add screen falls
-            back to snake by default and the user can toggle the chip. */}
+            never gets buried under the care sections. The catalog row's own
+            taxon wins; family inference is only a fallback for untagged
+            rows. When neither tells us, NO taxon is sent and the add screen
+            makes the keeper pick (it used to fall back to 'snake', so a toad
+            from an unlisted family was pre-filed as a snake). */}
         <AddToCollectionCTA
           onPress={() => {
-            const inferred = taxonFromFamily(species.family);
+            const inferred = speciesTaxon(species);
             router.push({
               pathname: '/reptile/add',
               params: {
                 species_id: species.id,
                 scientific_name: species.scientific_name,
                 common_name: species.common_names[0] ?? '',
-                taxon: inferred ?? 'snake',
+                ...(inferred ? { taxon: inferred } : {}),
               },
             } as never);
           }}
-          taxonHint={taxonFromFamily(species.family)}
+          taxonHint={speciesTaxon(species)}
         />
 
         {/* Quick stats */}

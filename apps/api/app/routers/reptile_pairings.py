@@ -88,6 +88,34 @@ def _enrich_response(
     )
 
 
+# Singular / plural nouns for the validation messages. Built by hand rather
+# than "{taxon}s": 'other' gave "Both parents must be others."
+_TAXON_NOUNS = {
+    "snake": ("snake", "snakes"),
+    "lizard": ("lizard", "lizards"),
+    "turtle": ("turtle", "turtles"),
+    "tortoise": ("tortoise", "tortoises"),
+    "frog": ("frog", "frogs"),
+    "salamander": ("salamander", "salamanders"),
+}
+
+
+def taxon_parent_messages(taxon: str) -> dict:
+    """The three parent-check messages for `taxon`, worded for that group."""
+    one, many = _TAXON_NOUNS.get(taxon, (None, None))
+    if one is None:  # 'other' and anything unexpected
+        return {
+            "taxon": "Both parents must be in the same group (Other).",
+            "male": "Male slot must be a male (or unknown-sex) animal.",
+            "female": "Female slot must be a female (or unknown-sex) animal.",
+        }
+    return {
+        "taxon": f"Both parents must be {many}.",
+        "male": f"Male slot must be a male (or unknown-sex) {one}.",
+        "female": f"Female slot must be a female (or unknown-sex) {one}.",
+    }
+
+
 def _resolve_parents(
     payload: ReptilePairingCreate,
     user_id: UUID,
@@ -114,21 +142,13 @@ def _resolve_parents(
     # Both parents must be the declared taxon — cross-taxon pairings
     # aren't biologically meaningful and the DB CHECK no longer guards
     # this (ADR-003), so the API is the enforcement point.
+    msgs = taxon_parent_messages(taxon)
     if male.taxon != taxon or female.taxon != taxon:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Both parents must be {payload.taxon}s.",
-        )
+        raise HTTPException(status_code=400, detail=msgs["taxon"])
     if male.sex and male.sex.value not in ("male", "unknown"):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Male slot must be a male (or unknown-sex) {payload.taxon}.",
-        )
+        raise HTTPException(status_code=400, detail=msgs["male"])
     if female.sex and female.sex.value not in ("female", "unknown"):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Female slot must be a female (or unknown-sex) {payload.taxon}.",
-        )
+        raise HTTPException(status_code=400, detail=msgs["female"])
     return {
         "male_animal_id": male.id,
         "female_animal_id": female.id,

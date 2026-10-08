@@ -196,6 +196,11 @@ function AddReptileForm() {
       commonName: searchParams.get('common_name') ?? '',
     }
   })
+  // A species arrived from a care sheet whose group we couldn't tell: make
+  // the keeper pick one rather than silently filing it as a snake.
+  const [taxonPicked, setTaxonPicked] = useState<boolean>(
+    () => !(searchParams.get('species_id') && !isAnimalTaxon(searchParams.get('taxon'))),
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Free-tier cap (HTTP 402) surfaces an upgrade modal instead of an inline
@@ -223,6 +228,10 @@ function AddReptileForm() {
     e.preventDefault()
     if (submitting) return
     setError(null)
+    if (!taxonPicked) {
+      setError('Pick what kind of animal this is before saving.')
+      return
+    }
 
     // Light client-side guard: if the user typed a weight/price/length that
     // isn't a number, catch it before hitting the server.
@@ -329,8 +338,16 @@ function AddReptileForm() {
         {/* and drives the taxon-aware placeholder examples below.        */}
         {/* ------------------------------------------------------------- */}
         <TaxonToggle
-          value={form.taxon}
-          onChange={(next) => update('taxon', next)}
+          value={taxonPicked ? form.taxon : null}
+          onChange={(next) => {
+            update('taxon', next)
+            setTaxonPicked(true)
+          }}
+          prompt={
+            taxonPicked
+              ? null
+              : "We couldn't tell this species' group from its care sheet. Pick one to continue."
+          }
         />
 
         {/* ------------------------------------------------------------- */}
@@ -703,15 +720,21 @@ function Field({
 function TaxonToggle({
   value,
   onChange,
+  prompt,
 }: {
-  value: Taxon
+  /** null = nothing chosen yet (the keeper must pick). */
+  value: Taxon | null
   onChange: (next: Taxon) => void
+  prompt?: string | null
 }) {
   const options = ANIMAL_TAXON_ORDER.map((key) => ANIMAL_TAXA[key])
 
   return (
     <fieldset className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
       <legend className={`${SECTION_HDR_CLS} px-2`}>What are you adding?</legend>
+      {prompt && (
+        <p className="mb-3 text-xs text-amber-300 px-1">{prompt}</p>
+      )}
       <div
         role="radiogroup"
         aria-label="Animal type"

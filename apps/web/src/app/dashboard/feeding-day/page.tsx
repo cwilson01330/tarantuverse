@@ -466,7 +466,7 @@ export default function FeedingDayPage() {
             Add animals to your collection to run a Feeding Day.
           </p>
           <Link
-            href="/dashboard/tarantulas/add"
+            href="/dashboard/tarantulas?add=1"
             className="px-5 py-2 rounded-xl bg-gradient-brand text-white font-medium shadow-gradient-brand hover:opacity-90 transition"
           >
             Add your first animal

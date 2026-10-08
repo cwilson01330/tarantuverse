@@ -182,8 +182,8 @@ export default function EnclosuresPage() {
                     <span className="flex items-center gap-1">
                       {enclosure.is_communal ? '👥' : '👤'}
                       {enclosure.is_communal
-                        ? `${enclosure.population_count || enclosure.inhabitant_count} spiders`
-                        : `${enclosure.inhabitant_count} spider`}
+                        ? `${enclosure.population_count || enclosure.inhabitant_count} total`
+                        : `${enclosure.inhabitant_count} ${enclosure.inhabitant_count === 1 ? 'member' : 'members'}`}
                     </span>
 
                     {/* Type */}

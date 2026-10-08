@@ -65,6 +65,7 @@ import {
   type CreatePairingPayload,
   type ReptilePairingType,
   type Taxon,
+  breedingVocab,
   createPairing,
 } from '../../../src/lib/breeding';
 // ADR-003/011: per-taxon libs collapsed into lib/animals. We fetch the
@@ -96,7 +97,7 @@ function animalToOption(a: Animal): ParentOption {
     id: a.id,
     taxon: a.taxon,
     display_name:
-      a.name || a.common_name || a.scientific_name || 'Unnamed reptile',
+      a.name || a.common_name || a.scientific_name || `Unnamed ${breedingVocab(a.taxon).animal}`,
     sex: a.sex,
     scientific_name: a.scientific_name,
     herp_species_id: a.herp_species_id,
@@ -249,7 +250,7 @@ function NewPairingScreen() {
       return;
     }
     if (maleId === femaleId) {
-      setSubmitError('Male and female must be different reptiles.');
+      setSubmitError(`Male and female must be different ${breedingVocab(taxon).animals}.`);
       return;
     }
     // Defensive cross-species check. Reachable only if the keeper
@@ -369,7 +370,7 @@ function NewPairingScreen() {
                 hint={
                   males.length === 0
                     ? `No ${ANIMAL_TAXA[taxon].plural.toLowerCase()} with male or unknown sex in your collection yet.`
-                    : 'Male or unknown-sex reptiles only.'
+                    : `Male or unknown-sex ${breedingVocab(taxon).animals} only.`
                 }
               >
                 <ParentPickerButton
@@ -387,7 +388,7 @@ function NewPairingScreen() {
                 hint={
                   females.length === 0
                     ? `No ${ANIMAL_TAXA[taxon].plural.toLowerCase()} with female or unknown sex in your collection yet.`
-                    : 'Female or unknown-sex reptiles only.'
+                    : `Female or unknown-sex ${breedingVocab(taxon).animals} only.`
                 }
               >
                 <ParentPickerButton
@@ -738,7 +739,7 @@ function ParentPickerModal({
                   ]}
                 >
                   {emptyOverride ??
-                    'No candidates available. Add a reptile of the right sex to your collection first.'}
+                    'No candidates available. Add an animal of the right sex to your collection first.'}
                 </Text>
               ) : (
                 options.map((p) => {

@@ -148,9 +148,10 @@ export default function EditInvertPage() {
           enclosure_notes: form.enclosure_notes || null,
           last_substrate_change: form.last_substrate_change || null,
           notes: form.notes,
-          // Tarantula only — drives the care-sheet feeding cadence. Normalised
-          // so an unexpected stored casing can't fail the whole save.
-          ...(form.taxon === 'tarantula' ? { life_stage: lifeStageValue(form.life_stage) } : {}),
+          // Every taxon — the API reads life_stage for every taxon's feeding
+          // interval (mobile has always offered it for all). Normalised so an
+          // unexpected stored casing can't fail the whole save.
+          life_stage: lifeStageValue(form.life_stage),
           // Owner only (the server strips it from a co-keeper's write too).
           // `visibility` is what the keeper profile reads; is_public follows it.
           ...(isOwner ? { visibility: isPublic ? 'public' : 'private', is_public: isPublic } : {}),
@@ -247,26 +248,26 @@ export default function EditInvertPage() {
                 <Field label={withMmUnit(meta?.sizeLabel ?? 'Size', units)}><input value={sizeField.value} onChange={(e) => sizeField.setValue(e.target.value)} inputMode="decimal" className={inputCls} /></Field>
               </div>
 
-              {form.taxon === 'tarantula' && (
-                <Field label="Life stage">
-                  <div className="flex gap-2 flex-wrap">
-                    {LIFE_STAGES.map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => set('life_stage', lifeStageValue(form.life_stage) === st ? null : st)}
-                        aria-pressed={lifeStageValue(form.life_stage) === st}
-                        className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${lifeStageValue(form.life_stage) === st ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1.5 text-xs text-theme-tertiary">
-                    With a linked care sheet, this sets the suggested feeding schedule.
-                  </p>
-                </Field>
-              )}
+              {/* Every taxon, as on mobile (invert/edit.tsx). Tap the selected
+                  stage to clear it: a guess gives a wrong schedule. */}
+              <Field label="Life stage">
+                <div className="flex gap-2 flex-wrap">
+                  {LIFE_STAGES.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => set('life_stage', lifeStageValue(form.life_stage) === st ? null : st)}
+                      aria-pressed={lifeStageValue(form.life_stage) === st}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${lifeStageValue(form.life_stage) === st ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-theme-tertiary">
+                  With a linked care sheet, this sets the suggested feeding schedule. Tap the selected stage to clear it.
+                </p>
+              </Field>
 
               <h2 className="text-xs font-bold uppercase tracking-wide text-theme-tertiary border-b border-theme pb-2 pt-2">Acquisition</h2>
               <div className="grid grid-cols-2 gap-4">

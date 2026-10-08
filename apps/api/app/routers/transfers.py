@@ -384,6 +384,8 @@ async def create_transfer(
         raise HTTPException(status_code=404, detail="Animal not found")
     if invert.transferred_out_at is not None:
         raise HTTPException(status_code=400, detail="This animal has already been transferred.")
+    if getattr(invert, "died_at", None) is not None:
+        raise HTTPException(status_code=409, detail="This animal is marked as died, so it can't be transferred.")
 
     snapshot = _build_snapshot(db, invert, current_user)
     token = secrets.token_urlsafe(32)
@@ -434,6 +436,8 @@ async def create_animal_transfer(
         raise HTTPException(status_code=404, detail="Animal not found")
     if animal.transferred_out_at is not None:
         raise HTTPException(status_code=400, detail="This animal has already been transferred.")
+    if getattr(animal, "died_at", None) is not None:
+        raise HTTPException(status_code=409, detail="This animal is marked as died, so it can't be transferred.")
 
     snapshot = _build_animal_snapshot(db, animal, current_user)
     token = secrets.token_urlsafe(32)

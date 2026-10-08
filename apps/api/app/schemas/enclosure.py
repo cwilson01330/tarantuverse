@@ -99,12 +99,18 @@ class EnclosureListResponse(BaseModel):
 
 
 class InhabitantInfo(BaseModel):
-    """Basic info about a tarantula in an enclosure"""
+    """Basic info about an animal (any taxon) or colony in an enclosure.
+
+    `kind`, `taxon` and `count` were added after the first clients shipped;
+    all optional/defaulted so older builds keep parsing the list."""
     id: uuid.UUID
     name: Optional[str] = None
     scientific_name: Optional[str] = None
     sex: Optional[str] = None
     photo_url: Optional[str] = None
+    kind: str = "animal"              # "animal" | "colony"
+    taxon: Optional[str] = None
+    count: Optional[int] = None       # colony headcount; None for an animal
 
     class Config:
         from_attributes = True

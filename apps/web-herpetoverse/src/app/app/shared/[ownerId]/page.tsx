@@ -27,7 +27,7 @@ const BTN = 'px-3 py-1.5 rounded-lg text-sm font-semibold transition disabled:op
 const CARD = 'p-3 rounded-xl border border-neutral-800 bg-neutral-900/40'
 
 function isDue(a: AnimalFeedingStatus): boolean {
-  if (a.is_feeding_paused) return false
+  if (a.is_feeding_paused || a.is_brumating) return false
   return a.status_mode === 'daily' ? !a.fed_today : a.is_overdue
 }
 

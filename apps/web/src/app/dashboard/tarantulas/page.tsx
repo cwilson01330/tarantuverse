@@ -20,10 +20,12 @@ import {
   formatEndedDate,
   type ColonyListItem,
 } from '@/lib/colonies'
-import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, taxonHasModule } from '@/lib/inverts'
+import { listDeceasedInverts, tenureLabel } from '@/lib/animal-lifecycle'
 
 interface Tarantula {
   id: string
+  name?: string | null
   common_name: string
   scientific_name: string
   sex?: string
@@ -32,16 +34,79 @@ interface Tarantula {
   location?: string | null
 }
 
+/**
+ * One row of GET /inverts/feeding-status (schemas/invert.py::
+ * InvertFeedingStatusItem). One request covers every taxon — this replaced a
+ * /tarantulas/{id}/feeding-stats call per tarantula, and every other taxon
+ * used to get no status at all.
+ */
 interface FeedingStatus {
-  tarantula_id: string
-  days_since_last_feeding?: number
-  acceptance_rate: number
-  // Pause state — see pst_20260502. When paused, the collection grid
-  // shows a quiet purple "Paused" pill instead of the red "X days
-  // overdue" treatment so a 7-month premolt sling doesn't read as a
-  // husbandry emergency.
+  id: string
+  name?: string | null
+  location?: string | null
+  days_since_last_feeding?: number | null
+  // Pause state — see pst_20260502. A paused animal reads "Feeding paused",
+  // never overdue, so a 7-month premolt sling doesn't look like an emergency.
   is_feeding_paused?: boolean
-  feeding_paused_reason?: string | null
+  // Server-computed from the species + life stage (or the keeper's own
+  // cadence). Detritivores and never-fed animals are never overdue.
+  is_overdue?: boolean
+  interval_days?: number | null
+}
+
+/**
+ * Status text for a card or list row. Words, because "17d overdue" says what
+ * to do and a colour ramp makes you work it out. Mirrors feedingLine in
+ * apps/mobile/src/components/AnimalCard.tsx.
+ */
+function feedingLine(s: FeedingStatus): { text: string; tone: 'muted' | 'ok' | 'overdue' } {
+  if (s.is_feeding_paused) return { text: 'Feeding paused', tone: 'muted' }
+  if (s.days_since_last_feeding == null) return { text: 'Not yet fed', tone: 'muted' }
+  const d = s.days_since_last_feeding
+  if (s.is_overdue) {
+    // `d` is days since fed, not days past due — with the interval we can say
+    // how late it is; without one, don't invent a number.
+    const past = s.interval_days != null ? d - s.interval_days : null
+    return { text: past == null ? 'Overdue' : past > 0 ? `${past}d overdue` : 'Due today', tone: 'overdue' }
+  }
+  return { text: d === 0 ? 'Fed today' : `Fed ${d}d ago`, tone: 'ok' }
+}
+
+/** The keeper's own name first ("Gerald"), then common, then scientific —
+ *  the order the detail page and mobile use. */
+function animalTitle(a: {
+  name?: string | null
+  common_name?: string | null
+  scientific_name?: string | null
+  taxon?: string | null
+}): string {
+  return (
+    a.name ||
+    a.common_name ||
+    a.scientific_name ||
+    (isInvertTaxon(a.taxon) ? INVERT_TAXA[a.taxon].label : 'Unnamed')
+  )
+}
+
+/** Milliseconds between acquisition and death, or -1 when either is unknown
+ *  (sorted last under "Longest in your care"). */
+function tenureMs(a: { date_acquired?: string | null; died_at?: string | null }): number {
+  if (!a.date_acquired || !a.died_at) return -1
+  const from = new Date(`${a.date_acquired.slice(0, 10)}T12:00:00`).getTime()
+  const to = new Date(`${a.died_at.slice(0, 10)}T12:00:00`).getTime()
+  return Number.isFinite(from) && Number.isFinite(to) ? to - from : -1
+}
+
+/** A deceased animal off GET /inverts/?status=deceased. */
+interface DeceasedAnimal {
+  id: string
+  taxon: string
+  name?: string | null
+  common_name?: string | null
+  scientific_name?: string | null
+  photo_url?: string | null
+  date_acquired?: string | null
+  died_at?: string | null
 }
 
 /**
@@ -59,15 +124,16 @@ interface PremoltPrediction {
 }
 
 // --- Multi-taxon (ADR-006) -------------------------------------------------
-// The collection list shows every taxon. Tarantulas keep their rich badges
-// (feeding status + premolt); the other taxa render lean cards. Non-tarantula
-// detail/add pages are built in later web batches — until then those routes
-// 404 (collection list parity is this batch's scope).
+// The collection list shows every taxon. Feeding status shows for every taxon
+// with a feeding cadence (registry `feedingStats` module); premolt stays
+// tarantula-only. Every card opens the shared /dashboard/inverts/[id] page.
 type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider' | 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'roach' | 'isopod' | 'other'
 
 interface Animal {
   id: string
   taxon: TaxonKey
+  /** The keeper's own name for the animal ("Gerald"). Shown first, searched. */
+  name?: string | null
   common_name: string
   scientific_name: string
   sex?: string
@@ -77,27 +143,29 @@ interface Animal {
   location?: string | null
 }
 
+// Every non-tarantula taxon is listed with ONE call to the generic
+// /inverts/ surface (ADR-007), which applies the shared active filter: an
+// animal that died or was transferred out drops out of the grid, the chip
+// counts and the cap notice. The legacy scorpion/centipede/whip-spider
+// facades this page used to read filtered neither (audit-2 H1).
 const TAXA: {
   key: TaxonKey
   label: string
   glyph: string
-  listEndpoint: string
   addPath: string
   detailPath: (id: string) => string
 }[] = [
-  { key: 'tarantula', label: 'Tarantulas', glyph: '🕷', listEndpoint: '/api/v1/tarantulas/', addPath: '/dashboard/tarantulas/add', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'scorpion', label: 'Scorpions', glyph: '🦂', listEndpoint: '/api/v1/scorpions/', addPath: '/dashboard/inverts/add?taxon=scorpion', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'centipede', label: 'Centipedes', glyph: '🐛', listEndpoint: '/api/v1/centipedes/', addPath: '/dashboard/inverts/add?taxon=centipede', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'whip_spider', label: 'Whip spiders', glyph: '🕸️', listEndpoint: '/api/v1/whip-spiders/', addPath: '/dashboard/inverts/add?taxon=whip_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
-  // Newer taxa have no per-taxon facade router — list them through the
-  // generic /inverts/?taxon= surface (ADR-007).
-  { key: 'vinegaroon', label: 'Vinegaroons', glyph: '🦂', listEndpoint: '/api/v1/inverts/?taxon=vinegaroon', addPath: '/dashboard/inverts/add?taxon=vinegaroon', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'true_spider', label: 'True spiders', glyph: '🕷', listEndpoint: '/api/v1/inverts/?taxon=true_spider', addPath: '/dashboard/inverts/add?taxon=true_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'millipede', label: 'Millipedes', glyph: '🪱', listEndpoint: '/api/v1/inverts/?taxon=millipede', addPath: '/dashboard/inverts/add?taxon=millipede', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'mantis', label: 'Mantises', glyph: '🦗', listEndpoint: '/api/v1/inverts/?taxon=mantis', addPath: '/dashboard/inverts/add?taxon=mantis', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'roach', label: 'Roaches', glyph: '🪳', listEndpoint: '/api/v1/inverts/?taxon=roach', addPath: '/dashboard/inverts/add?taxon=roach', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'isopod', label: 'Isopods', glyph: '🪲', listEndpoint: '/api/v1/inverts/?taxon=isopod', addPath: '/dashboard/inverts/add?taxon=isopod', detailPath: (id) => `/dashboard/inverts/${id}` },
-  { key: 'other', label: 'Other', glyph: '🐾', listEndpoint: '/api/v1/inverts/?taxon=other', addPath: '/dashboard/inverts/add?taxon=other', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'tarantula', label: 'Tarantulas', glyph: '🕷', addPath: '/dashboard/tarantulas/add', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'scorpion', label: 'Scorpions', glyph: '🦂', addPath: '/dashboard/inverts/add?taxon=scorpion', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'centipede', label: 'Centipedes', glyph: '🐛', addPath: '/dashboard/inverts/add?taxon=centipede', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'whip_spider', label: 'Whip spiders', glyph: '🕸️', addPath: '/dashboard/inverts/add?taxon=whip_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'vinegaroon', label: 'Vinegaroons', glyph: '🦂', addPath: '/dashboard/inverts/add?taxon=vinegaroon', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'true_spider', label: 'True spiders', glyph: '🕷', addPath: '/dashboard/inverts/add?taxon=true_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'millipede', label: 'Millipedes', glyph: '🪱', addPath: '/dashboard/inverts/add?taxon=millipede', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'mantis', label: 'Mantises', glyph: '🦗', addPath: '/dashboard/inverts/add?taxon=mantis', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'roach', label: 'Roaches', glyph: '🪳', addPath: '/dashboard/inverts/add?taxon=roach', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'isopod', label: 'Isopods', glyph: '🪲', addPath: '/dashboard/inverts/add?taxon=isopod', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'other', label: 'Other', glyph: '🐾', addPath: '/dashboard/inverts/add?taxon=other', detailPath: (id) => `/dashboard/inverts/${id}` },
 ]
 
 const TAXON_CONFIG: Record<TaxonKey, (typeof TAXA)[number]> = TAXA.reduce(
@@ -121,6 +189,11 @@ export default function TarantulasPage() {
   // filter chips, or the plan count.
   const [archivedColonies, setArchivedColonies] = useState<ColonyListItem[]>([])
   const [showArchived, setShowArchived] = useState(false)
+  // Animals marked as died (ADR-015). Kept out of the grid, the filters and
+  // the plan count; reachable from a quiet entry that only shows when N > 0.
+  const [deceased, setDeceased] = useState<DeceasedAnimal[]>([])
+  const [showDeceased, setShowDeceased] = useState(false)
+  const [deceasedSort, setDeceasedSort] = useState<'recent' | 'tenure'>('recent')
   const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey | 'colony'>('all')
   const [showAddMenu, setShowAddMenu] = useState(false)
   // The dashboard's Add Animal action lands here with ?add=1 to open the picker.
@@ -159,17 +232,28 @@ export default function TarantulasPage() {
       // ignore
     }
   }
+  // One call for every taxon: feeding status, location and the animal's own
+  // name (the /tarantulas/ list carries no `name`).
   const loadLocations = useCallback(async (tok: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/inverts/feeding-status`, { headers: { Authorization: `Bearer ${tok}` } })
+      const res = await fetch(
+        `${API_URL}/api/v1/inverts/feeding-status?tz_offset_minutes=${new Date().getTimezoneOffset()}`,
+        { headers: { Authorization: `Bearer ${tok}` } },
+      )
       if (res.ok) {
         const rows = await res.json()
         const next = new Map<string, string | null>()
-        for (const r of Array.isArray(rows) ? rows : []) next.set(r.id, r.location ?? null)
+        const statuses = new Map<string, FeedingStatus>()
+        for (const r of (Array.isArray(rows) ? rows : []) as FeedingStatus[]) {
+          next.set(r.id, r.location ?? null)
+          statuses.set(r.id, r)
+        }
         setLocationById(next)
+        setFeedingStatuses(statuses)
       }
     } catch {
-      // non-fatal — cards fall back to the location on their own row
+      // non-fatal — cards fall back to the location on their own row and
+      // show no feeding line (unknown is not "not yet fed")
     }
     try {
       setKeeperLocations(await listLocations(tok))
@@ -236,40 +320,41 @@ export default function TarantulasPage() {
         const data = await response.json()
         setTarantulas(data)
 
-        // Fetch feeding stats and premolt predictions for each tarantula
-        fetchAllFeedingStatuses(token, data)
+        // Premolt signals in one call. Feeding status comes from
+        // /inverts/feeding-status in loadLocations, for every taxon.
         fetchAllPremoltPredictions(token, data)
       }
 
-      // Fetch the non-tarantula taxa in parallel and tag each with its
-      // taxon. Each is non-fatal — an API that lags behind one taxon just
-      // shows fewer animals rather than blanking the whole list.
-      const otherTaxa = TAXA.filter((t) => t.key !== 'tarantula')
-      const otherResults = await Promise.all(
-        otherTaxa.map(async (t) => {
-          try {
-            const res = await fetch(`${API_URL}${t.listEndpoint}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            })
-            if (!res.ok) return [] as Animal[]
-            const rows = await res.json()
-            return (Array.isArray(rows) ? rows : []).map((r: any) => ({
+      // Every other taxon in one call, each row tagged with its own taxon.
+      // Non-fatal — a failure shows fewer animals rather than blanking the list.
+      try {
+        const res = await fetch(`${API_URL}/api/v1/inverts/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        const rows = res.ok ? await res.json() : []
+        setOtherAnimals(
+          (Array.isArray(rows) ? rows : [])
+            .filter((r: any) => r.taxon && r.taxon !== 'tarantula')
+            .map((r: any) => ({
               id: r.id,
-              taxon: t.key,
-              common_name: r.common_name || r.name || '',
+              taxon: (isInvertTaxon(r.taxon) ? r.taxon : 'other') as TaxonKey,
+              name: r.name ?? null,
+              common_name: r.common_name || '',
               scientific_name: r.scientific_name || '',
               sex: r.sex,
               date_acquired: r.date_acquired,
               photo_url: r.photo_url,
               location: r.location ?? null,
-            })) as Animal[]
-          } catch {
-            return [] as Animal[]
-          }
-        }),
-      )
-      setOtherAnimals(otherResults.flat())
+            })) as Animal[],
+        )
+      } catch {
+        setOtherAnimals([])
+      }
       loadLocations(token)
+      // The memorial view's count — only an entry when there's something in it.
+      listDeceasedInverts(token)
+        .then((rows) => setDeceased(Array.isArray(rows) ? rows : []))
+        .catch(() => setDeceased([]))
 
       // Fetch colonies (non-fatal — a lagging endpoint just hides colonies).
       try {
@@ -302,36 +387,6 @@ export default function TarantulasPage() {
     }
   }
 
-  const fetchAllFeedingStatuses = async (token: string, tarantulasList: Tarantula[]) => {
-    const statusMap = new Map<string, FeedingStatus>()
-
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await fetch(`${API_URL}/api/v1/tarantulas/${t.id}/feeding-stats`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          })
-          if (response.ok) {
-            const data = await response.json()
-            statusMap.set(t.id, {
-              tarantula_id: t.id,
-              days_since_last_feeding: data.days_since_last_feeding,
-              acceptance_rate: data.acceptance_rate,
-              is_feeding_paused: data.is_feeding_paused,
-              feeding_paused_reason: data.feeding_paused_reason,
-            })
-          }
-        } catch {
-          // Individual feeding stat fetch failed - skip this tarantula
-        }
-      })
-    )
-
-    setFeedingStatuses(statusMap)
-  }
-
   /**
    * Premolt signals from the canonical /premolt/dashboard service.
    *
@@ -361,44 +416,30 @@ export default function TarantulasPage() {
     setPremoltPredictions(predictionMap)
   }
 
-  const getFeedingStatusBadge = (tarantulaId: string) => {
-    const status = feedingStatuses.get(tarantulaId)
+  /**
+   * Feeding status for an animal, whatever its taxon. Detritivores and grazers
+   * (millipede, roach, isopod — no feedingStats module) get nothing: "12d since
+   * fed" would be a number with no meaning for an animal that grazes. Mirrors
+   * statusFor in apps/mobile/app/(tabs)/collection.tsx.
+   */
+  const statusFor = (a: Animal): FeedingStatus | undefined =>
+    taxonHasModule(a.taxon, 'feedingStats') ? feedingStatuses.get(a.id) : undefined
+
+  /** Card badge: the server's per-species verdict, not a flat 7/14/21-day ramp
+   *  (which made this page disagree with the dashboard and Feeding Day). */
+  const getFeedingStatusBadge = (a: Animal) => {
+    const status = statusFor(a)
     if (!status) return null
-
-    // Paused trumps everything. Don't surface a red "21d overdue" pill
-    // on a tarantula the keeper has flagged as in-premolt.
-    if (status.is_feeding_paused) {
-      return (
-        <span className="px-3 py-1 rounded-full bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
-          ⏸ Paused
-        </span>
-      )
-    }
-
-    // `== null` catches both null (spider has no feedings yet) AND
-    // undefined (status hasn't loaded). The previous `=== undefined`
-    // let null through and rendered "Fed nulld ago" on new spiders.
-    if (status.days_since_last_feeding == null) return null
-
-    const days = status.days_since_last_feeding
-    let bgColor = 'bg-green-500/90'
-    let textColor = 'text-white'
-    let emoji = '\u2713'
-
-    if (days >= 21) {
-      bgColor = 'bg-red-500/90'
-      emoji = '\u26A0\uFE0F'
-    } else if (days >= 14) {
-      bgColor = 'bg-orange-500/90'
-      emoji = '\u23F0'
-    } else if (days >= 7) {
-      bgColor = 'bg-yellow-500/90'
-      emoji = '\uD83D\uDCC5'
-    }
-
+    const line = feedingLine(status)
+    const cls =
+      line.tone === 'overdue'
+        ? 'bg-red-600/90 text-white'
+        : line.tone === 'muted'
+          ? 'bg-surface-elevated text-theme-secondary border border-theme'
+          : 'bg-black/55 text-white'
     return (
-      <span className={`px-3 py-1 rounded-full ${bgColor} backdrop-blur-sm ${textColor} text-xs font-semibold shadow-lg`}>
-        {emoji} Fed {days}d ago
+      <span className={`px-3 py-1 rounded-full backdrop-blur-sm text-xs font-semibold shadow-lg ${cls}`}>
+        {line.text}
       </span>
     )
   }
@@ -446,11 +487,13 @@ export default function TarantulasPage() {
   }
 
   // Unified collection across all taxa. Tarantulas are tagged on the fly;
-  // the other taxa are already tagged in otherAnimals.
+  // the other taxa are already tagged in otherAnimals. The /tarantulas/ list
+  // has no `name`, so a tarantula's nickname comes from the feeding-status row.
   const allAnimals: Animal[] = [
     ...tarantulas.map((t) => ({
       id: t.id,
       taxon: 'tarantula' as const,
+      name: t.name ?? feedingStatuses.get(t.id)?.name ?? null,
       common_name: t.common_name,
       scientific_name: t.scientific_name,
       sex: t.sex,
@@ -468,6 +511,7 @@ export default function TarantulasPage() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
+        (a.name || '').toLowerCase().includes(q) ||
         (a.common_name || '').toLowerCase().includes(q) ||
         (a.scientific_name || '').toLowerCase().includes(q)
       )
@@ -575,9 +619,11 @@ export default function TarantulasPage() {
                           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                             {items.map((animal) => {
                               const isT = animal.taxon === 'tarantula'
-                              const feedingStatus = isT ? feedingStatuses.get(animal.id) : undefined
+                              const feedingStatus = statusFor(animal)
+                              const line = feedingStatus ? feedingLine(feedingStatus) : null
                               const premoltPrediction = isT ? premoltPredictions.get(animal.id) : undefined
                               const cfg = TAXON_CONFIG[animal.taxon]
+                              const title = animalTitle(animal)
                               return (
                                 <tr
                                   key={animal.id}
@@ -589,7 +635,7 @@ export default function TarantulasPage() {
                                       {animal.photo_url ? (
                                         <img
                                           src={getImageUrl(animal.photo_url)}
-                                          alt={animal.common_name}
+                                          alt={title}
                                           className="w-full h-full object-cover"
                                         />
                                       ) : (
@@ -600,7 +646,7 @@ export default function TarantulasPage() {
                                   <td className="px-4 py-3">
                                     <div className="font-semibold text-theme-primary">
                                       {!isT && <span className="mr-1">{cfg.glyph}</span>}
-                                      {animal.common_name || animal.scientific_name}
+                                      {title}
                                     </div>
                                     <div className="text-sm text-theme-secondary italic sm:hidden">{animal.scientific_name}</div>
                                   </td>
@@ -617,23 +663,18 @@ export default function TarantulasPage() {
                                     )}
                                   </td>
                                   <td className="px-4 py-3 align-middle">
-                                    {!isT ? (
+                                    {/* "—" when there's no status: a grazer with no
+                                        feeding cadence, or a status we couldn't load. */}
+                                    {!line ? (
                                       <span className="text-theme-tertiary text-sm">—</span>
-                                    ) : feedingStatus?.is_feeding_paused ? (
-                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
-                                        ⏸ Paused
-                                      </span>
-                                    ) : feedingStatus?.days_since_last_feeding != null ? (
-                                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                                        feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
-                                        feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
-                                        feedingStatus.days_since_last_feeding >= 7 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' :
-                                        'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300'
-                                      }`}>
-                                        {feedingStatus.days_since_last_feeding}d ago
+                                    ) : line.tone === 'overdue' ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">
+                                        {line.text}
                                       </span>
                                     ) : (
-                                      <span className="text-theme-tertiary text-sm">Not fed yet</span>
+                                      <span className={`text-sm whitespace-nowrap ${line.tone === 'muted' ? 'text-theme-tertiary' : 'text-theme-secondary'}`}>
+                                        {line.text}
+                                      </span>
                                     )}
                                   </td>
                                   <td className="px-4 py-3 hidden lg:table-cell align-middle">
@@ -669,7 +710,7 @@ export default function TarantulasPage() {
                                 <>
                                   <img
                                     src={getImageUrl(animal.photo_url)}
-                                    alt={animal.common_name}
+                                    alt={animalTitle(animal)}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                   />
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
@@ -688,16 +729,11 @@ export default function TarantulasPage() {
                                     {animal.taxon === 'tarantula' ? getPremoltBadge(animal.id) : null}
                                   </div>
 
-                                  {/* Right badge: feeding status for tarantulas,
-                                      taxon label for the other taxa. */}
+                                  {/* Right badge: feeding status for every taxon
+                                      with a feeding cadence; the taxon label for
+                                      grazers, and whenever no status loaded. */}
                                   <div>
-                                    {animal.taxon === 'tarantula' ? (
-                                      getFeedingStatusBadge(animal.id) || (
-                                        <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
-                                          No data
-                                        </span>
-                                      )
-                                    ) : (
+                                    {getFeedingStatusBadge(animal) || (
                                       <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
                                         {TAXON_CONFIG[animal.taxon].glyph} {TAXON_CONFIG[animal.taxon].label.replace(/s$/, '')}
                                       </span>
@@ -710,7 +746,7 @@ export default function TarantulasPage() {
                             {/* Content */}
                             <div className="p-5">
                               <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
-                                {animal.common_name || animal.scientific_name}
+                                {animalTitle(animal)}
                               </h3>
                               <p className="text-sm italic text-theme-secondary mb-3 line-clamp-1">
                                 {animal.scientific_name}
@@ -1129,6 +1165,119 @@ export default function TarantulasPage() {
                 )}
               </div>
             )}
+
+            {/* Deceased — the memorial view (ADR-015). Quiet, and only when
+                there's something in it; out of the grid, filters and plan
+                count. Each row opens the animal's page, where Restore lives.
+                Tone: flat and factual — a neutral dot, never red, no skull.
+                "Longest in your care" is a sort, not the default, so it can't
+                read as a leaderboard. Mirrors mobile DeceasedArchive. */}
+            {deceased.length > 0 && (() => {
+              const q = searchQuery.trim().toLowerCase()
+              const rows = (q
+                ? deceased.filter((a) =>
+                    [a.name, a.common_name, a.scientific_name].some((v) => (v ?? '').toLowerCase().includes(q)),
+                  )
+                : deceased
+              )
+                .slice()
+                .sort((a, b) =>
+                  deceasedSort === 'tenure'
+                    ? tenureMs(b) - tenureMs(a)
+                    : (b.died_at ?? '').localeCompare(a.died_at ?? ''),
+                )
+              const sortChip = (value: 'recent' | 'tenure', label: string) => (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={deceasedSort === value}
+                  onClick={() => setDeceasedSort(value)}
+                  className={`px-3 py-1 rounded-full border text-xs font-medium transition ${
+                    deceasedSort === value
+                      ? 'border-gray-500 dark:border-gray-400 text-theme-primary'
+                      : 'border-theme text-theme-secondary hover:text-theme-primary'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+              return (
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeceased((v) => !v)}
+                    aria-expanded={showDeceased}
+                    aria-controls="deceased-animals-list"
+                    className="text-sm text-theme-tertiary hover:text-theme-primary underline underline-offset-2 transition"
+                  >
+                    {showDeceased ? 'Hide deceased' : 'Deceased'} ({deceased.length})
+                  </button>
+                  {showDeceased && (
+                    <div id="deceased-animals-list" className="mt-3">
+                      <p className="text-xs text-theme-secondary">
+                        {deceased.length} record{deceased.length === 1 ? '' : 's'} kept · not counted on your plan
+                      </p>
+                      <div className="flex gap-2 mt-2 mb-3" role="radiogroup" aria-label="Sort">
+                        {sortChip('recent', 'Most recent')}
+                        {sortChip('tenure', 'Longest in your care')}
+                      </div>
+                      {rows.length === 0 ? (
+                        <p className="text-sm text-theme-secondary">Nothing matches “{searchQuery}”</p>
+                      ) : (
+                        <ul className="divide-y divide-theme rounded-2xl border border-theme bg-surface overflow-hidden">
+                          {rows.map((a) => {
+                            const title = animalTitle(a)
+                            const species = a.scientific_name && a.scientific_name !== title ? a.scientific_name : null
+                            const tenure = tenureLabel(a.date_acquired, a.died_at)
+                            const died = a.died_at
+                              ? formatLocalDate(a.died_at, { month: 'short', day: 'numeric', year: 'numeric' })
+                              : null
+                            const line = [died ? `Died ${died}` : 'Died', tenure ? `in your care ${tenure}` : null]
+                              .filter(Boolean)
+                              .join(' · ')
+                            return (
+                              <li key={a.id}>
+                                <Link
+                                  href={`/dashboard/inverts/${a.id}`}
+                                  className="flex items-center gap-3 p-3 hover:bg-surface-elevated transition"
+                                >
+                                  {a.photo_url ? (
+                                    // Muted, not greyed out: the animal is still the animal.
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={getImageUrl(a.photo_url)}
+                                      alt=""
+                                      className="w-11 h-11 rounded-lg object-cover opacity-70 flex-shrink-0"
+                                    />
+                                  ) : (
+                                    <span
+                                      className="w-11 h-11 rounded-lg bg-surface-elevated flex items-center justify-center text-xl flex-shrink-0"
+                                      aria-hidden="true"
+                                    >
+                                      {isInvertTaxon(a.taxon) ? INVERT_TAXA[a.taxon].glyph : '🐾'}
+                                    </span>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-semibold text-theme-primary truncate">{title}</div>
+                                    {species && (
+                                      <div className="text-xs italic text-theme-secondary truncate">{species}</div>
+                                    )}
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 flex-shrink-0" aria-hidden="true" />
+                                      <span className="text-xs text-theme-secondary truncate">{line}</span>
+                                    </div>
+                                  </div>
+                                </Link>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Sidebar - Activity Feed */}

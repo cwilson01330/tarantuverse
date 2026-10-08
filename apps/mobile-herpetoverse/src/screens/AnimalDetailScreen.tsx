@@ -57,6 +57,8 @@ import {
 import { AnimalHero } from '../components/reptile-detail/AnimalHero';
 import { AnimalTimeline } from '../components/reptile-detail/AnimalTimeline';
 import { FeedingCard } from '../components/reptile-detail/FeedingCard';
+import { BrumationRow } from '../components/reptile-detail/BrumationRow';
+import { confirmDeleteAnimal } from '../lib/confirm-delete-animal';
 import { StatStrip } from '../components/reptile-detail/StatStrip';
 import { WeightCard } from '../components/reptile-detail/WeightCard';
 import {
@@ -125,12 +127,32 @@ export function AnimalDetailScreen() {
   // exportable, and closed to new logs and edits. `canKeep` stays true so the
   // keeper can still Undo.
   const dead = !!animal?.died_at;
-  const canLog = can(role, 'logger') && !dead;
+  // A handed-off record is history too — the API refuses edits to it (409),
+  // so the screen doesn't offer Edit or logging. Matches HV web.
+  const closed = dead || !!animal?.transferred_out_at;
+  const canLog = can(role, 'logger') && !closed;
   const canKeep = can(role, 'keeper');
   const mayChange = useCallback(
-    (e: { logged_by_user_id?: string | null }) => !dead && canChangeEntry(role, user?.id, e),
-    [role, user?.id, dead],
+    (e: { logged_by_user_id?: string | null }) => !closed && canChangeEntry(role, user?.id, e),
+    [role, user?.id, closed],
   );
+  const [deleting, setDeleting] = useState(false);
+  // Delete for a closed record — Edit, where Delete normally lives, isn't
+  // offered for those. Counts the breeding records that go with it first.
+  const deleteClosedRecord = useCallback(() => {
+    if (!animal || deleting) return;
+    void confirmDeleteAnimal({
+      id: animal.id,
+      title: animalTitle(animal),
+      offerMarkDied: false,
+      onStart: () => setDeleting(true),
+      onDeleted: () => router.replace('/' as never),
+      onError: () => {
+        setDeleting(false);
+        Alert.alert("Couldn't delete", 'Nothing has changed — try again.');
+      },
+    });
+  }, [animal, deleting, router]);
 
 
   const fetchAll = useCallback(async () => {
@@ -268,7 +290,7 @@ export function AnimalDetailScreen() {
           brumationActive={animal.brumation_active}
           onBack={() => router.back()}
           onShare={isOwner || canKeep ? () => router.push(`/share/${animal.id}` as never) : undefined}
-          onEdit={canKeep && !dead ? () => router.push(`/reptile/edit/${animal.id}` as never) : undefined}
+          onEdit={canKeep && !closed ? () => router.push(`/reptile/edit/${animal.id}` as never) : undefined}
           onOpenGallery={() =>
             router.push(`/reptile/photos/${animal.id}` as never)
           }
@@ -347,7 +369,7 @@ export function AnimalDetailScreen() {
         {/* One feeding card — replaces the status banner, the feeding
             intelligence panel and the CGD refresh card (design handoff,
             screen 9). Pause, schedule and CGD live inside it. */}
-        {!dead && <FeedingCard
+        {!closed && <FeedingCard
           animal={animal}
           feedings={feedings}
           refreshKey={`${feedings.length}-${weights.length}-${animal.current_weight_g ?? ''}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}-${animal.feeding_interval_days ?? ''}`}
@@ -358,6 +380,8 @@ export function AnimalDetailScreen() {
           onPause={() => setPauseOpen(true)}
           onSetCadence={() => setCadenceOpen(true)}
         />}
+
+        {!closed && <BrumationRow animal={animal} canKeep={canKeep} onChanged={onRefresh} />}
 
         <StatStrip animal={animal} weights={weights} feedings={feedings} />
 
@@ -428,8 +452,26 @@ export function AnimalDetailScreen() {
         {/* Owner-only: co-keepers never transfer (rung 3). */}
         {isOwner && !dead && <AnimalTransferSection animal={animal} onTransferred={onRefresh} />}
 
-        {dead && (
+        {closed && (
           <Text style={[TYPE.caption, { color: colors.textTertiary }]}>{LIFE.logsClosed}</Text>
+        )}
+
+        {/* Owner-only: delete for a died / transferred record (Edit, where
+            Delete normally lives, isn't offered for those). */}
+        {closed && isOwner && (
+          <TouchableOpacity
+            onPress={deleteClosedRecord}
+            disabled={deleting}
+            style={styles.textAction}
+            accessibilityRole="button"
+            accessibilityHint="Permanently deletes this record and its history"
+          >
+            {deleting ? (
+              <ActivityIndicator color={colors.danger} />
+            ) : (
+              <Text style={[TYPE.label, { color: colors.danger }]}>Delete record…</Text>
+            )}
+          </TouchableOpacity>
         )}
 
         {/* End of record (§14.1) — collapsed, after transfer. Marking died is

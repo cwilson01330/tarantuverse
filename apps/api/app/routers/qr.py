@@ -262,6 +262,12 @@ async def create_animal_upload_session(
     ).first()
     if not animal:
         raise HTTPException(status_code=404, detail="Animal not found")
+    # A died or handed-off animal's record is history: no new photo uploads
+    # (same rule as routers/animals.py::refuse_if_closed).
+    if getattr(animal, "died_at", None) is not None:
+        raise HTTPException(status_code=409, detail="This animal is marked as died. Restore it before making changes.")
+    if getattr(animal, "transferred_out_at", None) is not None:
+        raise HTTPException(status_code=409, detail="This animal was transferred to another keeper, so its record can't be changed.")
 
     # Deactivate any existing sessions for this animal
     db.query(QRUploadSession).filter(

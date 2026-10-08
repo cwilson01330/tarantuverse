@@ -20,7 +20,16 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CareSheet from '@/components/CareSheet'
 import { fetchReptileSpeciesById } from '@/lib/reptileSpecies'
-import { ANIMAL_TAXA, type AnimalTaxon } from '@/lib/animals'
+import type { AnimalTaxon } from '@/lib/animals'
+
+// The registry keys and labels, spelled out locally: lib/animals is a
+// 'use client' module, so neither its helpers nor its values can be read from
+// this server page (only its types). Kept in lockstep with ANIMAL_TAXA.
+const TAXON_LABEL: Record<AnimalTaxon, string> = {
+  snake: 'Snake', lizard: 'Lizard', turtle: 'Turtle', tortoise: 'Tortoise',
+  frog: 'Frog', salamander: 'Salamander', other: 'Other',
+}
+const KNOWN_TAXA: ReadonlySet<string> = new Set(Object.keys(TAXON_LABEL))
 
 interface PageProps {
   // Next.js 15: dynamic params are a Promise.
@@ -121,17 +130,22 @@ export default async function SpeciesDetailPage({ params }: PageProps) {
   }
 
   // "Add to collection" CTA — pre-fills the add form with this species.
-  // Taxon is inferred from family when we recognize it; otherwise the
-  // keeper picks it on the add form (which defaults to snake).
-  const inferredTaxon = taxonFromFamily(species.family)
-  const addHref = `/app/reptiles/add?${new URLSearchParams({
+  // The catalog row's own `taxon` wins; the family sets are only a fallback
+  // for untagged rows. When neither tells us, NO taxon is sent and the add
+  // form makes the keeper pick (it used to fall back to 'snake', so a toad
+  // from an unlisted family was pre-filed as a snake).
+  const inferredTaxon: AnimalTaxon | null =
+    (species.taxon && KNOWN_TAXA.has(species.taxon) ? species.taxon : null) ??
+    taxonFromFamily(species.family)
+  const addParams: Record<string, string> = {
     species_id: species.id,
     scientific_name: species.scientific_name,
     common_name: species.common_names[0] ?? '',
-    taxon: inferredTaxon ?? 'snake',
-  }).toString()}`
+  }
+  if (inferredTaxon) addParams.taxon = inferredTaxon
+  const addHref = `/app/reptiles/add?${new URLSearchParams(addParams).toString()}`
   const ctaLabel = inferredTaxon
-    ? `Add as ${ANIMAL_TAXA[inferredTaxon].label.toLowerCase()}`
+    ? `Add as ${TAXON_LABEL[inferredTaxon].toLowerCase()}`
     : 'Add to my collection'
   const ctaHint = inferredTaxon
     ? 'Pre-fills species + scientific name. You can change anything before saving.'

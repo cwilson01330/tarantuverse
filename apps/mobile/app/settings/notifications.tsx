@@ -1,35 +1,71 @@
+/**
+ * Notification settings (TV mobile).
+ *
+ * Every switch here changes something the server actually does (audit-2 H4).
+ * The old "Animal Care Reminders" block — feeding, substrate, molt prediction
+ * and maintenance — saved flags that only the retired `app/tarantula/add-*`
+ * screens read, so they controlled nothing. Animal-care reminders are the
+ * server's daily feeding digest now (services/digest_service.py: one push a
+ * day, only when something is due, using Feeding Day's schedule), so that is
+ * what this screen controls: on/off and the hour, in this phone's time zone.
+ *
+ * Kept in step with apps/web/src/app/dashboard/settings/notifications.
+ */
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 import { requestNotificationPermissions, getExpoPushToken } from '../../src/services/notifications';
+import { SPACING, TYPE } from '../../src/theme/tokens';
 
 interface NotificationPreferences {
-  feeding_reminders_enabled: boolean;
-  feeding_reminder_hours: number;
-  substrate_reminders_enabled: boolean;
-  substrate_reminder_days: number;
-  molt_predictions_enabled: boolean;
-  maintenance_reminders_enabled: boolean;
-  maintenance_reminder_days: number;
+  daily_digest_enabled: boolean;
+  digest_hour: number;
   push_notifications_enabled: boolean;
   direct_messages_enabled: boolean;
   forum_replies_enabled: boolean;
   new_followers_enabled: boolean;
-  community_activity_enabled: boolean;
   sitter_activity_enabled?: boolean;
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
 }
 
+/** "9:00 AM" from 9, "12:00 PM" from 12. */
+function formatHour(h: number): string {
+  const hour = ((h % 24) + 24) % 24;
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:00 ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+/** Whether a whole hour falls inside the quiet window — same rule as the
+ *  server's notification_service.in_quiet_hours (start inclusive, end exclusive,
+ *  wraps midnight). */
+function hourIsQuiet(hour: number, start: string, end: string): boolean {
+  const toMin = (s: string) => {
+    const [h, m] = String(s ?? '').split(':').map((x) => Number(x));
+    return Number.isInteger(h) && Number.isInteger(m) ? h * 60 + m : null;
+  };
+  const a = toMin(start);
+  const b = toMin(end);
+  if (a == null || b == null || a === b) return false;
+  const t = hour * 60;
+  return a < b ? t >= a && t < b : t >= a || t < b;
+}
+
+/** "22:00" → "10:00 PM". Falls back to the raw string if it doesn't parse. */
+function formatClock(hhmm: string | null | undefined): string {
+  const [h, m] = String(hhmm ?? '').split(':').map((x) => Number(x));
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return String(hhmm ?? '');
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
 export default function NotificationSettingsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const backButton = (
@@ -42,18 +78,12 @@ export default function NotificationSettingsScreen() {
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
-    feeding_reminders_enabled: true,
-    feeding_reminder_hours: 24,
-    substrate_reminders_enabled: true,
-    substrate_reminder_days: 90,
-    molt_predictions_enabled: true,
-    maintenance_reminders_enabled: true,
-    maintenance_reminder_days: 30,
+    daily_digest_enabled: true,
+    digest_hour: 9,
     push_notifications_enabled: true,
     direct_messages_enabled: true,
     forum_replies_enabled: true,
     new_followers_enabled: true,
-    community_activity_enabled: false,
     sitter_activity_enabled: true,
     quiet_hours_enabled: false,
     quiet_hours_start: '22:00',
@@ -65,27 +95,37 @@ export default function NotificationSettingsScreen() {
     checkNotificationPermissions();
   }, []);
 
+  const registerToken = async () => {
+    const token = await getExpoPushToken();
+    if (!token) return;
+    try {
+      // The device time zone rides along: the digest hour is this phone's hour.
+      await apiClient.post('/notification-preferences/push-token', {
+        token,
+        tz_offset_minutes: new Date().getTimezoneOffset(),
+      });
+    } catch (error) {
+      console.error('Error registering push token:', error);
+    }
+  };
+
   const checkNotificationPermissions = async () => {
     const hasPermission = await requestNotificationPermissions();
     setPermissionGranted(hasPermission);
-
-    if (hasPermission) {
-      // Register push token with backend
-      const token = await getExpoPushToken();
-      if (token) {
-        try {
-          await apiClient.post('/notification-preferences/push-token', { token });
-        } catch (error) {
-          console.error('Error registering push token:', error);
-        }
-      }
-    }
+    if (hasPermission) await registerToken();
   };
 
   const loadPreferences = async () => {
     try {
       const response = await apiClient.get('/notification-preferences/');
-      setPreferences(response.data);
+      const d = response.data ?? {};
+      setPreferences((prev) => ({
+        ...prev,
+        ...d,
+        // Older API builds don't return these; keep the defaults the server uses.
+        daily_digest_enabled: d.daily_digest_enabled ?? true,
+        digest_hour: typeof d.digest_hour === 'number' ? d.digest_hour : 9,
+      }));
     } catch (error: any) {
       console.error('Error loading notification preferences:', error);
       Alert.alert('Error', 'Failed to load notification preferences');
@@ -97,8 +137,20 @@ export default function NotificationSettingsScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await apiClient.put('/notification-preferences/', preferences);
-      Alert.alert('Success', 'Notification preferences saved successfully');
+      // Only the fields this screen edits. Herpetoverse shares this row and has
+      // its own settings (e.g. its per-animal feeding reminders), so sending
+      // back everything we loaded could overwrite a change made there.
+      await apiClient.put('/notification-preferences/', {
+        daily_digest_enabled: preferences.daily_digest_enabled,
+        digest_hour: preferences.digest_hour,
+        tz_offset_minutes: new Date().getTimezoneOffset(),
+        direct_messages_enabled: preferences.direct_messages_enabled,
+        forum_replies_enabled: preferences.forum_replies_enabled,
+        new_followers_enabled: preferences.new_followers_enabled,
+        sitter_activity_enabled: preferences.sitter_activity_enabled ?? true,
+        quiet_hours_enabled: preferences.quiet_hours_enabled,
+      });
+      Alert.alert('Saved', 'Notification preferences saved.');
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to save preferences');
     } finally {
@@ -112,18 +164,14 @@ export default function NotificationSettingsScreen() {
 
     if (granted) {
       Alert.alert('Success', 'Notification permissions granted!');
-      const token = await getExpoPushToken();
-      if (token) {
-        try {
-          await apiClient.post('/notification-preferences/push-token', { token });
-        } catch (error) {
-          console.error('Error registering push token:', error);
-        }
-      }
+      await registerToken();
     } else {
       Alert.alert('Permissions Denied', 'You need to enable notifications in your device settings.');
     }
   };
+
+  const stepHour = (delta: number) =>
+    setPreferences((p) => ({ ...p, digest_hour: (((p.digest_hour + delta) % 24) + 24) % 24 }));
 
   const styles = StyleSheet.create({
     container: {
@@ -217,6 +265,30 @@ export default function NotificationSettingsScreen() {
       color: colors.textSecondary,
       lineHeight: 18,
     },
+    hourStepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    hourButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: layout.radius.full,
+      backgroundColor: colors.background,
+    },
+    hourValue: {
+      ...TYPE.bodyStrong,
+      color: colors.textPrimary,
+      minWidth: 76,
+      textAlign: 'center',
+    },
+    disabled: {
+      opacity: 0.4,
+    },
     buttonContainer: {
       flexDirection: 'row',
       gap: 12,
@@ -264,6 +336,8 @@ export default function NotificationSettingsScreen() {
     );
   }
 
+  const digestOn = preferences.daily_digest_enabled;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Notifications" leftAction={backButton} />
@@ -274,7 +348,7 @@ export default function NotificationSettingsScreen() {
           <View style={styles.permissionBanner}>
             <MaterialCommunityIcons name="bell-off" size={24} color={colors.primary} />
             <Text style={styles.permissionBannerText}>
-              Enable notifications to receive reminders for feeding, substrate changes, and more.
+              Turn on notifications to get your daily feeding digest and community alerts on this phone.
             </Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
               <Text style={styles.permissionButtonText}>Enable</Text>
@@ -282,64 +356,58 @@ export default function NotificationSettingsScreen() {
           </View>
         )}
 
-        {/* Local Notifications */}
+        {/* Daily feeding digest — the server-side animal-care reminder */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Animal Care Reminders</Text>
+          <Text style={styles.sectionTitle}>Feeding reminders</Text>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Feeding Reminders</Text>
+              <Text style={styles.settingLabel}>Daily feeding digest</Text>
               <Text style={styles.settingDescription}>
-                Get notified when it's time to feed your animals (based on their last feeding)
+                One notification a day saying how many animals are due, using the same schedule as Feeding Day. Nothing is sent on days when nothing is due.
               </Text>
             </View>
             <Switch
-              value={preferences.feeding_reminders_enabled}
-              onValueChange={(value) => setPreferences({ ...preferences, feeding_reminders_enabled: value })}
+              value={digestOn}
+              onValueChange={(value) => setPreferences({ ...preferences, daily_digest_enabled: value })}
               trackColor={{ false: colors.border, true: colors.primary }}
+              accessibilityLabel="Daily feeding digest"
             />
           </View>
 
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, styles.settingRowLast, !digestOn && styles.disabled]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Substrate Change Reminders</Text>
+              <Text style={styles.settingLabel}>Time</Text>
               <Text style={styles.settingDescription}>
-                Reminders to change substrate (default: every 90 days)
+                {preferences.quiet_hours_enabled &&
+                hourIsQuiet(preferences.digest_hour, preferences.quiet_hours_start, preferences.quiet_hours_end)
+                  ? "In this phone's time zone. This is inside your quiet hours, so the digest will wait in your notifications list instead of buzzing."
+                  : "In this phone's time zone."}
               </Text>
             </View>
-            <Switch
-              value={preferences.substrate_reminders_enabled}
-              onValueChange={(value) => setPreferences({ ...preferences, substrate_reminders_enabled: value })}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Molt Predictions</Text>
-              <Text style={styles.settingDescription}>
-                Get notified when a tarantula might be approaching a molt (tarantulas only)
+            <View style={styles.hourStepper}>
+              <TouchableOpacity
+                style={styles.hourButton}
+                onPress={() => stepHour(-1)}
+                disabled={!digestOn}
+                accessibilityRole="button"
+                accessibilityLabel="One hour earlier"
+              >
+                <MaterialCommunityIcons name="minus" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={styles.hourValue} accessibilityLabel={`Digest time ${formatHour(preferences.digest_hour)}`}>
+                {formatHour(preferences.digest_hour)}
               </Text>
+              <TouchableOpacity
+                style={styles.hourButton}
+                onPress={() => stepHour(1)}
+                disabled={!digestOn}
+                accessibilityRole="button"
+                accessibilityLabel="One hour later"
+              >
+                <MaterialCommunityIcons name="plus" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
             </View>
-            <Switch
-              value={preferences.molt_predictions_enabled}
-              onValueChange={(value) => setPreferences({ ...preferences, molt_predictions_enabled: value })}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
-          </View>
-
-          <View style={[styles.settingRow, styles.settingRowLast]}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Maintenance Reminders</Text>
-              <Text style={styles.settingDescription}>
-                General maintenance reminders (water dishes, enclosure cleaning)
-              </Text>
-            </View>
-            <Switch
-              value={preferences.maintenance_reminders_enabled}
-              onValueChange={(value) => setPreferences({ ...preferences, maintenance_reminders_enabled: value })}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
           </View>
         </View>
 
@@ -389,7 +457,7 @@ export default function NotificationSettingsScreen() {
             />
           </View>
 
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, styles.settingRowLast]}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Sitter activity</Text>
               <Text style={styles.settingDescription}>
@@ -403,20 +471,6 @@ export default function NotificationSettingsScreen() {
               accessibilityLabel="Sitter activity notifications"
             />
           </View>
-
-          <View style={[styles.settingRow, styles.settingRowLast]}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Community Activity</Text>
-              <Text style={styles.settingDescription}>
-                Updates from keepers you follow
-              </Text>
-            </View>
-            <Switch
-              value={preferences.community_activity_enabled}
-              onValueChange={(value) => setPreferences({ ...preferences, community_activity_enabled: value })}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
-          </View>
         </View>
 
         {/* Quiet Hours */}
@@ -427,13 +481,14 @@ export default function NotificationSettingsScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Enable Quiet Hours</Text>
               <Text style={styles.settingDescription}>
-                Pause notifications during nighttime (10 PM - 8 AM by default)
+                No push notifications from {formatClock(preferences.quiet_hours_start)} to {formatClock(preferences.quiet_hours_end)}, this phone's time. They still wait in your notifications list. Sitter-link lockouts still come through.
               </Text>
             </View>
             <Switch
               value={preferences.quiet_hours_enabled}
               onValueChange={(value) => setPreferences({ ...preferences, quiet_hours_enabled: value })}
               trackColor={{ false: colors.border, true: colors.primary }}
+              accessibilityLabel="Quiet hours"
             />
           </View>
         </View>

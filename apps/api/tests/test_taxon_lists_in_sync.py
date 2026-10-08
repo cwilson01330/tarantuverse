@@ -300,7 +300,12 @@ def _ts_complete():
         ("INVERT_TAXA", I, lambda: ts_obj_keys(I, r"INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = \{"), set(), ""),
         ("TAXON_MODULES", I, lambda: ts_obj_keys(I, r"export const TAXON_MODULES: Record<InvertTaxon, FeatureModule\[\]> = \{"), set(), ""),
         ("BREEDING_VOCABULARY", I, lambda: ts_obj_keys(I, r"export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = \{"), _NO_OTHER_VOCAB, _NO_OTHER_VOCAB_REASON),
+        # Feeding-form food chips per taxon (audit-2 M6). Complete on purpose:
+        # a new taxon must decide what it eats. Contents are pinned web vs
+        # mobile in tests/test_food_vocabulary.py.
+        ("FOOD_VOCABULARY", I, lambda: ts_obj_keys(I, r"export const FOOD_VOCABULARY: Record<InvertTaxon, FoodVocabulary> = \{"), set(), ""),
         ("InvertTaxon (type)", M, lambda: ts_union(M, "InvertTaxon"), set(), ""),
+        ("FOOD_VOCABULARY", M, lambda: ts_obj_keys(M, r"export const FOOD_VOCABULARY: Record<InvertTaxon, FoodVocabulary> = \{"), set(), ""),
         ("INVERT_TAXA", M, lambda: ts_obj_keys(M, r"export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = \{"), set(), ""),
         ("INVERT_TAXON_ORDER", M, lambda: ts_str_list(M, r"export const INVERT_TAXON_ORDER: InvertTaxon\[\] = \["), set(), ""),
         ("taxonMdiIcon cases", M, lambda: ts_cases(M, r"function taxonMdiIcon\([^)]*\)[^{]*\{"), {"other"}, '"other" takes the default (paw) icon'),
@@ -506,7 +511,9 @@ KNOWN_NON_LISTS = {
     "apps/api/app/models/invert_species.py":
         "holds INVERT_TAXON_VALUES (the canonical list) and the species CHECK, both checked here",
     "apps/web/src/app/dashboard/inverts/add/page.tsx":
-        "builds its picker from INVERT_TAXA / PICKER_TAXA rather than a copy",
+        "builds its picker from INVERT_TAXA / PICKER_TAXA rather than a copy; its "
+        "DEFAULT_ENCLOSURE_TYPE map is typed Record<InvertTaxon, …> (tsc enforces every "
+        "taxon) and pinned to mobile by tests/test_d_add_form_defaults.py",
 }
 
 _STRAY_SCAN_ROOTS = [

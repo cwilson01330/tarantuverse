@@ -26,7 +26,12 @@ import {
   type ColonySource,
   type ColonyTaxon,
 } from '@/lib/colonies'
-import { showsEnclosureOrientation, enclosureSizePlaceholder } from '@/lib/colony-presets'
+import {
+  bucketHint,
+  enclosureSizePlaceholder,
+  showsEnclosureOrientation,
+  suggestedBuckets,
+} from '@/lib/colony-presets'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -35,7 +40,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 // copy of a registry is a copy that eventually disagrees with it.
 const COLONY_TAXA: ColonyTaxon[] = PICKER_TAXA as ColonyTaxon[]
 
-const DEFAULT_STAGES = ['adults', 'juveniles', 'nymphs']
+/**
+ * Starting buckets: the taxon's suggested census vocabulary (mirrors mobile
+ * src/lib/colony-buckets.ts via lib/colony-presets.ts) — Unsexed/Females/
+ * Males for communal spiders, Adult females/Adult males/Nymphs for roaches,
+ * and so on. Shown as labels; saved as the API's canonical lowercase keys
+ * (stageKey), so "Adult females" is stored as "adult females".
+ */
+function seedStages(taxon: string): StageRow[] {
+  return suggestedBuckets(taxon).map((b) => makeStageRow(b))
+}
 
 interface SpeciesHit {
   id: string
@@ -89,9 +103,7 @@ function AddColonyForm() {
   const [name, setName] = useState('')
   const [speciesId, setSpeciesId] = useState<string | null>(null)
 
-  const [stages, setStages] = useState<StageRow[]>(
-    DEFAULT_STAGES.map((s) => makeStageRow(s)),
-  )
+  const [stages, setStages] = useState<StageRow[]>(() => seedStages(initialTaxon))
   const [countEstimated, setCountEstimated] = useState(false)
 
   const [dateAcquired, setDateAcquired] = useState('')
@@ -172,7 +184,23 @@ function AddColonyForm() {
   const addStage = (name = '') => {
     setStages((prev) => [...prev, makeStageRow(name)])
   }
-  const hasMixed = stages.some((r) => r.name.trim().toLowerCase() === 'mixed')
+  const hasMixed = stages.some((r) => stageKey(r.name) === 'mixed')
+  // Suggestions not already on the form (compared by stored key).
+  const unusedSuggestions = suggestedBuckets(taxon).filter(
+    (b) => !stages.some((r) => stageKey(r.name) === stageKey(b)),
+  )
+
+  /** Switch taxon. The bucket rows follow it while the keeper hasn't touched
+   *  them (no counts typed, names exactly the old taxon's suggestions). */
+  const chooseTaxon = (t: ColonyTaxon) => {
+    const pristine =
+      stages.every((r) => r.count.trim() === '') &&
+      stages.map((r) => r.name).join('|') === suggestedBuckets(taxon).join('|')
+    setTaxon(t)
+    setSpeciesId(null)
+    setQuery('')
+    if (pristine) setStages(seedStages(t))
+  }
 
   const buildStageCounts = (): Record<string, number> => {
     const map: Record<string, number> = {}
@@ -291,10 +319,7 @@ function AddColonyForm() {
                   <button
                     key={t}
                     type="button"
-                    onClick={() => {
-                      setTaxon(t)
-                      setSpeciesId(null)
-                    }}
+                    onClick={() => chooseTaxon(t)}
                     className={`px-3 py-2 rounded-full text-sm font-semibold transition ${
                       active
                         ? 'bg-gradient-brand text-white shadow-md'
@@ -393,6 +418,29 @@ function AddColonyForm() {
                 </div>
               ))}
             </div>
+            {stages.length === 0 && (
+              <p className="text-sm text-theme-tertiary">
+                No buckets yet. Add one below (use “mixed” if you don’t track stages).
+              </p>
+            )}
+            {unusedSuggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {unusedSuggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => addStage(s)}
+                    aria-label={`Add ${s} bucket`}
+                    className="px-3 py-1 rounded-full border border-theme bg-surface text-xs font-semibold text-theme-secondary hover:text-theme-primary hover:bg-surface-elevated transition"
+                  >
+                    + {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {bucketHint(taxon) && (
+              <p className="text-xs text-theme-tertiary mt-2">{bucketHint(taxon)}</p>
+            )}
             <div className="flex flex-wrap gap-2 mt-2">
               <button
                 type="button"
@@ -401,7 +449,7 @@ function AddColonyForm() {
               >
                 + Add stage
               </button>
-              {!hasMixed && (
+              {!hasMixed && !unusedSuggestions.some((s) => stageKey(s) === 'mixed') && (
                 <button
                   type="button"
                   onClick={() => addStage('mixed')}

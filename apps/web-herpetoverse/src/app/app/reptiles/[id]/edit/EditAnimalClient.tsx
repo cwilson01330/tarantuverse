@@ -30,6 +30,7 @@ import EnclosurePicker from '@/components/EnclosurePicker'
 import { LocationField } from '@/components/LocationPicker'
 import { useAuth } from '@/lib/auth'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
+import DeleteAnimalModal from '@/components/DeleteAnimalModal'
 import { ApiError } from '@/lib/apiClient'
 import { useUnitField } from '@/hooks/useUnitField'
 import {
@@ -38,7 +39,6 @@ import {
   type Source,
   type UpdateAnimalPayload,
   animalTitle,
-  deleteAnimal,
   getAnimal,
   updateAnimal,
 } from '@/lib/animals'
@@ -254,6 +254,22 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
         >
           {loadError || 'Could not load this reptile.'}
         </div>
+      </div>
+    )
+  }
+
+  // Died / transferred records are history; the API refuses edits (409).
+  // Deleting stays available to the owner (e.g. a record added by mistake).
+  if (animal.died_at || animal.transferred_out_at) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <BackLink animalId={animalId} />
+        <div className="mt-6 p-4 rounded-md border border-neutral-800 bg-neutral-900/60 text-sm text-neutral-300">
+          {animal.died_at
+            ? `${animalTitle(animal)} is marked as died, so its details can't be edited. Restore it from its page first if that was a mistake.`
+            : `${animalTitle(animal)} was transferred to another keeper, so this record can't be edited.`}
+        </div>
+        {isOwner && <DangerZone animal={animal} />}
       </div>
     )
   }
@@ -590,23 +606,25 @@ function DangerZone({ animal }: { animal: Animal }) {
         Danger zone
       </h2>
       <p className="text-sm text-neutral-300 mb-1">
-        Delete this reptile permanently.
+        Delete this animal permanently.
       </p>
       <p className="text-xs text-neutral-500 mb-4 max-w-xl">
         This removes the record plus every weight log, feeding, shed, and
-        photo attached to it. We don&rsquo;t keep a backup you can restore
-        from. If you&rsquo;re rehoming, consider exporting first.
+        photo attached to it — and any pairings it&rsquo;s a parent in, with
+        their clutches and offspring records. We don&rsquo;t keep a backup
+        you can restore from. If you&rsquo;re rehoming, consider exporting
+        first.
       </p>
       <button
         type="button"
         onClick={() => setOpen(true)}
         className="text-sm font-medium px-4 py-2 rounded-md border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:border-red-500/60 transition-colors"
       >
-        Delete this reptile…
+        Delete this animal…
       </button>
 
       {open && (
-        <DeleteConfirmModal
+        <DeleteAnimalModal
           animal={animal}
           onCancel={() => setOpen(false)}
           onDeleted={() => {
@@ -616,111 +634,6 @@ function DangerZone({ animal }: { animal: Animal }) {
         />
       )}
     </section>
-  )
-}
-
-function DeleteConfirmModal({
-  animal,
-  onCancel,
-  onDeleted,
-}: {
-  animal: Animal
-  onCancel: () => void
-  onDeleted: () => void
-}) {
-  const title = animalTitle(animal)
-  const [typed, setTyped] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const matches = typed.trim() === title
-
-  async function handleDelete() {
-    if (!matches || submitting) return
-    setError(null)
-    setSubmitting(true)
-    try {
-      await deleteAnimal(animal.id)
-      onDeleted()
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message || 'Could not delete. Try again.')
-      } else {
-        setError('Could not delete. Check your connection and try again.')
-      }
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="delete-heading"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={(e) => {
-        // Click on the backdrop only — not on the modal body.
-        if (e.target === e.currentTarget && !submitting) onCancel()
-      }}
-    >
-      <div className="w-full max-w-md rounded-lg border border-red-500/40 bg-neutral-950 p-6 shadow-xl">
-        <h3
-          id="delete-heading"
-          className="text-lg font-semibold text-white mb-2"
-        >
-          Delete {title}?
-        </h3>
-        <p className="text-sm text-neutral-400 mb-1">
-          This cannot be undone. All logs and photos attached to this reptile
-          will be removed.
-        </p>
-        <p className="text-sm text-neutral-400 mb-4">
-          Type{' '}
-          <span className="font-mono text-red-300 px-1 py-0.5 rounded bg-red-500/10">
-            {title}
-          </span>{' '}
-          to confirm.
-        </p>
-
-        <input
-          type="text"
-          autoFocus
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          placeholder={title}
-          disabled={submitting}
-          className="w-full px-3 py-2 rounded-md bg-neutral-900 border border-neutral-800 focus:border-red-500/60 focus:outline-none focus:ring-1 focus:ring-red-500/40 text-neutral-100 placeholder-neutral-600 disabled:opacity-50"
-        />
-
-        {error && (
-          <div
-            role="alert"
-            className="mt-3 p-2.5 rounded-md border border-red-500/40 bg-red-500/10 text-xs text-red-300"
-          >
-            {error}
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="text-sm text-neutral-400 hover:text-neutral-200 px-3 py-2 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={!matches || submitting}
-            className="text-sm font-semibold px-4 py-2 rounded-md bg-red-500/80 text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {submitting ? 'Deleting…' : 'Delete permanently'}
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 

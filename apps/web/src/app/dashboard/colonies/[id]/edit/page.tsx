@@ -7,7 +7,7 @@
  * partial PUT (only changed fields would be a nice-to-have; here we send the
  * full editable set, which the backend accepts as a partial update).
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -15,7 +15,8 @@ import { useUnitField } from '@/hooks/useUnitField'
 import { useUnits } from '@/components/UnitsProvider'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
-import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
+import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
+import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
 import {
   getColony,
   stageKey,
@@ -23,7 +24,14 @@ import {
   type ColonyResponse,
   type ColonySource,
 } from '@/lib/colonies'
-import { showsEnclosureOrientation, enclosureSizePlaceholder } from '@/lib/colony-presets'
+import {
+  bucketHint,
+  enclosureSizePlaceholder,
+  showsEnclosureOrientation,
+  suggestedBuckets,
+} from '@/lib/colony-presets'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface StageRow {
   key: string
@@ -93,6 +101,11 @@ export default function EditColonyPage() {
   const [notes, setNotes] = useState('')
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
   const [isActive, setIsActive] = useState(true)
+  // Species link. Sent on save only when it CHANGED (like the invert edit
+  // form), so a colony whose stored link is stale can still be renamed.
+  const [speciesId, setSpeciesId] = useState<string | null>(null)
+  const [speciesText, setSpeciesText] = useState('')
+  const [loadedSpeciesId, setLoadedSpeciesId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!token || !colonyId) return
@@ -103,8 +116,12 @@ export default function EditColonyPage() {
       setStages(
         c.stage_counts && Object.keys(c.stage_counts).length > 0
           ? Object.entries(c.stage_counts).map(([k, v]) => makeStageRow(k, String(v)))
-          : [makeStageRow('adults'), makeStageRow('juveniles'), makeStageRow('nymphs')],
+          // No buckets yet: the taxon's own suggestions, as on add.
+          : suggestedBuckets(c.taxon).map((b) => makeStageRow(b)),
       )
+      setSpeciesId(c.species_id ?? null)
+      setLoadedSpeciesId(c.species_id ?? null)
+      setSpeciesText(c.species_scientific_name ?? '')
       const baseline: Record<string, number> = {}
       for (const [k, v] of Object.entries(c.stage_counts ?? {})) baseline[k] = Number(v) || 0
       setOriginalCounts(baseline)
@@ -151,7 +168,10 @@ export default function EditColonyPage() {
   const removeStage = (key: string) =>
     setStages((prev) => prev.filter((r) => r.key !== key))
   const addStage = (n = '') => setStages((prev) => [...prev, makeStageRow(n)])
-  const hasMixed = stages.some((r) => r.name.trim().toLowerCase() === 'mixed')
+  const hasMixed = stages.some((r) => stageKey(r.name) === 'mixed')
+  const unusedSuggestions = colony
+    ? suggestedBuckets(colony.taxon).filter((b) => !stages.some((r) => stageKey(r.name) === stageKey(b)))
+    : []
 
   const buildStageCounts = (): Record<string, number> => {
     const map: Record<string, number> = {}
@@ -203,6 +223,7 @@ export default function EditColonyPage() {
         ...(countsChanged
           ? { stage_counts: Object.keys(stageCounts).length > 0 ? stageCounts : null }
           : {}),
+        ...(speciesId !== loadedSpeciesId ? { species_id: speciesId } : {}),
         count_is_estimated: countEstimated,
         date_acquired: dateAcquired.trim() || null,
         founded_date: foundedDate.trim() || null,
@@ -302,6 +323,21 @@ export default function EditColonyPage() {
             />
           </Field>
 
+          {/* Species — within the colony's taxon. "Other" has no catalog. */}
+          {isInvertTaxon(colony.taxon) && colony.taxon !== 'other' && (
+            <ColonySpeciesField
+              taxon={colony.taxon}
+              text={speciesText}
+              speciesId={speciesId}
+              onText={(t) => { setSpeciesText(t); setSpeciesId(null) }}
+              onPick={(sp) => {
+                setSpeciesId(sp.id)
+                setSpeciesText(sp.scientific_name)
+              }}
+              onUnlink={() => { setSpeciesId(null); setSpeciesText('') }}
+            />
+          )}
+
           {/* Life-stage buckets */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-theme-tertiary mb-1.5">
@@ -337,6 +373,24 @@ export default function EditColonyPage() {
                 </div>
               ))}
             </div>
+            {unusedSuggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {unusedSuggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => addStage(s)}
+                    aria-label={`Add ${s} bucket`}
+                    className="px-3 py-1 rounded-full border border-theme bg-surface text-xs font-semibold text-theme-secondary hover:text-theme-primary hover:bg-surface-elevated transition"
+                  >
+                    + {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {bucketHint(colony.taxon) && (
+              <p className="text-xs text-theme-tertiary mt-2">{bucketHint(colony.taxon)}</p>
+            )}
             <div className="flex flex-wrap gap-2 mt-2">
               <button
                 type="button"
@@ -345,7 +399,7 @@ export default function EditColonyPage() {
               >
                 + Add stage
               </button>
-              {!hasMixed && (
+              {!hasMixed && !unusedSuggestions.some((s) => stageKey(s) === 'mixed') && (
                 <button
                   type="button"
                   onClick={() => addStage('mixed')}
@@ -604,5 +658,120 @@ export default function EditColonyPage() {
         </form>
       </div>
     </DashboardLayout>
+  )
+}
+
+interface SpeciesHit {
+  id: string
+  scientific_name: string
+  common_names?: string[]
+}
+
+/**
+ * Species search + link for a colony (mirrors the add form, the invert edit
+ * form and mobile colony/[id]/edit.tsx). Colonies have no free-text species
+ * column, so only a picked species is saved: typing clears the link, and
+ * "Unlink" removes it.
+ */
+function ColonySpeciesField({
+  taxon, text, speciesId, onText, onPick, onUnlink,
+}: {
+  taxon: InvertTaxon
+  text: string
+  speciesId: string | null
+  onText: (t: string) => void
+  onPick: (s: SpeciesHit) => void
+  onUnlink: () => void
+}) {
+  const [hits, setHits] = useState<SpeciesHit[]>([])
+  const [open, setOpen] = useState(false)
+  const [noHits, setNoHits] = useState(false)
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Capitals, a typo or a bare epithet find nothing in the substring search;
+  // the matcher catches those. Same taxon only.
+  const nameMatch = useSpeciesMatch(noHits && !speciesId ? text : '', taxon)
+  const suggestion = nameMatch?.match && nameMatch.match.taxon === taxon ? nameMatch.match : null
+
+  useEffect(() => () => { if (debounce.current) clearTimeout(debounce.current) }, [])
+
+  const change = (value: string) => {
+    onText(value)
+    setOpen(true)
+    setNoHits(false)
+    if (debounce.current) clearTimeout(debounce.current)
+    if (!value.trim()) { setHits([]); return }
+    debounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/v1/invert-species/search?q=${encodeURIComponent(value.trim())}&taxon=${taxon}&limit=8`,
+        )
+        const rows: SpeciesHit[] = res.ok ? await res.json() : []
+        setHits(rows)
+        setNoHits(rows.length === 0)
+      } catch {
+        setHits([])
+      }
+    }, 250)
+  }
+
+  const pick = (sp: SpeciesHit) => {
+    onPick(sp)
+    setOpen(false)
+    setHits([])
+    setNoHits(false)
+  }
+
+  return (
+    <Field label="Species">
+      <div className="relative">
+        <input
+          value={text}
+          onChange={(e) => change(e.target.value)}
+          onFocus={() => setOpen(true)}
+          placeholder="Search species… (optional)"
+          autoComplete="off"
+          className={inputCls}
+        />
+        {open && hits.length > 0 && (
+          <div className="absolute z-10 left-0 right-0 mt-1 bg-surface border border-theme rounded-lg shadow-lg max-h-60 overflow-auto">
+            {hits.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => pick(h)}
+                className="w-full text-left px-3 py-2 hover:bg-surface-elevated border-b border-theme last:border-0"
+              >
+                <div className="text-sm italic font-semibold text-theme-primary">{h.scientific_name}</div>
+                {h.common_names?.[0] && <div className="text-xs text-theme-secondary">{h.common_names[0]}</div>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {speciesId ? (
+        <div className="mt-1.5 flex items-center gap-3 text-xs text-theme-secondary">
+          <span>Linked to the care sheet for this species.</span>
+          <button
+            type="button"
+            onClick={onUnlink}
+            className="font-semibold text-theme-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Unlink
+          </button>
+        </div>
+      ) : suggestion ? (
+        <SpeciesSuggestion
+          match={suggestion}
+          currentTaxon={taxon}
+          onUse={() => pick({ id: suggestion.id, scientific_name: suggestion.scientific_name, common_names: suggestion.common_name ? [suggestion.common_name] : [] })}
+        />
+      ) : text.trim() ? (
+        <p className="mt-1 text-xs text-theme-tertiary">
+          Not linked. Pick a species from the list to link its care sheet; typed text on its own isn&apos;t saved.
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-theme-tertiary">Optional — links a care sheet. Leave blank for mixed or unlisted colonies.</p>
+      )}
+    </Field>
   )
 }

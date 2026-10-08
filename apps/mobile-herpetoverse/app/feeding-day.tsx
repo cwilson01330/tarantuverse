@@ -286,6 +286,8 @@ function FeedingDayScreen() {
 
   const statusPill = (a: AnimalFeedingStatus) => {
     if (a.is_feeding_paused) return { label: 'Paused', color: colors.warning };
+    // Brumation / aestivation — set on the animal's screen; never overdue.
+    if (a.is_brumating) return { label: 'Resting', color: colors.textTertiary };
     // Frequent/daily feeders (e.g. insectivorous beardies) get a calm fed-today
     // check — never a red "days overdue" that would nag every morning.
     if (a.status_mode === 'daily') {

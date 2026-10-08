@@ -427,3 +427,67 @@ export function elapsedSince(iso: string): string {
   const months = Math.round(days / 30.4)
   return `${months} ${months === 1 ? 'month' : 'months'}`
 }
+
+// ── Food vocabulary (audit-2 M6) ─────────────────────────────────────────────
+
+export interface FoodVocabulary {
+  /** Chips on the feeding form, most common first. The FIRST item is the
+   *  default for a new feeding. Always ends with 'Other', which opens a
+   *  free-text field — the typed text is what gets stored. */
+  foods: string[]
+  /** Whether "Prey size" means anything. Off for grazers: a handful of leaf
+   *  litter has no "Medium". */
+  preySize: boolean
+}
+
+/**
+ * What each taxon is actually fed. Stored as plain text in feeding_logs.food_type,
+ * so these are display strings, not codes — but keep the spellings stable
+ * (and identical to the colony lists where they overlap), because the prey
+ * breakdown in analytics groups on the exact string.
+ *
+ * Keep in lockstep with apps/mobile/src/lib/inverts.ts (test_food_vocabulary.py
+ * compares the two; test_taxon_lists_in_sync.py checks every taxon is here).
+ */
+export const FOOD_VOCABULARY: Record<InvertTaxon, FoodVocabulary> = {
+  tarantula: { foods: ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'], preySize: true },
+  scorpion: { foods: ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'], preySize: true },
+  centipede: { foods: ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'], preySize: true },
+  // Adults take crickets and roaches; small nymphs start on flies.
+  whip_spider: { foods: ['Cricket', 'Red Runner', 'Dubia Roach', 'Fruit fly', 'Other'], preySize: true },
+  vinegaroon: { foods: ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'], preySize: true },
+  // Jumping spiders and other small true spiders are mostly fed flies.
+  true_spider: { foods: ['Fruit fly', 'House fly', 'Blue bottle fly', 'Cricket', 'Red Runner', 'Other'], preySize: true },
+  millipede: { foods: ['Leaf litter', 'Rotting wood', 'Veg / greens', 'Fruit', 'Protein (fish flake)', 'Calcium (cuttlebone)', 'Other'], preySize: false },
+  mantis: { foods: ['Fruit fly', 'House fly', 'Blue bottle fly', 'Cricket', 'Red Runner', 'Other'], preySize: true },
+  roach: { foods: ['Dry gutload', 'Veg / greens', 'Fruit', 'Protein (fish flake)', 'Leaf litter', 'Other'], preySize: false },
+  isopod: { foods: ['Leaf litter', 'Rotting wood', 'Veg / greens', 'Fruit', 'Protein (fish flake)', 'Calcium (cuttlebone)', 'Other'], preySize: false },
+  other: { foods: ['Cricket', 'Dubia Roach', 'Fruit fly', 'Mealworm', 'Veg / greens', 'Leaf litter', 'Other'], preySize: true },
+}
+
+/** The vocabulary for a taxon string off the wire (unknown → "other"). */
+export function foodVocabularyFor(taxon: string | null | undefined): FoodVocabulary {
+  return (taxon && (FOOD_VOCABULARY as Record<string, FoodVocabulary>)[taxon]) || FOOD_VOCABULARY.other
+}
+
+/**
+ * Split a stored food_type into the chip to select and the free text to show.
+ * A value that isn't one of this taxon's chips (an older spelling, a food from
+ * another list, or something typed under "Other") selects "Other" with the
+ * text filled in, so editing a feeding never rewrites what was recorded.
+ * Empty/null selects nothing: an unrecorded food stays unrecorded.
+ */
+export function splitStoredFood(stored: string | null | undefined, foods: string[]): { chip: string; other: string } {
+  const value = (stored ?? '').trim()
+  if (!value) return { chip: '', other: '' }
+  const hit = foods.find((f) => f.toLowerCase() === value.toLowerCase())
+  if (hit && hit !== 'Other') return { chip: hit, other: '' }
+  return { chip: 'Other', other: hit === 'Other' ? '' : value }
+}
+
+/** The food_type to send: the chip, or the typed text under "Other". */
+export function foodTypeToSave(chip: string, other: string): string | null {
+  if (!chip) return null
+  if (chip === 'Other') return other.trim() || 'Other'
+  return chip
+}

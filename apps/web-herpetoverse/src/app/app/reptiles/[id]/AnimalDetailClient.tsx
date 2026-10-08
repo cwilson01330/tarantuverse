@@ -26,6 +26,7 @@
  */
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   CartesianGrid,
@@ -43,6 +44,7 @@ import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import { FeedingCadenceDialog } from '@/components/FeedingCadenceDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
 import ShareCardModal from '@/components/ShareCardModal'
+import DeleteAnimalModal from '@/components/DeleteAnimalModal'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatLength } from '@/lib/units'
 import {
@@ -77,6 +79,8 @@ import {
   listSheds,
   listWeightLogs,
   relativeDays,
+  restLabel,
+  setBrumation,
 } from '@/lib/animals'
 import { CGD_BRANDS, DEFAULT_CGD_FOOD_TYPE } from '@/lib/cgd'
 import {
@@ -152,19 +156,27 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   const { user, token } = useAuth()
   const { role, ownerName } = useCollectionRole(token, user?.id, animal?.user_id)
   const dead = !!animal?.died_at
+  // A handed-off record is history too: the API refuses edits to it (409),
+  // so the page doesn't offer them.
+  const handedOff = !!animal?.transferred_out_at
+  const closed = dead || handedOff
   const access = useMemo<Access>(() => ({
     isOwner: role === 'owner',
-    canLog: can(role, 'logger') && !dead,
+    canLog: can(role, 'logger') && !closed,
     canKeep: can(role, 'keeper'),
     myId: user?.id ?? null,
-    closed: dead,
-  }), [role, user?.id, dead])
+    closed,
+  }), [role, user?.id, closed])
 
   // Mark as died / restore (ADR-015)
   const [diedOpen, setDiedOpen] = useState(false)
   const [endOpen, setEndOpen] = useState(false)
   const [reviving, setReviving] = useState(false)
   const [reviveError, setReviveError] = useState<string | null>(null)
+  // Delete for a closed (died / transferred) record — Edit, where Delete
+  // normally lives, isn't offered for those.
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const router = useRouter()
 
   // Weight slice
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
@@ -388,7 +400,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           )}
           {reviveError && <InlineError message={reviveError} />}
           {access.canKeep && (
-            <div className="pt-1">
+            <div className="pt-1 flex items-center gap-4 flex-wrap">
               <button
                 type="button"
                 onClick={restoreFromDied}
@@ -397,6 +409,15 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
               >
                 {reviving ? 'Restoring…' : LIFE.restore}
               </button>
+              {access.isOwner && (
+                <button
+                  type="button"
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-xs text-neutral-500 hover:text-red-300 transition-colors"
+                >
+                  Delete record…
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -421,7 +442,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           >
             Share card
           </button>}
-          {access.isOwner && <button
+          {access.isOwner && !access.closed && <button
             type="button"
             onClick={() => setQrOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-800 text-xs font-medium text-neutral-300 hover:text-herp-lime hover:border-herp-teal/40 transition-colors"
@@ -438,7 +459,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           mainPhotoUrl={animal.photo_url}
           onMainChanged={refetchAnimalOnly}
           canUpload={access.canLog}
-          canManage={access.canKeep}
+          canManage={access.canKeep && !access.closed}
         />
       </section>
 
@@ -458,7 +479,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
         />
       )}
 
-      {qrOpen && (
+      {qrOpen && !access.closed && (
         <ReptileQRModal
           taxon={animal.taxon}
           animalId={animal.id}
@@ -505,6 +526,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
       </Section>
 
       <Section title="Feeding log">
+        <BrumationControl animal={animal} onChanged={refetchAll} />
         {access.canLog && <LogFeedingForm
           animal={animal}
           suggestion={preySuggestion}
@@ -549,7 +571,9 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
 
       {/* Owner actions — transfer / rehome. Suppressed once handed off.
           Owner-only: co-keepers never transfer (rung 3). */}
-      {access.isOwner && <Section title="Owner actions">
+      {/* A died animal can't be rehomed — matches HV mobile, which hides
+          the transfer section on a dead animal. */}
+      {access.isOwner && (animal.transferred_out_at || !animal.died_at) && <Section title="Owner actions">
         {animal.transferred_out_at ? (
           <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-400 flex items-center gap-2 flex-wrap">
             <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300">
@@ -559,6 +583,13 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
               Handed off {fmtDate(animal.transferred_out_at)}. This is now a
               historical record.
             </span>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              className="ml-auto text-xs text-neutral-500 hover:text-red-300 transition-colors"
+            >
+              Delete record…
+            </button>
           </div>
         ) : (
           <TransferSection animal={animal} />
@@ -567,6 +598,14 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
 
       {access.closed && (
         <p className="text-xs text-neutral-500">{LIFE.logsClosed}</p>
+      )}
+
+      {deleteOpen && access.isOwner && (
+        <DeleteAnimalModal
+          animal={animal}
+          onCancel={() => setDeleteOpen(false)}
+          onDeleted={() => router.replace('/app/reptiles')}
+        />
       )}
 
       {/* End of record (§14.1) — collapsed, after transfer. Marking died is
@@ -898,7 +937,9 @@ function AnimalHeader({
     ? STAGE_LABEL[suggestion.stage]
     : null
   const hatched = fmtDate(animal.hatch_date)
-  const { canKeep } = useAccess()
+  // Died / transferred records are read-only (the API answers 409 to an
+  // edit) — same as HV mobile, which hides Edit on a dead animal.
+  const { canKeep, closed } = useAccess()
 
   return (
     <header>
@@ -906,7 +947,7 @@ function AnimalHeader({
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime font-medium">
           Reptile
         </p>
-        {canKeep && <Link
+        {canKeep && !closed && <Link
           href={`/app/reptiles/${animal.id}/edit`}
           className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider px-3 py-1.5 rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:border-neutral-700 transition-colors"
         >
@@ -1411,9 +1452,10 @@ function FeedingIntelligence({
   }, [animal.last_fed_at, animal.feeding_interval_days, suggestion])
 
   const overdue = useMemo(() => {
-    if (!nextWindow) return false
+    // A brumating animal isn't overdue — the keeper has said it's resting.
+    if (!nextWindow || animal.brumation_active) return false
     return Date.now() > nextWindow.max.getTime()
-  }, [nextWindow])
+  }, [nextWindow, animal.brumation_active])
 
   // Power-feeding check against the most recent accepted feeding — if its
   // prey_weight_g / body weight exceeds the threshold, flag it. The wire
@@ -1579,6 +1621,72 @@ function InfoBlock({
 /** Marker the feeding form prepends to a regurgitation's notes. Kept as a
  *  constant so the write path and the edit-prefill unwrap can't drift. */
 const REGURG_PREFIX = 'Regurgitation.'
+
+/**
+ * Brumation (aestivation for amphibians) on / off. Keeper-level, like the
+ * pause. Starting records today's local date. While on, Feeding Day never
+ * flags the animal overdue. Viewers and loggers only see the state.
+ */
+function BrumationControl({
+  animal,
+  onChanged,
+}: {
+  animal: Animal
+  onChanged: () => Promise<void> | void
+}) {
+  const { canKeep, closed } = useAccess()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const label = restLabel(animal.taxon)
+  const active = !!animal.brumation_active
+  if (closed) return null
+  if (!active && !canKeep) return null
+
+  async function toggle(next: boolean) {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await setBrumation(animal.id, next, next ? todayISO() : null)
+      await onChanged()
+    } catch (err) {
+      setError(errMsg(err, next ? `Could not start ${label.toLowerCase()}.` : `Could not end ${label.toLowerCase()}.`))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-900/40 p-3 space-y-1.5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-neutral-200">
+          <span aria-hidden="true">💤</span>{' '}
+          {active
+            ? animal.brumation_started_at
+              ? `${label} since ${fmtDay(animal.brumation_started_at)}`
+              : `${label} on`
+            : label}
+        </p>
+        {canKeep && (
+          <button
+            type="button"
+            onClick={() => toggle(!active)}
+            disabled={busy}
+            className="text-xs font-medium text-herp-teal hover:text-herp-lime disabled:opacity-50 transition-colors"
+          >
+            {busy ? 'Saving…' : active ? 'End' : 'Start'}
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-neutral-500 leading-relaxed">
+        {active
+          ? 'Not flagged overdue on Feeding Day while this is on.'
+          : 'Turn on while it rests for the season. It won’t be flagged overdue on Feeding Day until you end it.'}
+      </p>
+      {error && <InlineError message={error} />}
+    </div>
+  )
+}
 
 function LogFeedingForm({
   animal,

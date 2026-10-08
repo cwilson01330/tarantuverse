@@ -291,9 +291,26 @@ export default function InvertCareSheetClient({
                     {species.scientific_name}
                   </p>
                 </div>
-                {/* Renders nothing for signed-out visitors — this is a public
-                    SEO page, so most traffic here isn't logged in. */}
-                <ShortlistButton speciesId={species.id} className="shrink-0 mt-1" />
+                <div className="flex items-center gap-2 shrink-0 mt-1">
+                  {/* Parity with the tarantula sheet and mobile's invert sheet.
+                      Signed-in only, like Shortlist. Carries the taxon (which
+                      the add form reads) and the species id (the param name
+                      mobile's /add uses) so the keeper doesn't re-pick either. */}
+                  {user && (
+                    <Link
+                      href={`/dashboard/inverts/add?${new URLSearchParams({
+                        taxon: species.taxon,
+                        species_id: species.id,
+                      }).toString()}`}
+                      className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition whitespace-nowrap"
+                    >
+                      + Add to collection
+                    </Link>
+                  )}
+                  {/* Renders nothing for signed-out visitors — this is a public
+                      SEO page, so most traffic here isn't logged in. */}
+                  <ShortlistButton speciesId={species.id} />
+                </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 <Badge className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">

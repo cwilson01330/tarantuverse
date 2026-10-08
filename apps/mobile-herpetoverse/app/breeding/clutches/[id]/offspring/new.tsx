@@ -17,7 +17,7 @@
  * Hermes-prod safety: static JSX branches only.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -48,7 +48,10 @@ import {
   OFFSPRING_STATUS_LABEL,
   type CreateOffspringPayload,
   type OffspringStatus,
+  breedingVocab,
   createOffspring,
+  getClutch,
+  getPairing,
 } from '../../../../../src/lib/breeding';
 
 const STATUS_OPTIONS = (
@@ -93,6 +96,18 @@ function NewOffspringScreen() {
   // Breeding is HV-premium: a 402 opens the upgrade modal.
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [capMessage, setCapMessage] = useState<string | null>(null);
+  // Pairing taxon → "New hatchling" vs "New offspring".
+  const [taxon, setTaxon] = useState<string | null>(null);
+  useEffect(() => {
+    if (!clutchId) return;
+    let cancelled = false;
+    getClutch(clutchId)
+      .then((c) => getPairing(c.pairing_id))
+      .then((p) => { if (!cancelled) setTaxon(p.taxon); })
+      .catch(() => { /* neutral wording is fine */ });
+    return () => { cancelled = true; };
+  }, [clutchId]);
+  const vocab = breedingVocab(taxon);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -164,7 +179,7 @@ function NewOffspringScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="New hatchling" leftAction={<HeaderBackButton />} />
+      <AppHeader title={`New ${vocab.youngLower}`} leftAction={<HeaderBackButton />} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -250,7 +265,7 @@ function NewOffspringScreen() {
           {error && <FormErrorBanner message={error} />}
 
           <SubmitButton
-            label="Save hatchling"
+            label={`Save ${vocab.youngLower}`}
             busy={submitting}
             onPress={handleSubmit}
           />

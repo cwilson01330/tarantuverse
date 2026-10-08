@@ -32,6 +32,7 @@ import {
   listInvertCareLogs, deleteInvertCareLog, CARE_LOG_LABELS,
   type InvertCareLog,
   getInvertSpecies,
+  foodVocabularyFor,
 } from '../../src/lib/inverts';
 import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
@@ -576,6 +577,10 @@ function InvertDetailScreen() {
         const prey = [f.food_size?.trim().toLowerCase(), f.food_type?.trim().toLowerCase()]
           .filter(Boolean)
           .join(' ');
+        // Grazers are fed leaf litter or veg, not "a" prey item.
+        if (!foodVocabularyFor(invert?.taxon).preySize) {
+          return f.accepted ? `Fed ${prey || 'food'}` : `Refused ${prey || 'food'}`;
+        }
         return f.accepted
           ? `Ate ${prey ? `a ${prey}` : 'a feeder'}`
           : `Refused ${prey ? `a ${prey}` : 'food'}`;

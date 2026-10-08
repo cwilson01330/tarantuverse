@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.notification_preferences import NotificationPreferences
 from app.schemas.notification_preferences import (
+    NON_NULLABLE_FIELDS,
     NotificationPreferencesResponse,
     NotificationPreferencesUpdate,
     NotificationPreferencesBase
@@ -15,6 +16,16 @@ from app.schemas.notification_preferences import (
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/notification-preferences", tags=["notification-preferences"])
+
+
+def update_values(preferences: NotificationPreferencesUpdate) -> dict:
+    """The fields a PUT should write: only those the client sent, minus an
+    explicit null on a column that can't hold one (see NON_NULLABLE_FIELDS)."""
+    return {
+        field: value
+        for field, value in preferences.model_dump(exclude_unset=True).items()
+        if not (value is None and field in NON_NULLABLE_FIELDS)
+    }
 
 
 @router.get("/", response_model=NotificationPreferencesResponse)
@@ -72,8 +83,7 @@ async def update_notification_preferences(
         db.add(prefs)
 
     # Update fields that were provided
-    update_data = preferences.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
+    for field, value in update_values(preferences).items():
         setattr(prefs, field, value)
 
     db.commit()

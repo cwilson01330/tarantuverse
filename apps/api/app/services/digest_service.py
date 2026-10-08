@@ -115,6 +115,10 @@ def _animal_overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int
             a.feeding_paused_until is None or a.feeding_paused_until >= today_local
         ):
             continue
+        # Brumating animals don't eat; the app tells keepers reminders are
+        # silenced during brumation, so the digest must not count them.
+        if getattr(a, "brumation_active", False):
+            continue
         interval = _animal_feeding_interval(a)
         if interval is None:
             continue

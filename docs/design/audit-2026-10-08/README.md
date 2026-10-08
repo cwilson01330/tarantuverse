@@ -34,6 +34,12 @@ finding was checked against the code (file:line in each report):
 - Web dashboard count/cap gate leaves out colonies. *colonies M1*
 - HV transfer claim doesn't mark the source offspring sold. *hv M2*
 
+> **Groups 2–4 done and verified 2026-10-09** (2280 API tests pass; tsc clean on
+> all four apps after one HV mobile type fix; token gate and lint clean).
+> Still open after this batch: HV web genetics UI (hv H2), HV web notifications
+> page + search (hv M9), HV per-animal events client (hv M12), HV feeder-stock
+> export (hv M11), and the two decisions in section 5.
+
 ### 2. Safety / destructive actions
 - Deleting an HV animal silently cascades to its pairings, clutches and offspring; neither confirm says so. *hv H1*
 - Died HV animals still editable on web (and the server accepts writes). *hv M6*

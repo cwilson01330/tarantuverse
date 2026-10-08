@@ -215,10 +215,10 @@ function CollectionScreen() {
   // card before the first animal appeared.
   const [searchOpen, setSearchOpen] = useState(false);
   const [sortSheetOpen, setSortSheetOpen] = useState(false);
-  // Long-press quick-actions sheet. `actionTarget` holds the tarantula
-  // whose sheet is open (null = closed); `actionBusy` gates the rows
+  // Long-press quick-actions sheet, for every taxon. `actionTarget` holds the
+  // animal whose sheet is open (null = closed); `actionBusy` gates the rows
   // while the mark-fed POST is in flight.
-  const [actionTarget, setActionTarget] = useState<Tarantula | null>(null);
+  const [actionTarget, setActionTarget] = useState<{ id: string; taxon: string; name: string } | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
   /** Show the one-tap "Fed" button on cards. Defaults ON — it was added
@@ -761,7 +761,13 @@ function CollectionScreen() {
     const target = actionTarget;
     setActionBusy(true);
     try {
-      await apiClient.post(`/tarantulas/${target.id}/feedings`, {
+      // Same routing as logQuickFeeding below: tarantulas on the legacy route
+      // until the ADR-005 read cutover, everything else on the generic one.
+      const path =
+        target.taxon === 'tarantula'
+          ? `/tarantulas/${target.id}/feedings`
+          : `/inverts/${target.id}/feedings`;
+      await apiClient.post(path, {
         fed_at: new Date().toISOString(),
         accepted,
       });
@@ -770,17 +776,15 @@ function CollectionScreen() {
       if (Platform.OS === 'android') {
         ToastAndroid.show(
           accepted
-            ? `Logged a feeding for ${getDisplayName(target)}`
-            : `Logged a refusal for ${getDisplayName(target)}`,
+            ? `Logged a feeding for ${target.name}`
+            : `Logged a refusal for ${target.name}`,
           ToastAndroid.SHORT,
         );
       }
     } catch (error) {
       Alert.alert(
         accepted ? 'Could not log feeding' : 'Could not log refusal',
-        `Something went wrong logging for ${getDisplayName(
-          target,
-        )}. Please try again.`,
+        `Something went wrong logging for ${target.name}. Please try again.`,
       );
     } finally {
       setActionBusy(false);
@@ -867,12 +871,18 @@ function CollectionScreen() {
     router.push(`/invert/add-molt?id=${tarantulaId}` as any);
   };
 
+  // The same edit form the detail screen opens, for every taxon. This used to
+  // open the legacy /tarantula/edit, so one tarantula had two edit forms with
+  // different fields (no location, instar or size on the old one).
   const handleEditFromSheet = () => {
     if (!actionTarget) return;
-    const tarantulaId = actionTarget.id;
+    const animalId = actionTarget.id;
     setActionTarget(null);
-    router.push(`/tarantula/edit?id=${tarantulaId}`);
+    router.push(`/invert/edit?id=${animalId}` as any);
   };
+
+  const openActions = (id: string, taxon: string, name: string) =>
+    setActionTarget({ id, taxon, name });
 
   const renderTarantula = ({ item }: { item: Tarantula }) => {
     const status = feedingStatuses.get(item.id);
@@ -894,7 +904,7 @@ function CollectionScreen() {
         }}
         premolt={showsPremolt(item.id)}
         onPress={() => router.push(`/tarantula/${item.id}`)}
-        onLongPress={() => setActionTarget(item)}
+        onLongPress={() => openActions(item.id, 'tarantula', getDisplayName(item))}
         onQuickFeed={
           showFedButton
             ? () => handleQuickFeed(item.id, 'tarantula', getDisplayName(item))
@@ -946,6 +956,9 @@ function CollectionScreen() {
             : undefined
         }
         onPress={() => router.push(`/invert/${item.id}` as any)}
+        onLongPress={() =>
+          openActions(item.id, taxon, item.name || item.common_name || item.scientific_name || 'this animal')
+        }
         // Only offer the button where a feeding cadence is meaningful. statusFor
         // returns nothing for detritivores/omnivores, and a "Fed" button on a
         // millipede would imply a live-prey schedule it doesn't have.
@@ -993,7 +1006,7 @@ function CollectionScreen() {
       <TouchableOpacity
         style={styles.listItem}
         onPress={() => router.push(`/tarantula/${item.id}`)}
-        onLongPress={() => setActionTarget(item)}
+        onLongPress={() => openActions(item.id, 'tarantula', displayName)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
         accessibilityHint="Opens this animal's detail page. Long press for quick actions."
@@ -1109,7 +1122,8 @@ function CollectionScreen() {
     },
     glyph: string,
     taxonLabel: string,
-    feedingStatus?: FeedingStatus,
+    feedingStatus: FeedingStatus | undefined,
+    taxon: string,
   ) => {
     const displayName =
       item.name || item.common_name || item.scientific_name || 'Unnamed';
@@ -1124,9 +1138,10 @@ function CollectionScreen() {
       <TouchableOpacity
         style={styles.listItem}
         onPress={() => router.push(`/invert/${item.id}` as any)}
+        onLongPress={() => openActions(item.id, taxon, displayName)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, ${taxonLabel}`}
-        accessibilityHint="Opens this animal's detail page."
+        accessibilityHint="Opens this animal's detail page. Long press for quick actions."
       >
         <View style={styles.listImageContainer}>
           {item.photo_url ? (
@@ -1879,17 +1894,17 @@ function CollectionScreen() {
     if (item.kind === 'scorpion') {
       return viewMode === 'card'
         ? renderScorpion({ item: item.data })
-        : renderInvertListItem(item.data, '🦂', 'scorpion', statusFor(item.data.id, 'scorpion'));
+        : renderInvertListItem(item.data, '🦂', 'scorpion', statusFor(item.data.id, 'scorpion'), 'scorpion');
     }
     if (item.kind === 'centipede') {
       return viewMode === 'card'
         ? renderCentipede({ item: item.data })
-        : renderInvertListItem(item.data, '🐛', 'centipede', statusFor(item.data.id, 'centipede'));
+        : renderInvertListItem(item.data, '🐛', 'centipede', statusFor(item.data.id, 'centipede'), 'centipede');
     }
     if (item.kind === 'whip_spider') {
       return viewMode === 'card'
         ? renderWhipSpider({ item: item.data })
-        : renderInvertListItem(item.data, '🕸️', 'whip spider', statusFor(item.data.id, 'whip_spider'));
+        : renderInvertListItem(item.data, '🕸️', 'whip spider', statusFor(item.data.id, 'whip_spider'), 'whip_spider');
     }
     if (item.kind === 'invert') {
       const meta = INVERT_TAXA[item.data.taxon];
@@ -1900,6 +1915,7 @@ function CollectionScreen() {
             meta?.glyph ?? '🐾',
             meta?.label ?? 'invert',
             statusFor(item.data.id, item.data.taxon),
+            item.data.taxon,
           );
     }
     // Colonies never reach here — they render as full-width ColonyRows above
@@ -2365,7 +2381,7 @@ function CollectionScreen() {
       <TarantulaActionSheet
         target={
           actionTarget
-            ? { id: actionTarget.id, name: getDisplayName(actionTarget) }
+            ? { id: actionTarget.id, name: actionTarget.name }
             : null
         }
         busy={actionBusy}
@@ -2373,7 +2389,13 @@ function CollectionScreen() {
           if (!actionBusy) setActionTarget(null);
         }}
         onMarkFed={handleMarkFed}
-        onMarkRefused={handleMarkRefused}
+        // A refusal only means something where there's a live-prey cadence;
+        // a millipede or isopod "refusing" leaf litter isn't a thing.
+        onMarkRefused={
+          actionTarget && INVERT_TAXA[actionTarget.taxon as InvertTaxon]?.feedingMode !== 'predator'
+            ? undefined
+            : handleMarkRefused
+        }
         onLogMolt={handleLogMolt}
         onEdit={handleEditFromSheet}
       />

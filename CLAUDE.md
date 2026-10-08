@@ -466,6 +466,8 @@
 
 - **Colony counts are canonical and fully evented (2026-10-08)**: `utils/colony_counts.py` — stage keys are lowercase with single spaces (`canonical_stage`, `canonical_stage_counts`) on every write path incl. transfers; decreasing event types are stored negative, increasing positive (count_correction keeps its sign); create/import write one "Starting count" `added` event per bucket (descriptive — never re-applied); direct `stage_counts` edits write `count_correction` events per changed bucket. History replay puts the starting count first whatever its date. Archived colonies are treated like ended for the public (`/col`, previews, card links). Data scripts: `fix_colony_stage_keys_20261008.py` (dry-run first), `report_colony_event_signs.py` (read-only).
 
+- **Audit-2 groups 2–4 (2026-10-08, verified 2026-10-09: 2280 API tests, tsc ×4, token gate, lint clean)**: closed animals (died or transferred) refuse writes server-side — HV `routers/animals.py::refuse_if_closed`, QR upload sessions, new transfers; brumating HV animals are skipped by Feeding Day and the digest; reminders = the server daily digest (on/off + hour in notification settings, quiet hours enforced in `services/notification_service.py`) — the old local per-animal reminder toggles were removed because nothing read them; per-taxon `FOOD_VOCABULARY` in both registries (free-text Other); enclosures list every taxon (+ colonies with `?include_colonies=true`); web + HV web Sharing pages list/revoke card links.
+
 - **Full ZIP export streams from a spooled temp file** and only fetches photo URLs under `R2_PUBLIC_URL` (`_is_our_photo_url`), max 25 MB each — never build it as one in-memory bytes blob on the 512 MB instance.
 
 - **Password & Secret Management**:

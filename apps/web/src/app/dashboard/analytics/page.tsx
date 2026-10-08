@@ -164,7 +164,7 @@ export default function AnalyticsPage() {
               {/* The collection page carries the add menu for every taxon;
                   the old target was the tarantula-only form. */}
               <button
-                onClick={() => router.push("/dashboard/tarantulas")}
+                onClick={() => router.push("/dashboard/tarantulas?add=1")}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Add your first animal

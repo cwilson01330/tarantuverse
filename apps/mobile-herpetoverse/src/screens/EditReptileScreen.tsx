@@ -20,7 +20,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -52,10 +51,10 @@ import {
   type Source,
   type UpdateAnimalPayload,
   animalTitle,
-  deleteAnimal,
   getAnimal,
   updateAnimal,
 } from '../lib/animals';
+import { confirmDeleteAnimal } from '../lib/confirm-delete-animal';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'female', label: 'Female' },
@@ -217,31 +216,23 @@ export function EditReptileScreen() {
   function handleDelete() {
     if (!id || deleting) return;
     const title = animal ? animalTitle(animal) : null;
-    const label = title || 'this reptile';
-    Alert.alert(
-      `Delete ${label}?`,
-      "This permanently removes the reptile and all weigh-ins, feedings, sheds, and photos attached to it. There is no undo.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            setError(null);
-            try {
-              await deleteAnimal(id);
-              // Pop back to root collection — the detail screen we
-              // came from no longer exists.
-              router.replace('/' as never);
-            } catch (err) {
-              setError(extractErrorMessage(err, "Couldn't delete this reptile."));
-              setDeleting(false);
-            }
-          },
-        },
-      ],
-    );
+    // Counts what else goes (pairings → clutches → offspring) first.
+    void confirmDeleteAnimal({
+      id,
+      title: title || 'this animal',
+      offerMarkDied: !!animal && !animal.died_at && !animal.transferred_out_at,
+      onStart: () => {
+        setDeleting(true);
+        setError(null);
+      },
+      // Pop back to root collection — the detail screen we came from no
+      // longer exists.
+      onDeleted: () => router.replace('/' as never),
+      onError: (err) => {
+        setError(extractErrorMessage(err, "Couldn't delete this animal."));
+        setDeleting(false);
+      },
+    });
   }
 
   // ---- Loading + error gates ----
@@ -452,7 +443,7 @@ export function EditReptileScreen() {
               accessibilityRole="button"
             >
               <Text style={[styles.deleteButtonText, { color: colors.danger }]}>
-                {deleting ? 'Deleting…' : 'Delete this reptile'}
+                {deleting ? 'Deleting…' : 'Delete this animal'}
               </Text>
             </TouchableOpacity>
             <Text
@@ -461,7 +452,9 @@ export function EditReptileScreen() {
                 { color: colors.textTertiary },
               ]}
             >
-              Permanently removes weigh-ins, feedings, sheds, and photos.
+              Permanently removes weigh-ins, feedings, sheds, photos, and any
+              pairings it&apos;s a parent in (with their clutches and offspring
+              records).
             </Text>
           </View>}
         </ScrollView>

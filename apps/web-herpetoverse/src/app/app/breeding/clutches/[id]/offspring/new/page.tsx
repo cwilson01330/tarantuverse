@@ -11,7 +11,7 @@
  */
 
 import Link from 'next/link'
-import { use, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import UpgradeModal from '@/components/UpgradeModal'
@@ -21,7 +21,10 @@ import {
   type CreateOffspringPayload,
   type OffspringStatus,
   OFFSPRING_STATUS_LABEL,
+  breedingVocab,
   createOffspring,
+  getClutch,
+  getPairing,
 } from '@/lib/breeding'
 
 interface Params {
@@ -50,6 +53,17 @@ export default function NewOffspringPage({
   // lapsed after the clutch was created — show the upgrade path, not a raw
   // "Payment Required" error.
   const [capInfo, setCapInfo] = useState<{ message: string | null } | null>(null)
+  // Pairing taxon → "New hatchling" vs "New offspring".
+  const [taxon, setTaxon] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getClutch(clutchId)
+      .then((c) => getPairing(c.pairing_id))
+      .then((p) => { if (!cancelled) setTaxon(p.taxon) })
+      .catch(() => { /* neutral wording is fine */ })
+    return () => { cancelled = true }
+  }, [clutchId])
+  const vocab = breedingVocab(taxon)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -96,7 +110,7 @@ export default function NewOffspringPage({
 
       <header className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-wide mb-1">
-          New hatchling
+          New {vocab.youngLower}
         </h1>
         <p className="text-sm text-neutral-400">
           Quick record. You can fill in genotype, sale, and status updates
@@ -192,7 +206,7 @@ export default function NewOffspringPage({
             disabled={submitting}
             className="flex-1 px-4 py-2.5 rounded-md herp-gradient-bg text-herp-dark text-sm font-semibold disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : 'Save hatchling'}
+            {submitting ? 'Saving…' : `Save ${vocab.youngLower}`}
           </button>
           <Link
             href={`/app/breeding/clutches/${clutchId}`}

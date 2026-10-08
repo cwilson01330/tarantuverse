@@ -136,7 +136,7 @@ export function LocationDialog({
               }
             }}
             maxLength={MAX_LEN}
-            placeholder="e.g. Spider room, Rack 2"
+            placeholder="e.g. Back room, Rack 2"
             autoFocus={locations.length === 0}
             className="flex-1 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
           />

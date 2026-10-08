@@ -136,7 +136,7 @@ export default function AchievementsPage() {
             <span>🏆</span> Achievements
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Unlock badges as you progress through your tarantula keeping journey.
+            Unlock badges as you build and care for your collection.
           </p>
         </div>
 

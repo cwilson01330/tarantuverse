@@ -363,6 +363,128 @@ export async function getClutchParentGenotypes(
   return data;
 }
 
+// ─── Limits ────────────────────────────────────────────────────────────
+
+/** Upper bound on every clutch count — mirrors CLUTCH_COUNT_MAX in
+ *  apps/api/app/schemas/reptile_breeding.py. Was 200, which blocked frog
+ *  and toad spawns (often thousands of eggs). Keep the two in step. */
+export const CLUTCH_COUNT_MAX = 5000;
+
+// ─── Breeding vocabulary ───────────────────────────────────────────────
+//
+// The breeding tables were built for snakes, so the schema says
+// `slug_count` and the screens said "Slugs" and "reptile" to every keeper.
+// "Slug" is snake and gecko hobby slang for an infertile egg; a frog keeper
+// counting a spawn, or a turtle keeper, shouldn't be told to count slugs.
+// Mirror of apps/web-herpetoverse/src/lib/breeding.ts::BREEDING_VOCABULARY
+// — keep the two in lockstep. Same idea as TV's BREEDING_VOCABULARY.
+
+export interface BreedingVocab {
+  /** Animal noun, singular / plural ("snake" / "snakes"; "animal" for Other). */
+  animal: string;
+  animals: string;
+  /** Clutch count label on the detail screen ("Eggs"; "Eggs or young"). */
+  countLabel: string;
+  /** Create-form label for the first count. */
+  initialCountLabel: string;
+  initialCountHint: string;
+  countPlaceholder: string;
+  /** Infertile count: "Slugs" for snakes + lizards, "Infertile" otherwise. */
+  infertileLabel: string;
+  infertileFormLabel: string;
+  /** One hatched young ("Hatchling"; "Offspring" where hatchling is wrong). */
+  young: string;
+  /** Lower-case singular for sentences ("hatchling"). */
+  youngLower: string;
+  /** Empty offspring list. */
+  emptyOffspring: string;
+  /** Clutch-create notes placeholder. */
+  clutchNotesPlaceholder: string;
+}
+
+const EGG_LAYER_HINT = 'Total eggs laid — fertile, infertile and anything in-between.';
+
+export const BREEDING_VOCABULARY: Record<Taxon, BreedingVocab> = {
+  snake: {
+    animal: 'snake', animals: 'snakes',
+    countLabel: 'Eggs', initialCountLabel: 'Initial egg count',
+    initialCountHint: 'Total eggs laid — fertile + slug + anything in-between. Live-bearers: count the young.',
+    countPlaceholder: 'e.g. 8',
+    infertileLabel: 'Slugs', infertileFormLabel: 'Slugs (infertile)',
+    young: 'Hatchling', youngLower: 'hatchling',
+    emptyOffspring: 'No offspring recorded yet. Add the first one as eggs hatch.',
+    clutchNotesPlaceholder: 'Maternal vs. artificial incubation, candling notes, hiccups…',
+  },
+  lizard: {
+    animal: 'lizard', animals: 'lizards',
+    countLabel: 'Eggs', initialCountLabel: 'Initial egg count',
+    initialCountHint: 'Total eggs laid — fertile + slug + anything in-between.',
+    countPlaceholder: 'e.g. 2',
+    infertileLabel: 'Slugs', infertileFormLabel: 'Slugs (infertile)',
+    young: 'Hatchling', youngLower: 'hatchling',
+    emptyOffspring: 'No offspring recorded yet. Add the first one as eggs hatch.',
+    clutchNotesPlaceholder: 'Incubation medium, candling notes, hiccups…',
+  },
+  turtle: {
+    animal: 'turtle', animals: 'turtles',
+    countLabel: 'Eggs', initialCountLabel: 'Initial egg count',
+    initialCountHint: EGG_LAYER_HINT,
+    countPlaceholder: 'e.g. 10',
+    infertileLabel: 'Infertile', infertileFormLabel: 'Infertile',
+    young: 'Hatchling', youngLower: 'hatchling',
+    emptyOffspring: 'No offspring recorded yet. Add the first one as eggs hatch.',
+    clutchNotesPlaceholder: 'Nesting site, incubation medium, candling notes…',
+  },
+  tortoise: {
+    animal: 'tortoise', animals: 'tortoises',
+    countLabel: 'Eggs', initialCountLabel: 'Initial egg count',
+    initialCountHint: EGG_LAYER_HINT,
+    countPlaceholder: 'e.g. 6',
+    infertileLabel: 'Infertile', infertileFormLabel: 'Infertile',
+    young: 'Hatchling', youngLower: 'hatchling',
+    emptyOffspring: 'No offspring recorded yet. Add the first one as eggs hatch.',
+    clutchNotesPlaceholder: 'Nesting site, incubation medium, candling notes…',
+  },
+  frog: {
+    animal: 'frog', animals: 'frogs',
+    countLabel: 'Eggs', initialCountLabel: 'Initial egg count',
+    initialCountHint: 'Eggs in the spawn — an estimate is fine for a large egg mass.',
+    countPlaceholder: 'e.g. 300',
+    infertileLabel: 'Infertile', infertileFormLabel: 'Infertile',
+    young: 'Offspring', youngLower: 'offspring',
+    emptyOffspring: 'No offspring recorded yet. Add them as tadpoles or froglets come through.',
+    clutchNotesPlaceholder: 'Where it was laid, water conditions, tadpole notes…',
+  },
+  salamander: {
+    animal: 'salamander', animals: 'salamanders',
+    countLabel: 'Eggs or young', initialCountLabel: 'Initial count',
+    initialCountHint: 'Eggs laid — or larvae born, for live-bearing species.',
+    countPlaceholder: 'e.g. 40',
+    infertileLabel: 'Infertile', infertileFormLabel: 'Infertile',
+    young: 'Offspring', youngLower: 'offspring',
+    emptyOffspring: 'No offspring recorded yet. Add them as larvae come through.',
+    clutchNotesPlaceholder: 'Where it was laid, water conditions, larvae notes…',
+  },
+  other: {
+    animal: 'animal', animals: 'animals',
+    countLabel: 'Eggs or young', initialCountLabel: 'Initial count',
+    initialCountHint: 'Eggs laid, or young born for live-bearers.',
+    countPlaceholder: 'e.g. 8',
+    infertileLabel: 'Infertile', infertileFormLabel: 'Infertile',
+    young: 'Offspring', youngLower: 'offspring',
+    emptyOffspring: 'No offspring recorded yet.',
+    clutchNotesPlaceholder: 'Incubation, conditions, anything unusual…',
+  },
+};
+
+/** Vocabulary for a pairing's taxon; unknown / missing → the neutral 'other'
+ *  set, never the snake one. */
+export function breedingVocab(taxon: string | null | undefined): BreedingVocab {
+  return taxon && taxon in BREEDING_VOCABULARY
+    ? BREEDING_VOCABULARY[taxon as Taxon]
+    : BREEDING_VOCABULARY.other;
+}
+
 // ─── Display helpers ───────────────────────────────────────────────────
 
 export const PAIRING_TYPE_LABEL: Record<ReptilePairingType, string> = {

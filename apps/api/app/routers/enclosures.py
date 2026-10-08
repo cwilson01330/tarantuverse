@@ -1,5 +1,11 @@
 """
-Enclosure routes for communal and solo tarantula setups
+Enclosure routes for communal and solo setups.
+
+Inhabitants are read from `inverts` (every taxon) plus population colonies
+(`colonies.enclosure_id`). They used to be read from the legacy `tarantulas`
+table only, so a scorpion, mantis or colony put in an enclosure was never
+listed or counted (audit-2 animals M12). Legacy tarantula rows are still
+consulted, but only for the (should-be-empty) set that has no `inverts` twin.
 """
 from typing import List, Optional
 from uuid import UUID
@@ -31,6 +37,78 @@ from app.utils.access import policy
 router = APIRouter()
 
 
+def _sex_value(sex) -> Optional[str]:
+    if sex is None:
+        return None
+    return getattr(sex, "value", sex)
+
+
+def _enclosure_animals(db: Session, enclosure: Enclosure) -> list:
+    """Living, kept animals of ANY taxon in this enclosure.
+
+    Read from `inverts`. Died and handed-off animals are left out: they are no
+    longer in the enclosure in any useful sense. A legacy tarantula row with no
+    `inverts` twin (pre-backfill; should not exist any more) is still included
+    so nothing silently disappears.
+    """
+    from app.models.invert import Invert
+
+    animals = (
+        db.query(Invert)
+        .filter(
+            Invert.enclosure_id == enclosure.id,
+            Invert.user_id == enclosure.user_id,
+            Invert.died_at.is_(None),
+            Invert.transferred_out_at.is_(None),
+        )
+        .order_by(Invert.created_at.asc())
+        .all()
+    )
+    legacy = (
+        db.query(Tarantula)
+        .filter(
+            Tarantula.enclosure_id == enclosure.id,
+            Tarantula.user_id == enclosure.user_id,
+            Tarantula.died_at.is_(None),
+        )
+        .all()
+    )
+    if legacy:
+        legacy_ids = [t.id for t in legacy]
+        twins = {
+            row[0]
+            for row in db.query(Invert.id).filter(Invert.id.in_(legacy_ids)).all()
+        }
+        animals.extend(t for t in legacy if t.id not in twins)
+    return animals
+
+
+def _enclosure_colonies(db: Session, enclosure: Enclosure) -> list:
+    """Open population colonies in this enclosure (not archived, ended or handed off)."""
+    from app.models.colony import Colony
+
+    return (
+        db.query(Colony)
+        .filter(
+            Colony.enclosure_id == enclosure.id,
+            Colony.user_id == enclosure.user_id,
+            Colony.is_active.is_(True),
+            Colony.ended_at.is_(None),
+            Colony.transferred_out_at.is_(None),
+        )
+        .order_by(Colony.created_at.asc())
+        .all()
+    )
+
+
+def _colony_total(colony) -> int:
+    counts = colony.stage_counts or {}
+    try:
+        return sum(int(v) for v in counts.values() if isinstance(v, int))
+    except Exception:
+        return 0
+
+
 def get_enclosure_with_computed_fields(
     enclosure: Enclosure,
     db: Session,
@@ -45,10 +123,9 @@ def get_enclosure_with_computed_fields(
     feeding reads as "0 days ago" the next morning — see Brooke-on-EST
     bug from 2026-04-24.
     """
-    # Get inhabitant count
-    inhabitant_count = db.query(Tarantula).filter(
-        Tarantula.enclosure_id == enclosure.id
-    ).count()
+    # Inhabitant count: tracked entries in the enclosure — every taxon, plus
+    # each colony as one entry (its headcount is on the colony itself).
+    inhabitant_count = len(_enclosure_animals(db, enclosure)) + len(_enclosure_colonies(db, enclosure))
 
     # Get species name if species_id is set
     species_name = None
@@ -230,10 +307,17 @@ async def delete_enclosure(
             detail="Enclosure not found"
         )
 
-    # Remove tarantulas from enclosure (don't delete them)
-    db.query(Tarantula).filter(
-        Tarantula.enclosure_id == enclosure_id
-    ).update({"enclosure_id": None})
+    # Take every animal and colony out of the enclosure (don't delete them).
+    # The FKs are ON DELETE SET NULL as well; this keeps the session's objects
+    # in step and doesn't rely on it.
+    from app.models.colony import Colony
+    from app.models.invert import Invert
+    from app.models.scorpion import Scorpion
+
+    for model in (Tarantula, Invert, Scorpion, Colony):
+        db.query(model).filter(
+            model.enclosure_id == enclosure_id
+        ).update({"enclosure_id": None}, synchronize_session=False)
 
     db.delete(enclosure)
     db.commit()
@@ -246,10 +330,23 @@ async def delete_enclosure(
 @policy("owner_only")
 async def get_inhabitants(
     enclosure_id: UUID,
+    include_colonies: bool = Query(
+        False,
+        description=(
+            "Also list population colonies (kind='colony'). Off by default: "
+            "app builds that predate it open every row as an animal, and a "
+            "colony id would land on a not-found screen."
+        ),
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all tarantulas in an enclosure"""
+    """Everything tracked in an enclosure: animals of every taxon, then
+    (with include_colonies) colonies.
+
+    Older clients read only id/name/scientific_name/sex/photo_url; `kind`,
+    `taxon` and `count` are additive.
+    """
     enclosure = db.query(Enclosure).filter(
         Enclosure.id == enclosure_id,
         Enclosure.user_id == current_user.id
@@ -261,17 +358,108 @@ async def get_inhabitants(
             detail="Enclosure not found"
         )
 
-    tarantulas = db.query(Tarantula).filter(
-        Tarantula.enclosure_id == enclosure_id
-    ).all()
+    out = [
+        InhabitantInfo(
+            id=a.id,
+            name=a.name,
+            scientific_name=a.scientific_name,
+            sex=_sex_value(a.sex),
+            photo_url=a.photo_url,
+            kind="animal",
+            # Legacy tarantula rows carry no taxon column.
+            taxon=getattr(a, "taxon", None) or "tarantula",
+        )
+        for a in _enclosure_animals(db, enclosure)
+    ]
 
-    return [InhabitantInfo(
-        id=t.id,
-        name=t.name,
-        scientific_name=t.scientific_name,
-        sex=t.sex.value if t.sex else None,
-        photo_url=t.photo_url
-    ) for t in tarantulas]
+    colonies = _enclosure_colonies(db, enclosure) if include_colonies else []
+    if colonies:
+        from app.models.invert_species import InvertSpecies
+
+        species_ids = {c.species_id for c in colonies if c.species_id}
+        names = {}
+        if species_ids:
+            names = {
+                sid: sci
+                for sid, sci in db.query(InvertSpecies.id, InvertSpecies.scientific_name)
+                .filter(InvertSpecies.id.in_(species_ids))
+                .all()
+            }
+        out.extend(
+            InhabitantInfo(
+                id=c.id,
+                name=c.name,
+                scientific_name=names.get(c.species_id),
+                sex=None,
+                photo_url=c.photo_url,
+                kind="colony",
+                taxon=c.taxon,
+                count=_colony_total(c),
+            )
+            for c in colonies
+        )
+    return out
+
+
+def _owned_enclosure(db: Session, enclosure_id: UUID, user: User) -> Enclosure:
+    enclosure = db.query(Enclosure).filter(
+        Enclosure.id == enclosure_id,
+        Enclosure.user_id == user.id
+    ).first()
+    if not enclosure:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enclosure not found"
+        )
+    return enclosure
+
+
+def _set_inhabitant_enclosure(
+    db: Session, user: User, member_id: UUID, enclosure_id: Optional[UUID],
+    must_be_in: Optional[UUID] = None,
+) -> str:
+    """Point one animal (any taxon) or colony at `enclosure_id` (None = take it
+    out). Returns "animal" or "colony". 404 when the id isn't the user's, or
+    (for removal) isn't in `must_be_in`.
+
+    The path param is still called tarantula_id for older clients; any
+    invert id or colony id is accepted. Inverts are mirrored back to their
+    legacy row (tarantula/scorpion) so the two surfaces agree.
+    """
+    from app.models.colony import Colony
+    from app.models.invert import Invert
+    from app.services.inverts_dualwrite import (
+        mirror_invert_update_to_legacy,
+        mirror_tarantula_update,
+    )
+
+    invert = db.query(Invert).filter(Invert.id == member_id, Invert.user_id == user.id).first()
+    if invert is not None:
+        if must_be_in is not None and invert.enclosure_id != must_be_in:
+            raise HTTPException(status_code=404, detail="Animal not found in this enclosure")
+        if enclosure_id is not None and (invert.died_at is not None or invert.transferred_out_at is not None):
+            raise HTTPException(status_code=409, detail="This animal is no longer in your collection")
+        invert.enclosure_id = enclosure_id
+        mirror_invert_update_to_legacy(db, invert)
+        return "animal"
+
+    # A legacy tarantula with no inverts twin (pre-backfill).
+    tarantula = db.query(Tarantula).filter(Tarantula.id == member_id, Tarantula.user_id == user.id).first()
+    if tarantula is not None:
+        if must_be_in is not None and tarantula.enclosure_id != must_be_in:
+            raise HTTPException(status_code=404, detail="Animal not found in this enclosure")
+        tarantula.enclosure_id = enclosure_id
+        mirror_tarantula_update(db, tarantula)
+        return "animal"
+
+    colony = db.query(Colony).filter(Colony.id == member_id, Colony.user_id == user.id).first()
+    if colony is not None:
+        if must_be_in is not None and colony.enclosure_id != must_be_in:
+            raise HTTPException(status_code=404, detail="Colony not found in this enclosure")
+        colony.enclosure_id = enclosure_id
+        return "colony"
+
+    raise HTTPException(status_code=404, detail="Animal not found")
 
 
 @router.post("/{enclosure_id}/inhabitants/{tarantula_id}", status_code=status.HTTP_200_OK)
@@ -282,40 +470,14 @@ async def add_inhabitant(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Add a tarantula to an enclosure"""
-    # Verify enclosure ownership
-    enclosure = db.query(Enclosure).filter(
-        Enclosure.id == enclosure_id,
-        Enclosure.user_id == current_user.id
-    ).first()
-
-    if not enclosure:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Enclosure not found"
-        )
-
-    # Verify tarantula ownership
-    tarantula = db.query(Tarantula).filter(
-        Tarantula.id == tarantula_id,
-        Tarantula.user_id == current_user.id
-    ).first()
-
-    if not tarantula:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tarantula not found"
-        )
-
-    # Add to enclosure. Mirrored, or the generic detail screen keeps showing
-    # the old enclosure (or none) while the legacy page shows the new one.
-    from app.services.inverts_dualwrite import mirror_tarantula_update
-
-    tarantula.enclosure_id = enclosure_id
-    mirror_tarantula_update(db, tarantula)
+    """Put an animal (any taxon) or a colony in this enclosure. Moves it out
+    of whatever enclosure it was in."""
+    _owned_enclosure(db, enclosure_id, current_user)
+    kind = _set_inhabitant_enclosure(db, current_user, tarantula_id, enclosure_id)
     db.commit()
 
-    return {"message": "Tarantula added to enclosure", "tarantula_id": str(tarantula_id)}
+    # `tarantula_id` key kept for older clients.
+    return {"message": "Added to enclosure", "tarantula_id": str(tarantula_id), "kind": kind}
 
 
 @router.delete("/{enclosure_id}/inhabitants/{tarantula_id}", status_code=status.HTTP_200_OK)
@@ -326,40 +488,13 @@ async def remove_inhabitant(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Remove a tarantula from an enclosure"""
-    # Verify enclosure ownership
-    enclosure = db.query(Enclosure).filter(
-        Enclosure.id == enclosure_id,
-        Enclosure.user_id == current_user.id
-    ).first()
-
-    if not enclosure:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Enclosure not found"
-        )
-
-    # Verify tarantula is in this enclosure
-    tarantula = db.query(Tarantula).filter(
-        Tarantula.id == tarantula_id,
-        Tarantula.enclosure_id == enclosure_id,
-        Tarantula.user_id == current_user.id
-    ).first()
-
-    if not tarantula:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tarantula not found in this enclosure"
-        )
-
-    # Remove from enclosure — mirrored for the same reason as adding.
-    from app.services.inverts_dualwrite import mirror_tarantula_update
-
-    tarantula.enclosure_id = None
-    mirror_tarantula_update(db, tarantula)
+    """Take an animal (any taxon) or a colony out of this enclosure. Nothing
+    is deleted."""
+    _owned_enclosure(db, enclosure_id, current_user)
+    kind = _set_inhabitant_enclosure(db, current_user, tarantula_id, None, must_be_in=enclosure_id)
     db.commit()
 
-    return {"message": "Tarantula removed from enclosure", "tarantula_id": str(tarantula_id)}
+    return {"message": "Removed from enclosure", "tarantula_id": str(tarantula_id), "kind": kind}
 
 
 # ============== FEEDING LOGS ==============

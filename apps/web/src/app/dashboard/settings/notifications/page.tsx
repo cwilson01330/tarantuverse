@@ -1,27 +1,84 @@
 'use client';
 
+/**
+ * Notification settings (TV web). Every switch here changes something the
+ * server does (audit-2 H4). The old "Animal Care Reminders" switches (feeding,
+ * substrate, molt prediction, maintenance) were read only by retired mobile
+ * screens and controlled nothing; animal-care reminders are the server's daily
+ * feeding digest (services/digest_service.py), so that is what this page sets.
+ * Kept in step with apps/mobile/app/settings/notifications.tsx.
+ */
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
 
 interface NotificationPreferences {
-  feeding_reminders_enabled: boolean;
-  feeding_reminder_hours: number;
-  substrate_reminders_enabled: boolean;
-  substrate_reminder_days: number;
-  molt_predictions_enabled: boolean;
-  maintenance_reminders_enabled: boolean;
-  maintenance_reminder_days: number;
+  daily_digest_enabled: boolean;
+  digest_hour: number;
   push_notifications_enabled: boolean;
   direct_messages_enabled: boolean;
   forum_replies_enabled: boolean;
   new_followers_enabled: boolean;
-  community_activity_enabled: boolean;
   sitter_activity_enabled: boolean;
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
+}
+
+type BoolKey = {
+  [K in keyof NotificationPreferences]: NotificationPreferences[K] extends boolean ? K : never
+}[keyof NotificationPreferences];
+
+/** "9:00 AM" from 9. */
+function formatHour(h: number): string {
+  const hour = ((h % 24) + 24) % 24;
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:00 ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
+/** "22:00" → "10:00 PM"; the raw string if it doesn't parse. */
+function formatClock(hhmm: string | null | undefined): string {
+  const [h, m] = String(hhmm ?? '').split(':').map((x) => Number(x));
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return String(hhmm ?? '');
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/** Same rule as the server's notification_service.in_quiet_hours. */
+function hourIsQuiet(hour: number, start: string, end: string): boolean {
+  const toMin = (s: string) => {
+    const [h, m] = String(s ?? '').split(':').map((x) => Number(x));
+    return Number.isInteger(h) && Number.isInteger(m) ? h * 60 + m : null;
+  };
+  const a = toMin(start);
+  const b = toMin(end);
+  if (a == null || b == null || a === b) return false;
+  const t = hour * 60;
+  return a < b ? t >= a && t < b : t >= a || t < b;
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ml-4 ${
+        on ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+          on ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  );
 }
 
 export default function NotificationSettingsPage() {
@@ -32,18 +89,12 @@ export default function NotificationSettingsPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
-    feeding_reminders_enabled: true,
-    feeding_reminder_hours: 24,
-    substrate_reminders_enabled: true,
-    substrate_reminder_days: 90,
-    molt_predictions_enabled: true,
-    maintenance_reminders_enabled: true,
-    maintenance_reminder_days: 30,
+    daily_digest_enabled: true,
+    digest_hour: 9,
     push_notifications_enabled: true,
     direct_messages_enabled: true,
     forum_replies_enabled: true,
     new_followers_enabled: true,
-    community_activity_enabled: false,
     sitter_activity_enabled: true,
     quiet_hours_enabled: false,
     quiet_hours_start: '22:00',
@@ -59,6 +110,7 @@ export default function NotificationSettingsPage() {
     }
 
     loadPreferences();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, token]);
 
   const loadPreferences = async () => {
@@ -72,7 +124,14 @@ export default function NotificationSettingsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setPreferences(data);
+        setPreferences((prev) => ({
+          ...prev,
+          ...data,
+          // Older API builds don't return these; keep the server's defaults.
+          daily_digest_enabled: data.daily_digest_enabled ?? true,
+          digest_hour: typeof data.digest_hour === 'number' ? data.digest_hour : 9,
+          sitter_activity_enabled: data.sitter_activity_enabled ?? true,
+        }));
       }
     } catch (error) {
       console.error('Failed to load notification preferences:', error);
@@ -94,24 +153,18 @@ export default function NotificationSettingsPage() {
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-      // Only send the fields that can be updated (exclude id, user_id, expo_push_token)
+      // Only the fields this page edits — Herpetoverse shares this row and has
+      // its own settings, which a full echo could overwrite.
       const updatePayload = {
-        feeding_reminders_enabled: preferences.feeding_reminders_enabled,
-        feeding_reminder_hours: preferences.feeding_reminder_hours,
-        substrate_reminders_enabled: preferences.substrate_reminders_enabled,
-        substrate_reminder_days: preferences.substrate_reminder_days,
-        molt_predictions_enabled: preferences.molt_predictions_enabled,
-        maintenance_reminders_enabled: preferences.maintenance_reminders_enabled,
-        maintenance_reminder_days: preferences.maintenance_reminder_days,
-        push_notifications_enabled: preferences.push_notifications_enabled,
+        daily_digest_enabled: preferences.daily_digest_enabled,
+        digest_hour: preferences.digest_hour,
+        // The digest hour is a local hour: save this browser's zone with it.
+        tz_offset_minutes: new Date().getTimezoneOffset(),
         direct_messages_enabled: preferences.direct_messages_enabled,
         forum_replies_enabled: preferences.forum_replies_enabled,
         new_followers_enabled: preferences.new_followers_enabled,
-        community_activity_enabled: preferences.community_activity_enabled,
         sitter_activity_enabled: preferences.sitter_activity_enabled ?? true,
         quiet_hours_enabled: preferences.quiet_hours_enabled,
-        quiet_hours_start: preferences.quiet_hours_start,
-        quiet_hours_end: preferences.quiet_hours_end,
       };
 
       const response = await fetch(`${API_URL}/api/v1/notification-preferences/`, {
@@ -124,7 +177,7 @@ export default function NotificationSettingsPage() {
       });
 
       if (response.ok) {
-        setSuccessMessage('Notification preferences saved successfully!');
+        setSuccessMessage('Notification preferences saved.');
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -139,7 +192,7 @@ export default function NotificationSettingsPage() {
     }
   };
 
-  const togglePreference = (key: keyof NotificationPreferences) => {
+  const togglePreference = (key: BoolKey) => {
     setPreferences(prev => ({
       ...prev,
       [key]: !prev[key]
@@ -160,6 +213,15 @@ export default function NotificationSettingsPage() {
     );
   }
 
+  const digestOn = preferences.daily_digest_enabled;
+  const digestInQuiet =
+    preferences.quiet_hours_enabled &&
+    hourIsQuiet(preferences.digest_hour, preferences.quiet_hours_start, preferences.quiet_hours_end);
+
+  const row = 'flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg';
+  const title = 'font-semibold text-gray-900 dark:text-white mb-1';
+  const desc = 'text-sm text-gray-600 dark:text-gray-400';
+
   return (
     <DashboardLayout
       userName={authUser?.name ?? undefined}
@@ -177,7 +239,7 @@ export default function NotificationSettingsPage() {
           </button>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">🔔 Notification Settings</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Manage your notification preferences for animal care reminders and community activity
+            Choose what the app notifies you about and when.
           </p>
         </div>
 
@@ -188,100 +250,44 @@ export default function NotificationSettingsPage() {
           </div>
         )}
 
-        {/* Local Notifications - Animal Care */}
+        {/* Feeding reminders — the server's daily digest */}
         <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <span className="text-2xl">🕷️</span>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Animal Care Reminders</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Feeding reminders</h2>
           </div>
 
           <div className="space-y-4">
-            {/* Feeding Reminders */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className={row}>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Feeding Reminders</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Get notified when it's time to feed your animals (based on their last feeding)
+                <h3 className={title}>Daily feeding digest</h3>
+                <p className={desc}>
+                  One notification a day saying how many animals are due, using the same schedule as Feeding Day.
+                  Nothing is sent on days when nothing is due.
                 </p>
               </div>
-              <button
-                onClick={() => togglePreference('feeding_reminders_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.feeding_reminders_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.feeding_reminders_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <Toggle on={digestOn} onClick={() => togglePreference('daily_digest_enabled')} label="Daily feeding digest" />
             </div>
 
-            {/* Substrate Reminders */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className={`${row} ${digestOn ? '' : 'opacity-50'}`}>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Substrate Change Reminders</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Reminders to change substrate (default: every 90 days)
+                <label htmlFor="digest-hour" className={`block ${title}`}>Time</label>
+                <p className={desc}>
+                  Your local time. Saving here uses this browser&apos;s time zone.
+                  {digestInQuiet && ' This is inside your quiet hours, so the digest will wait in your notifications list instead of buzzing your phone.'}
                 </p>
               </div>
-              <button
-                onClick={() => togglePreference('substrate_reminders_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.substrate_reminders_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
+              <select
+                id="digest-hour"
+                value={preferences.digest_hour}
+                disabled={!digestOn}
+                onChange={(e) => setPreferences((p) => ({ ...p, digest_hour: Number(e.target.value) }))}
+                className="ml-4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-600 disabled:cursor-not-allowed"
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.substrate_reminders_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Molt Predictions */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Molt Predictions</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Get notified when a tarantula might be approaching a molt (tarantulas only)
-                </p>
-              </div>
-              <button
-                onClick={() => togglePreference('molt_predictions_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.molt_predictions_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.molt_predictions_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Maintenance Reminders */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Maintenance Reminders</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  General maintenance reminders (water dishes, enclosure cleaning)
-                </p>
-              </div>
-              <button
-                onClick={() => togglePreference('maintenance_reminders_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.maintenance_reminders_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.maintenance_reminders_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                {HOURS.map((h) => (
+                  <option key={h} value={h}>{formatHour(h)}</option>
+                ))}
+              </select>
             </div>
           </div>
         </section>
@@ -294,117 +300,38 @@ export default function NotificationSettingsPage() {
           </div>
 
           <div className="space-y-4">
-            {/* Direct Messages */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className={row}>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Direct Messages</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  When someone sends you a message
-                </p>
+                <h3 className={title}>Direct Messages</h3>
+                <p className={desc}>When someone sends you a message</p>
               </div>
-              <button
-                onClick={() => togglePreference('direct_messages_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.direct_messages_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.direct_messages_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <Toggle on={preferences.direct_messages_enabled} onClick={() => togglePreference('direct_messages_enabled')} label="Direct message notifications" />
             </div>
 
-            {/* Forum Replies */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className={row}>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Forum Replies</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  When someone replies to your forum posts
-                </p>
+                <h3 className={title}>Forum Replies</h3>
+                <p className={desc}>When someone replies to your forum posts</p>
               </div>
-              <button
-                onClick={() => togglePreference('forum_replies_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.forum_replies_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.forum_replies_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <Toggle on={preferences.forum_replies_enabled} onClick={() => togglePreference('forum_replies_enabled')} label="Forum reply notifications" />
             </div>
 
-            {/* New Followers */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className={row}>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">New Followers</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  When someone follows you
-                </p>
+                <h3 className={title}>New Followers</h3>
+                <p className={desc}>When someone follows you</p>
               </div>
-              <button
-                onClick={() => togglePreference('new_followers_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.new_followers_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.new_followers_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <Toggle on={preferences.new_followers_enabled} onClick={() => togglePreference('new_followers_enabled')} label="New follower notifications" />
             </div>
 
-            {/* Sitter activity */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <div className={row}>
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Sitter activity</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h3 className={title}>Sitter activity</h3>
+                <p className={desc}>
                   When a sitter starts logging feedings on one of your links (once per round). Lockouts always notify you.
                 </p>
               </div>
-              <button
-                onClick={() => togglePreference('sitter_activity_enabled')}
-                role="switch"
-                aria-checked={preferences.sitter_activity_enabled ?? true}
-                aria-label="Sitter activity notifications"
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  (preferences.sitter_activity_enabled ?? true) ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    (preferences.sitter_activity_enabled ?? true) ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Community Activity */}
-            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Community Activity</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Updates from keepers you follow
-                </p>
-              </div>
-              <button
-                onClick={() => togglePreference('community_activity_enabled')}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                  preferences.community_activity_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    preferences.community_activity_enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <Toggle on={preferences.sitter_activity_enabled ?? true} onClick={() => togglePreference('sitter_activity_enabled')} label="Sitter activity notifications" />
             </div>
           </div>
         </section>
@@ -416,25 +343,15 @@ export default function NotificationSettingsPage() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quiet Hours</h2>
           </div>
 
-          <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+          <div className={row}>
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Enable Quiet Hours</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Pause notifications during nighttime (10 PM - 8 AM by default)
+              <h3 className={title}>Enable Quiet Hours</h3>
+              <p className={desc}>
+                No push notifications from {formatClock(preferences.quiet_hours_start)} to {formatClock(preferences.quiet_hours_end)},
+                your local time. They still wait in your notifications list. Sitter-link lockouts still come through.
               </p>
             </div>
-            <button
-              onClick={() => togglePreference('quiet_hours_enabled')}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
-                preferences.quiet_hours_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  preferences.quiet_hours_enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+            <Toggle on={preferences.quiet_hours_enabled} onClick={() => togglePreference('quiet_hours_enabled')} label="Quiet hours" />
           </div>
         </section>
 
@@ -458,8 +375,8 @@ export default function NotificationSettingsPage() {
         {/* Info Banner */}
         <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <p className="text-sm text-blue-700 dark:text-blue-400">
-            <strong>Note:</strong> Local notifications (feeding, substrate, molt predictions) are only available on the mobile app.
-            Community notifications (messages, forum replies, followers) work on both web and mobile.
+            <strong>Note:</strong> Push notifications go to the Tarantuverse mobile app, so sign in there with notifications
+            allowed to receive them. These settings apply on every device.
           </p>
         </div>
       </div>

@@ -19,13 +19,16 @@ import GrowthChart from '@/components/GrowthChart'
 import ShareCardModal from '@/components/ShareCardModal'
 import UpgradeModal from '@/components/UpgradeModal'
 import {
+  ANIMAL_EVENT_LABELS,
   DEATH_CAUSE_LABELS,
   DEATH_CAUSE_ORDER,
   markInvertDied,
   tenureLabel,
   reviveInvert,
+  type AnimalEvent,
   type DeathCause,
 } from '@/lib/animal-lifecycle'
+import AnimalEventDialog from '@/components/AnimalEventDialog'
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
   tracksInstars, formatStage, stageSummary, elapsedSince, stageCountLabel, adultStageHint,
@@ -128,7 +131,7 @@ interface Invert {
 }
 
 interface Attributed { logged_by_user_id?: string | null; logged_by_name?: string | null; sitter_name?: string | null }
-interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
+interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; food_size?: string | null; accepted: boolean; notes?: string | null }
 interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null; outcome?: string | null; is_ultimate?: boolean; leg_span_after?: string | number | null }
 interface SubstrateChange extends Attributed { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
 /** Hydration events (car_20260909). Three types, because a top-up, a
@@ -205,8 +208,12 @@ export default function InvertDetailPage() {
   const [substrate, setSubstrate] = useState<SubstrateChange[]>([])
   const [careLogs, setCareLogs] = useState<CareLog[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
-  const [logState, setLogState] = useState<Record<'feedings' | 'molts' | 'substrate' | 'photos' | 'care', LoadState>>({
-    feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading', care: 'loading',
+  // Health & events (ADR-015 D5): injuries, illnesses, escapes, recoveries…
+  const [events, setEvents] = useState<AnimalEvent[]>([])
+  const [eventOpen, setEventOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<AnimalEvent | null>(null)
+  const [logState, setLogState] = useState<Record<'feedings' | 'molts' | 'substrate' | 'photos' | 'care' | 'events', LoadState>>({
+    feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading', care: 'loading', events: 'loading',
   })
   const [growth, setGrowth] = useState<any | null>(null)
   // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
@@ -303,7 +310,7 @@ export default function InvertDetailPage() {
         }
       }
 
-      const [f, m, s, p, g, c, fs, ts] = await Promise.all([
+      const [f, m, s, p, g, c, fs, ts, ev] = await Promise.all([
         load<any>('feedings'),
         load<any>('molts'),
         load<any>('substrate-changes'),
@@ -325,18 +332,22 @@ export default function InvertDetailPage() {
             ).then((r) => (r.ok ? r.json() : null)).catch(() => null)
           : Promise.resolve(null),
         data.taxon === 'tarantula' ? fetchTarantulaStats(id, headers) : Promise.resolve(null),
+        // Every taxon — an escape or a vet visit isn't species-specific.
+        load<AnimalEvent>('events'),
       ])
       setFeedings(f.data)
       setMolts(m.data)
       setSubstrate(s.data)
       setPhotos(p.data)
       setCareLogs(c.data)
+      setEvents(ev.data)
       setLogState({
         feedings: f.state,
         molts: m.state,
         substrate: s.state,
         photos: p.state,
         care: c.state,
+        events: ev.state,
       })
       setGrowth(g)
       setFeedingStats(fs)
@@ -614,7 +625,6 @@ export default function InvertDetailPage() {
       .join('&')
 
   const meta = invert ? taxonMeta(invert.taxon) : null
-  const isWhipSpider = invert?.taxon === 'whip_spider'
 
   return (
     <DashboardLayout
@@ -697,15 +707,16 @@ export default function InvertDetailPage() {
                   </button>
                 )}
                 {/* ADR-017 — an offer, not a setting. Once set it reports the
-                    value, so the control doubles as the indicator. */}
-                <button
+                    value, so the control doubles as the indicator. Only for
+                    taxa with a feeding cadence — a grazer has none to set. */}
+                {taxonHasModule(invert.taxon, 'feedingStats') && <button
                   onClick={() => setCadenceOpen(true)}
                   className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
                 >
                   {invert?.feeding_interval_days
                     ? `Every ${invert.feeding_interval_days}d`
                     : 'Feeding schedule'}
-                </button>
+                </button>}
                 </>)}
                 {isOwner && (<>
                 {/* QR was tarantula-only on web until QRModal gained a
@@ -809,7 +820,10 @@ export default function InvertDetailPage() {
               />
               <Fact label="Last molt" value={lastMoltAgo(molts)} />
               <Fact
-                label={isWhipSpider ? 'Leg span' : 'Size'}
+                // Registry wording, so it agrees with the add form, the share
+                // card and the growth chart (Leg span for spiders and whip
+                // spiders, Length for the rest).
+                label={meta.sizeLabel.replace(/\s*\(mm\)$/, '')}
                 value={formatLengthMm(invert.current_length_mm, units)}
               />
               <Fact label="Acquired" value={invert.date_acquired ? formatLocalDate(invert.date_acquired) : null} />
@@ -850,9 +864,9 @@ export default function InvertDetailPage() {
               empty="No feedings logged yet."
               state={logState.feedings}
               onRetry={fetchAll}
-              rows={feedings.slice(0, 8).map((x) => ({
+              rows={feedings.map((x) => ({
                 key: x.id,
-                left: `${x.food_type || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
+                left: `${[x.food_size, x.food_type].filter(Boolean).join(' ') || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
                 right: formatLocalDate(x.fed_at),
                 sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`) : undefined,
@@ -875,11 +889,36 @@ export default function InvertDetailPage() {
               empty="No molts logged yet."
               state={logState.molts}
               onRetry={fetchAll}
-              rows={molts.slice(0, 8).map((x) => ({
+              rows={molts.map((x) => ({
                 key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at), sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`) : undefined,
                 onDelete: canChange(x) ? () => deleteLog(`molts/${x.id}`, 'molt') : undefined,
                 onShare: canKeep ? () => setShareMolt(x.id) : undefined,
+              }))}
+            />
+
+            {/* Health & events (ADR-015 D5) — everything that isn't a feeding
+                or a molt and used to have nowhere to go but the notes blob.
+                Same permissions as the other logs: loggers add, and change
+                only their own entries. Logging closes once an animal died. */}
+            <LogSection
+              title="Health & events"
+              cta={canLog && !invert.died_at ? 'Log event' : undefined}
+              onCta={canLog && !invert.died_at ? () => { setEditingEvent(null); setEventOpen(true) } : undefined}
+              empty="No events recorded. Injuries, illnesses, escapes and recoveries go here."
+              state={logState.events}
+              onRetry={fetchAll}
+              rows={events.map((e) => ({
+                key: e.id,
+                // Severity only exists for injury and illness.
+                left: e.severity
+                  ? `${ANIMAL_EVENT_LABELS[e.event_type] ?? 'Event'} · ${e.severity[0].toUpperCase()}${e.severity.slice(1)}`
+                  : ANIMAL_EVENT_LABELS[e.event_type] ?? 'Event',
+                right: formatLocalDate(e.occurred_at),
+                // The keeper's own words are the record; attribution after.
+                sub: [e.notes, attribution(e)].filter(Boolean).join(' · ') || undefined,
+                onEdit: canChange(e) ? () => { setEditingEvent(e); setEventOpen(true) } : undefined,
+                onDelete: canChange(e) ? () => deleteLog(`animal-events/${e.id}`, 'event') : undefined,
               }))}
             />
 
@@ -1076,7 +1115,7 @@ export default function InvertDetailPage() {
               empty="No watering logged yet."
               state={logState.care}
               onRetry={fetchAll}
-              rows={careLogs.slice(0, 8).map((x) => ({
+              rows={careLogs.map((x) => ({
                 key: x.id,
                 left: CARE_LOG_LABELS[x.log_type] ?? 'Watered',
                 right: formatLocalDate(x.logged_at),
@@ -1093,7 +1132,7 @@ export default function InvertDetailPage() {
               empty="No substrate changes logged yet."
               state={logState.substrate}
               onRetry={fetchAll}
-              rows={substrate.slice(0, 8).map((x) => ({
+              rows={substrate.map((x) => ({
                 key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at), sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-substrate-change?${qp({ logId: x.id, changed_at: x.changed_at, substrate_type: x.substrate_type, substrate_depth: x.substrate_depth, reason: x.reason, notes: x.notes })}`) : undefined,
                 onDelete: canChange(x) ? () => deleteLog(`substrate-changes/${x.id}`, 'substrate change') : undefined,
@@ -1163,8 +1202,12 @@ export default function InvertDetailPage() {
         animalId={id as string}
         token={token}
         current={invert?.feeding_interval_days ?? null}
-        derivedDays={null}
-        derivedSource={null}
+        // What the keeper is overriding, as mobile passes it. Once they've
+        // set their own cadence the server's interval IS their number, not
+        // what clearing returns to — so pass nothing rather than call the
+        // keeper's figure "our default".
+        derivedDays={feedingStats?.interval_source === 'keeper' ? null : feedingStats?.interval_days ?? null}
+        derivedSource={feedingStats?.interval_source === 'keeper' ? null : feedingStats?.interval_source ?? null}
         onClose={() => setCadenceOpen(false)}
         onSaved={fetchAll}
       />
@@ -1179,6 +1222,17 @@ export default function InvertDetailPage() {
           initialReason={feedingStats?.feeding_paused_reason ?? invert.feeding_paused_reason ?? undefined}
           initialUntil={feedingStats?.feeding_paused_until ?? invert.feeding_paused_until ?? undefined}
           isPaused={!!feedingStats?.is_feeding_paused}
+        />
+      )}
+
+      {invert && canLog && (
+        <AnimalEventDialog
+          open={eventOpen}
+          token={token}
+          invertId={invert.id}
+          editing={editingEvent}
+          onClose={() => { setEventOpen(false); setEditingEvent(null) }}
+          onSaved={fetchAll}
         />
       )}
 
@@ -1435,7 +1489,7 @@ export default function InvertDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note to buyer (optional)</label>
                 <textarea
                   value={transferNote} onChange={(e) => setTransferNote(e.target.value)}
-                  placeholder="e.g. 0.0.1 sling, last molt 6/1, eating well"
+                  placeholder="e.g. unsexed juvenile, last molt 6/1, eating well"
                   className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
                   rows={2}
                 />
@@ -1521,6 +1575,9 @@ function Fact({ label, value }: { label: string; value?: string | null }) {
   )
 }
 
+/** How many entries a log list shows before "Show all (N)". */
+const LOG_PREVIEW = 8
+
 function LogSection({
   title,
   cta,
@@ -1540,6 +1597,11 @@ function LogSection({
   state?: LoadState
   onRetry?: () => void
 }) {
+  // The newest LOG_PREVIEW entries, with the full history one click away.
+  // This used to be a hard .slice(0, 8): a tarantula with 60 feedings had
+  // 52 of them unreachable on web.
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? rows : rows.slice(0, LOG_PREVIEW)
   return (
     <Section title={title} action={cta && onCta ? { label: cta, onClick: onCta } : undefined}>
       {state === 'loading' ? (
@@ -1569,7 +1631,8 @@ function LogSection({
       ) : rows.length === 0 ? (
         <p className="text-sm text-theme-tertiary italic">{empty}</p>
       ) : (
-        rows.map((r) => (
+        <>
+        {shown.map((r) => (
           <div key={r.key} className="group flex items-center gap-3 py-1.5 border-b border-theme last:border-0">
             <span className="flex-1 text-sm text-theme-primary">
               {r.left}
@@ -1604,7 +1667,18 @@ function LogSection({
               </button>
             )}
           </div>
-        ))
+        ))}
+        {rows.length > LOG_PREVIEW && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="mt-2 text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            {expanded ? 'Show fewer' : `Show all (${rows.length})`}
+          </button>
+        )}
+        </>
       )}
     </Section>
   )

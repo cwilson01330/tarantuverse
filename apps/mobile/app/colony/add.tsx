@@ -56,6 +56,14 @@ const SOURCE_OPTIONS: { value: Source; label: string }[] = [
 // buckets to anyone — so a communal keeper tracking females vs males had to
 // type the vocabulary themselves.
 
+/** Starting buckets for a taxon: its suggested vocabulary as stored keys
+ *  ("adult females"), empty counts. Same seed as the web add form. */
+function seedBuckets(taxon: InvertTaxon): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const b of suggestedBuckets(taxon)) out[bucketKey(b)] = '';
+  return out;
+}
+
 function parseCount(s: string): number {
   if (s.trim() === '') return 0;
   const n = Number.parseInt(s, 10);
@@ -76,11 +84,9 @@ export default function AddColonyScreen() {
   const [speciesId, setSpeciesId] = useState<string | null>(null);
   const [scientificName, setScientificName] = useState('');
 
-  // Stage buckets — seed with adults + nymphs; keeper can adjust.
-  const [stageCounts, setStageCounts] = useState<Record<string, string>>({
-    adults: '',
-    nymphs: '',
-  });
+  // Stage buckets — seeded from the taxon's suggestions (it used to be
+  // adults + nymphs for every taxon); the keeper can adjust.
+  const [stageCounts, setStageCounts] = useState<Record<string, string>>(() => seedBuckets('roach'));
   const [newStageName, setNewStageName] = useState('');
   const [countIsEstimated, setCountIsEstimated] = useState(false);
 
@@ -205,7 +211,13 @@ export default function AddColonyScreen() {
                   <TouchableOpacity
                     key={t}
                     onPress={() => {
+                      // The buckets follow the taxon while untouched: no
+                      // counts typed and exactly the old taxon's seed.
+                      const pristine =
+                        Object.values(stageCounts).every((v) => v.trim() === '') &&
+                        Object.keys(stageCounts).join('|') === Object.keys(seedBuckets(taxon)).join('|');
                       setTaxon(t);
+                      if (pristine) setStageCounts(seedBuckets(t));
                       // Reset the species link — it's scoped to the taxon.
                       setSpeciesId(null);
                       setScientificName('');

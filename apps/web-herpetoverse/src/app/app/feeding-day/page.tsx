@@ -753,6 +753,14 @@ function StatusPill({
       </span>
     )
   }
+  // Brumation / aestivation — set on the animal's page; never overdue.
+  if (animal.is_brumating) {
+    return (
+      <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300">
+        Resting
+      </span>
+    )
+  }
   if (animal.status_mode === 'daily') {
     return animal.fed_today ? (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500/15 text-green-300">

@@ -326,7 +326,10 @@ function describe(s: FeedingStatus, animal: Animal): Verdict {
       tone: 'info',
       icon: 'pause-circle-outline',
       headline: 'Feeding paused',
-      detail: s.note ?? (animal.brumation_active ? 'Brumation is active. Reminders are silenced.' : undefined),
+      // Honest about reach: brumation keeps the animal off Feeding Day's
+      // overdue list. It used to say "Reminders are silenced", which the
+      // daily digest didn't honour.
+      detail: s.note ?? (animal.brumation_active ? "Brumation is on, so it isn't flagged overdue on Feeding Day." : undefined),
     };
   }
   if (s.status === 'no_feedings') {

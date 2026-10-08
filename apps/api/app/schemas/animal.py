@@ -123,6 +123,29 @@ class AnimalFeedingStatusItem(BaseModel):
     # a multi-day cadence) that keep the days-since / overdue treatment.
     status_mode: str = "interval"  # "daily" | "interval"
     fed_today: bool = False
+    # Brumation (or aestivation) — the animal is deliberately not eating, so
+    # it is never overdue. Separate from is_feeding_paused so clients can say
+    # which it is.
+    is_brumating: bool = False
+
+
+class BrumationRequest(BaseModel):
+    """Start or end brumation (aestivation for amphibians).
+
+    `started_at` is the keeper's local date; omitted, the server uses today.
+    Ending clears the start date — the flag and its date describe the
+    current rest, not a history."""
+    active: bool
+    started_at: Optional[date] = None
+
+
+class DeleteImpactResponse(BaseModel):
+    """What else goes when an animal is deleted. Pairings the animal is a
+    parent in cascade on delete, taking their clutches and offspring records
+    with them — the delete confirm has to say so before it happens."""
+    pairings: int = 0
+    clutches: int = 0
+    offspring: int = 0
 
 
 class AnimalResponse(AnimalBase):

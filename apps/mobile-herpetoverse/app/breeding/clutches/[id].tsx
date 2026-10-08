@@ -9,9 +9,9 @@
  *   - Offspring list (read-only) — full CRUD lands in Sprint 5d
  *   - Delete affordance with cascade-aware confirm
  *
- * Editing clutch fields inline is deferred — for now, deleting +
- * re-creating is the recovery path. The delete already cascades to
- * offspring on the server.
+ * Incubation temps + humidity are editable in place (audit-2 M8) — temps
+ * typed in the keeper's units through useUnitField, stored °F. Wording
+ * (Slugs vs Infertile, Hatchling vs Offspring) follows the pairing's taxon.
  *
  * Hermes-prod safety: static JSX branches only.
  */
@@ -31,17 +31,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
-import { FormErrorBanner } from '../../../src/components/forms/FormPrimitives';
+import {
+  Field,
+  FormErrorBanner,
+  SubmitButton,
+  ThemedInput,
+  extractErrorMessage,
+} from '../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useUnits } from '../../../src/hooks/useUnits';
+import { useUnitField } from '../../../src/hooks/useUnitField';
 import { tempValue } from '../../../src/lib/units';
+import { TYPE } from '../../../src/theme/type';
 import {
   OFFSPRING_STATUS_LABEL,
   type Clutch,
   type ReptileOffspring,
+  breedingVocab,
   deleteClutch,
   getClutch,
+  getPairing,
   listOffspringForClutch,
+  updateClutch,
 } from '../../../src/lib/breeding';
 
 function ClutchDetailScreen() {
@@ -54,6 +65,10 @@ function ClutchDetailScreen() {
   const [offspring, setOffspring] = useState<ReptileOffspring[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editingConditions, setEditingConditions] = useState(false);
+  // Pairing taxon → wording. Neutral until loaded.
+  const [taxon, setTaxon] = useState<string | null>(null);
+  const vocab = breedingVocab(taxon);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -67,6 +82,9 @@ function ClutchDetailScreen() {
       setClutch(c);
       setOffspring(o);
       setLoadError(null);
+      getPairing(c.pairing_id)
+        .then((p) => setTaxon(p.taxon))
+        .catch(() => { /* neutral wording is fine */ });
     } catch (err: any) {
       setLoadError(
         err?.response?.data?.detail ||
@@ -333,7 +351,7 @@ function ClutchDetailScreen() {
                 )}
                 {clutch.expected_count != null && (
                   <KV
-                    label="Expected"
+                    label={vocab.countLabel}
                     value={String(clutch.expected_count)}
                   />
                 )}
@@ -344,7 +362,7 @@ function ClutchDetailScreen() {
                   />
                 )}
                 {clutch.slug_count != null && (
-                  <KV label="Slugs" value={String(clutch.slug_count)} />
+                  <KV label={vocab.infertileLabel} value={String(clutch.slug_count)} />
                 )}
                 {clutch.hatched_count != null && (
                   <KV
@@ -359,6 +377,29 @@ function ClutchDetailScreen() {
                   />
                 )}
               </View>
+
+              {editingConditions ? (
+                <IncubationEditor
+                  clutch={clutch}
+                  onCancel={() => setEditingConditions(false)}
+                  onSaved={(next) => {
+                    setClutch(next);
+                    setEditingConditions(false);
+                  }}
+                />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setEditingConditions(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit incubation temperature and humidity"
+                  hitSlop={8}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <Text style={[TYPE.label, { color: colors.primary }]}>
+                    Edit incubation
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {clutch.notes && (
                 <Text style={[styles.notes, { color: colors.textSecondary }]}>
@@ -381,7 +422,7 @@ function ClutchDetailScreen() {
                     )
                   }
                   accessibilityRole="button"
-                  accessibilityLabel="Add hatchling"
+                  accessibilityLabel={`Add ${vocab.youngLower}`}
                   style={styles.sectionAdd}
                 >
                   <MaterialCommunityIcons
@@ -392,7 +433,7 @@ function ClutchDetailScreen() {
                   <Text
                     style={[styles.sectionAddText, { color: colors.primary }]}
                   >
-                    Add hatchling
+                    Add {vocab.youngLower}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -412,10 +453,8 @@ function ClutchDetailScreen() {
                   <Text
                     style={[styles.emptyText, { color: colors.textSecondary }]}
                   >
-                    No hatchlings recorded for this clutch yet. Tap{' '}
-                    <Text style={{ fontWeight: '600' }}>Add hatchling</Text>{' '}
-                    once eggs start cutting — you can record morph,
-                    weight, and length, then update sale status later.
+                    {vocab.emptyOffspring} You can record weight and length,
+                    then update sale status later.
                   </Text>
                 </View>
               ) : (
@@ -427,7 +466,7 @@ function ClutchDetailScreen() {
                         router.push(`/breeding/offspring/${o.id}` as never)
                       }
                       accessibilityRole="button"
-                      accessibilityLabel={`Open ${o.morph_label ?? 'hatchling'}`}
+                      accessibilityLabel={`Open ${o.morph_label ?? vocab.youngLower}`}
                       style={[
                         styles.offspringRow,
                         {
@@ -450,7 +489,7 @@ function ClutchDetailScreen() {
                           ]}
                           numberOfLines={1}
                         >
-                          {o.morph_label ?? 'Hatchling'}
+                          {o.morph_label ?? vocab.young}
                         </Text>
                         <Text
                           style={[
@@ -480,6 +519,167 @@ function ClutchDetailScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Edit incubation temps + humidity after the clutch is created. Temps are
+ * stored °F and typed in the keeper's units; an untouched field saves its
+ * original stored value, so opening and saving never drifts it.
+ */
+function IncubationEditor({
+  clutch,
+  onCancel,
+  onSaved,
+}: {
+  clutch: Clutch;
+  onCancel: () => void;
+  onSaved: (next: Clutch) => void;
+}) {
+  const { colors, layout } = useTheme();
+  const { units } = useUnits();
+  const metric = units === 'metric';
+  const tMin = useUnitField('temp');
+  const tMax = useUnitField('temp');
+  const [humMin, setHumMin] = useState(
+    clutch.incubation_humidity_min_pct != null ? String(clutch.incubation_humidity_min_pct) : '',
+  );
+  const [humMax, setHumMax] = useState(
+    clutch.incubation_humidity_max_pct != null ? String(clutch.incubation_humidity_max_pct) : '',
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { load: loadMin } = tMin;
+  const { load: loadMax } = tMax;
+  useEffect(() => {
+    loadMin(clutch.incubation_temp_min_f);
+    loadMax(clutch.incubation_temp_max_f);
+  }, [clutch.incubation_temp_min_f, clutch.incubation_temp_max_f, loadMin, loadMax]);
+
+  function pct(raw: string, label: string): { ok: true; v: number | null } | { ok: false } {
+    const t = raw.trim();
+    if (!t) return { ok: true, v: null };
+    const n = Number(t);
+    if (!Number.isInteger(n) || n < 0 || n > 100) {
+      setError(`${label} should be a whole number from 0 to 100.`);
+      return { ok: false };
+    }
+    return { ok: true, v: n };
+  }
+
+  async function save() {
+    if (busy) return;
+    setError(null);
+    const lo = tMin.toStorage();
+    const hi = tMax.toStorage();
+    // The API accepts 40–120°F. Check the stored °F so the message is the
+    // same whichever units the keeper types in.
+    for (const [v, typed, text, label] of [
+      [lo, tMin.touched, tMin.value, 'Temp min'],
+      [hi, tMax.touched, tMax.value, 'Temp max'],
+    ] as const) {
+      if (typed && v == null && text.trim() !== '') {
+        setError(`${label} should be a number.`);
+        return;
+      }
+      if (typed && v != null && (v < 40 || v > 120)) {
+        setError(`${label} should be between ${metric ? '5 and 48°C' : '40 and 120°F'}.`);
+        return;
+      }
+    }
+    if (lo != null && hi != null && lo > hi) {
+      setError('Temp min should be ≤ temp max.');
+      return;
+    }
+    const hMin = pct(humMin, 'Humidity min');
+    if (!hMin.ok) return;
+    const hMax = pct(humMax, 'Humidity max');
+    if (!hMax.ok) return;
+    if (hMin.v != null && hMax.v != null && hMin.v > hMax.v) {
+      setError('Humidity min should be ≤ humidity max.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = await updateClutch(clutch.id, {
+        incubation_temp_min_f: lo,
+        incubation_temp_max_f: hi,
+        incubation_humidity_min_pct: hMin.v,
+        incubation_humidity_max_pct: hMax.v,
+      });
+      onSaved(next);
+    } catch (err) {
+      setError(extractErrorMessage(err, "Couldn't save the incubation conditions."));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View
+      style={{
+        gap: layout.spacing.md,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: colors.border,
+        paddingTop: layout.spacing.md,
+      }}
+    >
+      <View style={{ flexDirection: 'row', gap: layout.spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Field label={`Temp min (${tMin.unit})`} hint={metric ? '5–48' : '40–120'}>
+            <ThemedInput
+              value={tMin.value}
+              onChangeText={tMin.setValue}
+              placeholder={metric ? 'e.g. 30' : 'e.g. 86'}
+              keyboardType="decimal-pad"
+            />
+          </Field>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label={`Temp max (${tMax.unit})`} hint={metric ? '5–48' : '40–120'}>
+            <ThemedInput
+              value={tMax.value}
+              onChangeText={tMax.setValue}
+              placeholder={metric ? 'e.g. 33' : 'e.g. 91'}
+              keyboardType="decimal-pad"
+            />
+          </Field>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: layout.spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Field label="Humidity min %" hint="0–100">
+            <ThemedInput
+              value={humMin}
+              onChangeText={setHumMin}
+              placeholder="e.g. 75"
+              keyboardType="number-pad"
+            />
+          </Field>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label="Humidity max %" hint="0–100">
+            <ThemedInput
+              value={humMax}
+              onChangeText={setHumMax}
+              placeholder="e.g. 95"
+              keyboardType="number-pad"
+            />
+          </Field>
+        </View>
+      </View>
+      {error && <FormErrorBanner message={error} />}
+      <SubmitButton label="Save incubation" busy={busy} onPress={save} />
+      <TouchableOpacity
+        onPress={onCancel}
+        disabled={busy}
+        accessibilityRole="button"
+        hitSlop={8}
+        style={{ alignSelf: 'center', paddingVertical: layout.spacing.xs }}
+      >
+        <Text style={[TYPE.label, { color: colors.textSecondary }]}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 

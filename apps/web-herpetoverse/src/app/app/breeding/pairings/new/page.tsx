@@ -23,6 +23,7 @@ import {
   type ReptilePairingType,
   PAIRING_TYPE_LABEL,
   type Taxon,
+  breedingVocab,
   createPairing,
 } from '@/lib/breeding'
 // ADR-011: one collection fetch; the taxon picker is built from the groups
@@ -52,7 +53,7 @@ function animalToOption(a: Animal): ParentOption {
     id: a.id,
     taxon: a.taxon,
     display_name:
-      a.name || a.common_name || a.scientific_name || 'Unnamed reptile',
+      a.name || a.common_name || a.scientific_name || `Unnamed ${breedingVocab(a.taxon).animal}`,
     sex: a.sex,
     scientific_name: a.scientific_name,
     herp_species_id: a.herp_species_id,
@@ -205,7 +206,7 @@ export default function NewPairingPage() {
       return
     }
     if (maleId === femaleId) {
-      setSubmitError('Male and female must be different reptiles.')
+      setSubmitError(`Male and female must be different ${breedingVocab(taxon).animals}.`)
       return
     }
     // Defensive cross-species check — the picker filters already
@@ -303,7 +304,7 @@ export default function NewPairingPage() {
           hint={
             males.length === 0
               ? `No ${ANIMAL_TAXA[taxon].plural.toLowerCase()} with male or unknown sex in your collection yet.`
-              : 'Male or unknown-sex reptiles only.'
+              : `Male or unknown-sex ${breedingVocab(taxon).animals} only.`
           }
         >
           <ParentSelect
@@ -319,7 +320,7 @@ export default function NewPairingPage() {
           hint={
             females.length === 0
               ? `No ${ANIMAL_TAXA[taxon].plural.toLowerCase()} with female or unknown sex in your collection yet.`
-              : 'Female or unknown-sex reptiles only.'
+              : `Female or unknown-sex ${breedingVocab(taxon).animals} only.`
           }
         >
           <ParentSelect

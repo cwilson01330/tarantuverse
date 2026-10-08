@@ -22,17 +22,24 @@ import { use, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import {
+  type BreedingVocab,
   type Clutch,
   type ClutchParentGenotypes,
   type ReptileOffspring,
   type UpdateClutchPayload,
+  CLUTCH_COUNT_MAX,
   OFFSPRING_STATUS_LABEL,
+  breedingVocab,
   deleteClutch,
   getClutch,
   getClutchParentGenotypes,
+  getPairing,
   listOffspringForClutch,
   updateClutch,
 } from '@/lib/breeding'
+import { useUnits } from '@/components/UnitsProvider'
+import { useUnitField } from '@/hooks/useUnitField'
+import { formatTempRange } from '@/lib/units'
 import {
   type Gene,
   type GeneInput,
@@ -60,6 +67,9 @@ export default function ClutchDetailPage({
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [notesDraft, setNotesDraft] = useState('')
+  // Pairing taxon → wording (Slugs vs Infertile, Hatchling vs Offspring).
+  const [taxon, setTaxon] = useState<string | null>(null)
+  const vocab = breedingVocab(taxon)
 
   // Initial clutch load
   useEffect(() => {
@@ -69,6 +79,9 @@ export default function ClutchDetailPage({
         if (cancelled) return
         setClutch(c)
         setNotesDraft(c.notes ?? '')
+        getPairing(c.pairing_id)
+          .then((p) => { if (!cancelled) setTaxon(p.taxon) })
+          .catch(() => { /* neutral wording is fine */ })
       })
       .catch((err) => {
         if (cancelled) return
@@ -83,16 +96,18 @@ export default function ClutchDetailPage({
     }
   }, [id])
 
-  async function applyUpdate(patch: UpdateClutchPayload) {
+  async function applyUpdate(patch: UpdateClutchPayload): Promise<boolean> {
     setUpdating(true)
     setError(null)
     try {
       const next = await updateClutch(id, patch)
       setClutch(next)
+      return true
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Couldn't save changes.",
       )
+      return false
     } finally {
       setUpdating(false)
     }
@@ -169,7 +184,7 @@ export default function ClutchDetailPage({
             value={clutch.hatch_date ? formatDate(clutch.hatch_date) : '—'}
           />
           <Detail
-            label="Eggs"
+            label={vocab.countLabel}
             value={clutch.expected_count != null ? String(clutch.expected_count) : '—'}
           />
         </dl>
@@ -191,7 +206,7 @@ export default function ClutchDetailPage({
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <CountField
-            label="Eggs"
+            label={vocab.countLabel}
             value={clutch.expected_count}
             disabled={updating}
             onChange={(v) => applyUpdate({ expected_count: v })}
@@ -203,7 +218,7 @@ export default function ClutchDetailPage({
             onChange={(v) => applyUpdate({ fertile_count: v })}
           />
           <CountField
-            label="Slugs"
+            label={vocab.infertileLabel}
             value={clutch.slug_count}
             disabled={updating}
             onChange={(v) => applyUpdate({ slug_count: v })}
@@ -235,6 +250,11 @@ export default function ClutchDetailPage({
             onChange={(v) => applyUpdate({ pulled_date: v })}
           />
         </div>
+        <IncubationConditions
+          clutch={clutch}
+          disabled={updating}
+          onSave={applyUpdate}
+        />
       </section>
 
       {/* Predicted outcomes — separate component because it has its
@@ -242,7 +262,7 @@ export default function ClutchDetailPage({
       <PredictedOutcomes clutchId={id} />
 
       {/* Offspring */}
-      <Offspring clutchId={id} />
+      <Offspring clutchId={id} vocab={vocab} />
 
       {/* Notes */}
       <section className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 space-y-2">
@@ -449,7 +469,7 @@ const ZYGOSITY_TO_COUNT: Record<'wild' | 'het' | 'hom', 0 | 1 | 2> = {
 // Offspring section
 // ---------------------------------------------------------------------------
 
-function Offspring({ clutchId }: { clutchId: string }) {
+function Offspring({ clutchId, vocab }: { clutchId: string; vocab: BreedingVocab }) {
   const [items, setItems] = useState<ReptileOffspring[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -496,7 +516,7 @@ function Offspring({ clutchId }: { clutchId: string }) {
           href={`/app/breeding/clutches/${clutchId}/offspring/new`}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-neutral-800 text-xs font-medium text-neutral-300 hover:text-herp-lime hover:border-herp-teal/40 transition-colors"
         >
-          <span aria-hidden="true">＋</span> Add hatchling
+          <span aria-hidden="true">＋</span> Add {vocab.youngLower}
         </Link>
       </div>
 
@@ -515,7 +535,7 @@ function Offspring({ clutchId }: { clutchId: string }) {
 
       {items !== null && items.length === 0 && (
         <p className="text-sm text-neutral-500 italic px-1">
-          No offspring recorded yet. Add the first one as eggs hatch.
+          {vocab.emptyOffspring}
         </p>
       )}
 
@@ -529,7 +549,7 @@ function Offspring({ clutchId }: { clutchId: string }) {
               >
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <span className="text-sm text-white">
-                    {o.morph_label || 'Hatchling'}
+                    {o.morph_label || vocab.young}
                   </span>
                   <span className="text-[10px] uppercase tracking-wider text-neutral-400 font-medium">
                     {OFFSPRING_STATUS_LABEL[o.status]}
@@ -542,6 +562,196 @@ function Offspring({ clutchId }: { clutchId: string }) {
       )}
     </section>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Incubation conditions — shown, and editable after creation (they were
+// create-only before). Temps are stored °F and typed in the keeper's units
+// through useUnitField, so opening and saving never drifts a value.
+// ---------------------------------------------------------------------------
+
+function IncubationConditions({
+  clutch,
+  disabled,
+  onSave,
+}: {
+  clutch: Clutch
+  disabled: boolean
+  onSave: (patch: UpdateClutchPayload) => Promise<boolean>
+}) {
+  const { units } = useUnits()
+  const tMin = useUnitField('temp')
+  const tMax = useUnitField('temp')
+  const [humMin, setHumMin] = useState('')
+  const [humMax, setHumMax] = useState('')
+  const [editing, setEditing] = useState(false)
+
+  const { load: loadMin } = tMin
+  const { load: loadMax } = tMax
+  useEffect(() => {
+    loadMin(clutch.incubation_temp_min_f)
+    loadMax(clutch.incubation_temp_max_f)
+    setHumMin(clutch.incubation_humidity_min_pct != null ? String(clutch.incubation_humidity_min_pct) : '')
+    setHumMax(clutch.incubation_humidity_max_pct != null ? String(clutch.incubation_humidity_max_pct) : '')
+  }, [
+    clutch.incubation_temp_min_f,
+    clutch.incubation_temp_max_f,
+    clutch.incubation_humidity_min_pct,
+    clutch.incubation_humidity_max_pct,
+    loadMin,
+    loadMax,
+  ])
+
+  const temp = formatTempRange(clutch.incubation_temp_min_f, clutch.incubation_temp_max_f, units)
+  const hum =
+    clutch.incubation_humidity_min_pct == null && clutch.incubation_humidity_max_pct == null
+      ? null
+      : `${clutch.incubation_humidity_min_pct ?? '?'}–${clutch.incubation_humidity_max_pct ?? '?'}%`
+
+  async function save() {
+    const ok = await onSave({
+      incubation_temp_min_f: tMin.toStorage(),
+      incubation_temp_max_f: tMax.toStorage(),
+      incubation_humidity_min_pct: pctOrNull(humMin),
+      incubation_humidity_max_pct: pctOrNull(humMax),
+    })
+    // On failure the page shows the API's message and the form stays open.
+    if (ok) setEditing(false)
+  }
+
+  return (
+    <div className="pt-2 border-t border-neutral-800/60 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[10px] uppercase tracking-wider text-neutral-500">
+          Incubation
+        </h3>
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            disabled={disabled}
+            className="text-xs text-herp-teal hover:text-herp-lime disabled:opacity-50"
+          >
+            Edit
+          </button>
+        )}
+      </div>
+
+      {!editing ? (
+        <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <Detail label="Temperature" value={temp ?? '—'} />
+          <Detail label="Humidity" value={hum ?? '—'} />
+        </dl>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label={`Temp min (${tMin.unit})`}
+              value={tMin.value}
+              onChange={tMin.setValue}
+              min={units === 'metric' ? 5 : 40}
+              max={units === 'metric' ? 48 : 120}
+              step={0.1}
+              disabled={disabled}
+            />
+            <NumberInput
+              label={`Temp max (${tMax.unit})`}
+              value={tMax.value}
+              onChange={tMax.setValue}
+              min={units === 'metric' ? 5 : 40}
+              max={units === 'metric' ? 48 : 120}
+              step={0.1}
+              disabled={disabled}
+            />
+            <NumberInput
+              label="Humidity min %"
+              value={humMin}
+              onChange={setHumMin}
+              min={0}
+              max={100}
+              disabled={disabled}
+            />
+            <NumberInput
+              label="Humidity max %"
+              value={humMax}
+              onChange={setHumMax}
+              min={0}
+              max={100}
+              disabled={disabled}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={disabled}
+              className="px-3 py-1.5 rounded-md herp-gradient-bg text-herp-dark text-xs font-semibold disabled:opacity-50"
+            >
+              {disabled ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // Discard typing: reload the stored values.
+                tMin.load(clutch.incubation_temp_min_f)
+                tMax.load(clutch.incubation_temp_max_f)
+                setHumMin(clutch.incubation_humidity_min_pct != null ? String(clutch.incubation_humidity_min_pct) : '')
+                setHumMax(clutch.incubation_humidity_max_pct != null ? String(clutch.incubation_humidity_max_pct) : '')
+                setEditing(false)
+              }}
+              disabled={disabled}
+              className="px-3 py-1.5 rounded-md border border-neutral-800 text-neutral-300 text-xs font-medium hover:text-neutral-100 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NumberInput({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  disabled,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  min?: number
+  max?: number
+  step?: number
+  disabled: boolean
+}) {
+  return (
+    <div>
+      <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
+        {label}
+      </label>
+      <input
+        type="number"
+        inputMode="decimal"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={INPUT_CLS}
+      />
+    </div>
+  )
+}
+
+function pctOrNull(s: string): number | null {
+  if (!s.trim()) return null
+  const n = parseInt(s, 10)
+  return Number.isFinite(n) ? n : null
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +783,7 @@ function CountField({
       <input
         type="number"
         min={0}
-        max={200}
+        max={CLUTCH_COUNT_MAX}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {

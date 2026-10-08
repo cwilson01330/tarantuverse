@@ -11,6 +11,7 @@ digest; for now push honors the existing per-category enabled flags.
 """
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -77,6 +78,46 @@ def _validate_deeplink(deeplink: Optional[str], notification_type: str) -> Optio
     return None
 
 
+# Security alerts push even during quiet hours: a locked sitter link is the
+# keeper's cue that someone is guessing a PIN, and it can't wait until morning.
+QUIET_HOURS_EXEMPT_TYPES = frozenset({"sitter_pass_locked"})
+
+
+def _minutes(hhmm: Optional[str]) -> Optional[int]:
+    try:
+        h, m = (int(x) for x in str(hhmm).split(":"))
+    except (ValueError, TypeError):
+        return None
+    if not (0 <= h <= 23 and 0 <= m <= 59):
+        return None
+    return h * 60 + m
+
+
+def in_quiet_hours(prefs: Any, now: Optional[datetime] = None) -> bool:
+    """True when the keeper has quiet hours on and it is inside them on THEIR
+    clock (tz_offset_minutes, JS getTimezoneOffset sign: positive = west of UTC).
+
+    Unknown timezone → False: delivering at an odd hour beats silently dropping
+    a push at a guessed one. A window that wraps midnight (22:00-08:00) works;
+    start == end is treated as no window.
+    """
+    if prefs is None or not getattr(prefs, "quiet_hours_enabled", False):
+        return False
+    tz = getattr(prefs, "tz_offset_minutes", None)
+    if tz is None:
+        return False
+    start = _minutes(getattr(prefs, "quiet_hours_start", None))
+    end = _minutes(getattr(prefs, "quiet_hours_end", None))
+    if start is None or end is None or start == end:
+        return False
+    now = now or datetime.now(timezone.utc)
+    local = now - timedelta(minutes=tz)
+    mins = local.hour * 60 + local.minute
+    if start < end:
+        return start <= mins < end
+    return mins >= start or mins < end
+
+
 def create_notification(
     db: Session,
     *,
@@ -115,11 +156,15 @@ def create_notification(
                 .first()
             )
             category_ok = push_category is None or getattr(prefs, push_category, True)
+            # Quiet hours hold the PUSH only; the in-app row above is already
+            # written, so nothing is lost — it's waiting in the bell.
+            quiet = type not in QUIET_HOURS_EXEMPT_TYPES and in_quiet_hours(prefs)
             if (
                 prefs
                 and getattr(prefs, "push_notifications_enabled", False)
                 and prefs.expo_push_token
                 and category_ok
+                and not quiet
             ):
                 payload: Dict[str, Any] = {"type": type, "notification_id": str(notif.id)}
                 # notif.deeplink, NOT the raw argument — the push payload and the

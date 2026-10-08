@@ -6,6 +6,7 @@
  * Two halves on one page, because most people are on only one side:
  *  - Shared with me: collections you help keep, and invites waiting for you.
  *  - Your co-keepers: people who help keep YOUR collection (premium to invite).
+ *  - Transfers you've sent, and card links (list + turn off; mirrors mobile app/share/cards.tsx).
  *
  * Every button here is a hint; the API enforces every rule on every request.
  */
@@ -91,6 +92,9 @@ export default function SharingPage() {
           <h1 className="text-2xl font-bold text-theme-primary">Sharing</h1>
           <p className="text-theme-secondary mt-1">
             Keep a collection together. Everyone uses their own account, and you choose what each person can do.
+          </p>
+          <p className="text-sm text-theme-secondary mt-1">
+            Shared a card? <a href="#card-links" className="text-purple-700 dark:text-purple-300 hover:underline">Your card links</a> are at the bottom of this page.
           </p>
         </header>
 
@@ -228,6 +232,8 @@ export default function SharingPage() {
         </section>
 
         {token && <SentTransfers token={token} />}
+
+        {token && <CardLinks token={token} />}
       </div>
       <UpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} source="shared_keeping"
         feature="Co-keepers" description={upgrade ?? ''} />
@@ -354,6 +360,110 @@ function SentTransfers({ token }: { token: string }) {
             {r.status === 'pending' && (
               <button className={BTN_SECONDARY} disabled={busy === r.token} onClick={() => cancel(r)}>
                 {busy === r.token ? 'Cancelling…' : 'Cancel link'}
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+/** Mirrors apps/api/app/schemas/share_card.py::CardLinkItem. */
+interface CardLinkItem {
+  code: string
+  app: string
+  kind: string
+  name: string | null
+  url: string
+  created_at: string
+  revoked_at: string | null
+}
+
+/** Same wording as the mobile "Shared cards" screen (apps/mobile/src/lib/share-cards.ts). */
+function cardKindLabel(kind: string): string {
+  return ({ molt: 'molt', profile: 'profile', colony: 'colony', shed: 'shed', weight: 'weigh-in' } as Record<string, string>)[kind] ?? 'card'
+}
+
+/**
+ * Card links this keeper made (or that point at their animals), with a way to
+ * turn each off. Same API as the mobile "Shared cards" screen:
+ * GET /card-links/ and DELETE /card-links/{code}. The API lists both apps;
+ * Herpetoverse links belong on that site.
+ */
+function CardLinks({ token }: { token: string }) {
+  const [rows, setRows] = useState<CardLinkItem[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/v1/card-links/`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!r.ok) throw new Error()
+      const data: CardLinkItem[] = await r.json()
+      setRows(data.filter((c) => c.app === 'tarantuverse'))
+      setErr(null)
+    } catch {
+      setErr('Couldn’t load your card links.')
+    }
+  }, [token])
+
+  useEffect(() => { void load() }, [load])
+
+  const turnOff = async (c: CardLinkItem) => {
+    if (!confirm('Turn off this link? Anyone with the link will see that the card is no longer shared.')) return
+    setBusy(c.code)
+    try {
+      const r = await fetch(`${API_URL}/api/v1/card-links/${encodeURIComponent(c.code)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!r.ok && r.status !== 204) throw new Error()
+      await load()
+    } catch {
+      setErr('Couldn’t turn it off. Try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <section className="space-y-3" id="card-links">
+      <div>
+        <h2 className="text-lg font-semibold text-theme-primary">Card links</h2>
+        <p className="text-sm text-theme-secondary">
+          Links to share cards you made. Turning one off stops it working for everyone who has it. Make a new card from an animal&apos;s or colony&apos;s page.
+        </p>
+      </div>
+      {err && (
+        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          {err}{' '}
+          <button type="button" className="underline" onClick={() => void load()}>Try again</button>
+        </p>
+      )}
+      {rows === null && !err && <div className="h-16 rounded-xl bg-surface-elevated animate-pulse" />}
+      {rows?.length === 0 && <p className="text-theme-secondary">Card links you make appear here.</p>}
+      {rows?.map((c) => {
+        const name = c.name || (c.kind === 'colony' ? 'Colony' : 'Specimen')
+        return (
+          <div key={c.code} className="p-4 rounded-2xl bg-surface border border-theme flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="font-semibold text-theme-primary">
+                {name} <span className="font-normal text-theme-secondary">· {cardKindLabel(c.kind)}</span>
+              </p>
+              <p className="text-xs text-theme-tertiary truncate">
+                {fmt(c.created_at)} ·{' '}
+                {c.revoked_at
+                  ? `Off since ${fmt(c.revoked_at)}`
+                  : <a href={c.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.url}</a>}
+              </p>
+            </div>
+            {!c.revoked_at && (
+              <button className={BTN_SECONDARY} disabled={busy === c.code} onClick={() => turnOff(c)}
+                aria-label={`Turn off link for ${name}`}>
+                {busy === c.code ? 'Turning off…' : 'Turn off'}
               </button>
             )}
           </div>

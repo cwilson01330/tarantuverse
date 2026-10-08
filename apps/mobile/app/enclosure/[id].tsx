@@ -54,6 +54,8 @@ interface Inhabitant {
   scientific_name: string;
   photo_url: string | null;
   sex: string | null;
+  /** 'colony' rows are population colonies (listed with include_colonies). */
+  kind?: 'animal' | 'colony';
 }
 
 interface FeedingLog {
@@ -190,7 +192,9 @@ export default function EnclosureDetailScreen() {
 
   const fetchInhabitants = async () => {
     try {
-      const response = await apiClient.get(`/enclosures/${id}/inhabitants`);
+      // include_colonies: the enclosure's member count includes colonies, so
+      // the list must too (each opens its own colony screen below).
+      const response = await apiClient.get(`/enclosures/${id}/inhabitants?include_colonies=true`);
       setInhabitants(response.data);
     } catch (error) {
       console.error('Failed to fetch inhabitants:', error);
@@ -993,13 +997,21 @@ export default function EnclosureDetailScreen() {
             <TouchableOpacity
               key={inhabitant.id}
               style={styles.inhabitantCard}
-              onPress={() => router.push(`/tarantula/${inhabitant.id}`)}
+              onPress={() =>
+                router.push(
+                  inhabitant.kind === 'colony' ? `/colony/${inhabitant.id}` : `/invert/${inhabitant.id}`,
+                )
+              }
             >
               {inhabitant.photo_url ? (
                 <Image source={{ uri: getImageUrl(inhabitant.photo_url) }} style={styles.inhabitantImage} />
               ) : (
                 <View style={styles.inhabitantPlaceholder}>
-                  <MaterialCommunityIcons name="spider" size={24} color={colors.textTertiary} />
+                  <MaterialCommunityIcons
+                    name={inhabitant.kind === 'colony' ? 'bug' : 'spider'}
+                    size={24}
+                    color={colors.textTertiary}
+                  />
                 </View>
               )}
               <View style={styles.inhabitantInfo}>

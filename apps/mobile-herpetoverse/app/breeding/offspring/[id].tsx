@@ -7,10 +7,10 @@
  *   - Tap-to-edit status (mirrors the pairing-outcome pattern)
  *   - Delete affordance in the header
  *
- * Editing fields beyond status is deferred to a later sprint; the
- * status flip covers the most common workflow (hatched → kept / sold /
- * deceased) and the rest is rare enough that delete + recreate is an
- * acceptable recovery path for now.
+ * Status is tap-to-edit; hatch weight + length are editable in place
+ * (audit-2 M8 — length typed in the keeper's units via useUnitField,
+ * stored inches). Wording follows the pairing's taxon, and hold-back
+ * requires that taxon (it used to fall back to 'snake').
  *
  * Hermes-prod safety: static JSX branches only — no dynamic component
  * variables. See feedback_dynamic_component_hermes_prod_crash memory.
@@ -36,14 +36,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
-import { FormErrorBanner } from '../../../src/components/forms/FormPrimitives';
+import {
+  Field,
+  FormErrorBanner,
+  SubmitButton,
+  ThemedInput,
+  extractErrorMessage,
+} from '../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { useUnits } from '../../../src/hooks/useUnits';
-import { formatLength } from '../../../src/lib/units';
+import { useUnitField } from '../../../src/hooks/useUnitField';
+import { formatLength, toNum } from '../../../src/lib/units';
+import { TYPE } from '../../../src/theme/type';
 import {
   OFFSPRING_STATUS_LABEL,
   type OffspringStatus,
   type ReptileOffspring,
+  breedingVocab,
   deleteOffspring,
   getClutch,
   getOffspring,
@@ -177,6 +186,10 @@ function OffspringDetailScreen() {
   // Offspring no longer carries a taxon — it's on the linked animal
   // record. We resolve it for the "linked to collection" card's route.
   const [linkedTaxon, setLinkedTaxon] = useState<AnimalTaxon | null>(null);
+  // The pairing's taxon — wording, and REQUIRED for hold-back.
+  const [pairingTaxon, setPairingTaxon] = useState<AnimalTaxon | null>(null);
+  const vocab = breedingVocab(pairingTaxon);
+  const [editingHatch, setEditingHatch] = useState(false);
 
   const fetchOffspring = useCallback(async () => {
     if (!id) return;
@@ -184,6 +197,10 @@ function OffspringDetailScreen() {
       const o = await getOffspring(id as string);
       setOffspring(o);
       setLoadError(null);
+      getClutch(o.clutch_id)
+        .then((c) => getPairing(c.pairing_id))
+        .then((p) => setPairingTaxon(p.taxon))
+        .catch(() => { /* neutral wording; hold-back re-fetches */ });
     } catch (err: any) {
       setLoadError(
         err?.response?.data?.detail ||
@@ -224,7 +241,7 @@ function OffspringDetailScreen() {
     if (!offspring || deleting) return;
     Alert.alert(
       'Delete offspring?',
-      `${offspring.morph_label ?? 'This hatchling'} will be removed from the clutch. This can't be undone.`,
+      `${offspring.morph_label ?? `This ${vocab.youngLower}`} will be removed from the clutch. This can't be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -292,6 +309,7 @@ function OffspringDetailScreen() {
         herp_species_id,
         hatch_date: clutch.hatch_date,
       });
+      setPairingTaxon(taxon);
     } catch (err: any) {
       setHoldBackPrefillError(
         err?.response?.data?.detail ||
@@ -310,8 +328,16 @@ function OffspringDetailScreen() {
    */
   async function handleHoldBackSubmit() {
     if (!offspring || holdBackCreating) return;
+    // The taxon comes from the pairing, never a guess — without it we'd be
+    // filing a frog or turtle hatchling as a snake.
+    if (!holdBackPrefill) {
+      setHoldBackError(
+        "We couldn't load this clutch's parents, so we don't know which group to file it under. Close this and try again.",
+      );
+      return;
+    }
     if (!holdBackName.trim()) {
-      setHoldBackError('Give your new reptile a name first.');
+      setHoldBackError(`Give your new ${vocab.animal} a name first.`);
       return;
     }
     setHoldBackError(null);
@@ -320,24 +346,23 @@ function OffspringDetailScreen() {
       const morphLabelLine = offspring.morph_label
         ? `Morph: ${offspring.morph_label}.`
         : null;
-      const hatchedLine = holdBackPrefill?.hatch_date
+      const hatchedLine = holdBackPrefill.hatch_date
         ? `Hatched ${holdBackPrefill.hatch_date}.`
         : 'Hatched from this clutch.';
       const noteLines = [hatchedLine, morphLabelLine].filter(
         (l): l is string => Boolean(l),
       );
 
-      // ADR-003: one create call — taxon rides in the payload. The
-      // pairing is taxon-locked so holdBackPrefill.taxon is reliable;
-      // default to snake only if the prefill fetch failed entirely.
+      // ADR-003: one create call — taxon rides in the payload, taken from
+      // the taxon-locked pairing (checked above; no fallback).
       const payload: CreateAnimalPayload = {
-        taxon: holdBackPrefill?.taxon ?? 'snake',
+        taxon: holdBackPrefill.taxon,
         name: holdBackName.trim(),
         sex: holdBackSex,
         source: 'bred',
-        hatch_date: holdBackPrefill?.hatch_date ?? null,
-        scientific_name: holdBackPrefill?.scientific_name ?? null,
-        herp_species_id: holdBackPrefill?.herp_species_id ?? null,
+        hatch_date: holdBackPrefill.hatch_date ?? null,
+        scientific_name: holdBackPrefill.scientific_name ?? null,
+        herp_species_id: holdBackPrefill.herp_species_id ?? null,
         notes: noteLines.join('\n'),
         current_weight_g: offspring.hatch_weight_g ?? null,
         current_length_in: offspring.hatch_length_in ?? null,
@@ -442,7 +467,7 @@ function OffspringDetailScreen() {
                   <Text
                     style={[styles.heroLabel, { color: colors.textTertiary }]}
                   >
-                    HATCHLING
+                    {vocab.young.toUpperCase()}
                   </Text>
                   <Text
                     style={[styles.heroValue, { color: colors.textPrimary }]}
@@ -517,6 +542,31 @@ function OffspringDetailScreen() {
                 )}
               </View>
 
+              {editingHatch ? (
+                <HatchMeasurementsEditor
+                  offspring={offspring}
+                  onCancel={() => setEditingHatch(false)}
+                  onSaved={(next) => {
+                    setOffspring(next);
+                    setEditingHatch(false);
+                  }}
+                />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setEditingHatch(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit hatch weight and length"
+                  hitSlop={8}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <Text style={[TYPE.label, { color: colors.primary }]}>
+                    {offspring.hatch_weight_g == null && offspring.hatch_length_in == null
+                      ? 'Add hatch weight & length'
+                      : 'Edit hatch weight & length'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {offspring.notes && (
                 <Text style={[styles.notes, { color: colors.textSecondary }]}>
                   {offspring.notes}
@@ -576,8 +626,8 @@ function OffspringDetailScreen() {
                     Holding this one back?
                   </Text>
                   <Text style={[styles.ctaHelp, { color: '#d9f99d' }]}>
-                    Create a live reptile record — species, hatch date,
-                    and weight prefill from this clutch.
+                    Create a live {vocab.animal} record — species, hatch
+                    date, and weight prefill from this clutch.
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -860,8 +910,11 @@ function HoldBackModal({
                     paddingBottom: 12,
                   }}
                 >
-                  Creates a live {prefill?.taxon ?? 'reptile'} record and
-                  links it back to this offspring entry.
+                  Creates a live{' '}
+                  {prefill?.taxon && ANIMAL_TAXA[prefill.taxon]
+                    ? ANIMAL_TAXA[prefill.taxon].label.toLowerCase()
+                    : 'animal'}{' '}
+                  record and links it back to this offspring entry.
                 </Text>
 
                 {/* Prefill summary */}
@@ -887,8 +940,9 @@ function HoldBackModal({
                         lineHeight: 17,
                       }}
                     >
-                      {prefillError} You can still create the record — it
-                      just won&rsquo;t auto-fill the species.
+                      {prefillError} The record needs the parents&rsquo;
+                      group (snake, frog, turtle…), so it can&rsquo;t be
+                      created until this loads. Close this and try again.
                     </Text>
                   ) : (
                     <>
@@ -997,7 +1051,7 @@ function HoldBackModal({
                   }}
                 >
                   Set to unknown if it&rsquo;s too young to sex — you can
-                  update it on the reptile detail page later.
+                  update it on its detail page later.
                 </Text>
 
                 {error && (
@@ -1032,12 +1086,12 @@ function HoldBackModal({
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={onSubmit}
-                  disabled={creating || !name.trim()}
+                  disabled={creating || !prefill || !name.trim()}
                   style={[
                     styles.modalFooterPrimary,
                     {
                       borderRadius: layout.radius.sm,
-                      opacity: creating || !name.trim() ? 0.5 : 1,
+                      opacity: creating || !prefill || !name.trim() ? 0.5 : 1,
                     },
                   ]}
                 >
@@ -1055,6 +1109,104 @@ function HoldBackModal({
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+/**
+ * Edit hatch weight (grams — never converted) and hatch length (stored
+ * inches, typed in the keeper's units). An untouched length saves its
+ * original stored value, so opening and saving never drifts it.
+ */
+function HatchMeasurementsEditor({
+  offspring,
+  onCancel,
+  onSaved,
+}: {
+  offspring: ReptileOffspring;
+  onCancel: () => void;
+  onSaved: (next: ReptileOffspring) => void;
+}) {
+  const { colors, layout } = useTheme();
+  const { units } = useUnits();
+  const length = useUnitField('length');
+  const [weight, setWeight] = useState(offspring.hatch_weight_g ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { load: loadLength } = length;
+  useEffect(() => {
+    loadLength(offspring.hatch_length_in);
+  }, [offspring.hatch_length_in, loadLength]);
+
+  async function save() {
+    if (busy) return;
+    setError(null);
+    const w = toNum(weight);
+    if (weight.trim() !== '' && (w == null || w < 0)) {
+      setError('Hatch weight should be a positive number of grams.');
+      return;
+    }
+    const len = length.toStorage();
+    if (length.touched && length.value.trim() !== '' && len == null) {
+      setError('Hatch length should be a positive number.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = await updateOffspring(offspring.id, {
+        hatch_weight_g: w,
+        hatch_length_in: len,
+      });
+      onSaved(next);
+    } catch (err) {
+      setError(extractErrorMessage(err, "Couldn't save the hatch measurements."));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View
+      style={{
+        gap: layout.spacing.md,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: colors.border,
+        paddingTop: layout.spacing.md,
+      }}
+    >
+      <View style={{ flexDirection: 'row', gap: layout.spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Field label="Hatch weight (g)" hint="Optional">
+            <ThemedInput
+              value={weight}
+              onChangeText={setWeight}
+              placeholder="e.g. 6.5"
+              keyboardType="decimal-pad"
+            />
+          </Field>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label={`Hatch length (${length.unit})`} hint="Optional">
+            <ThemedInput
+              value={length.value}
+              onChangeText={length.setValue}
+              placeholder={units === 'metric' ? 'e.g. 25' : 'e.g. 10'}
+              keyboardType="decimal-pad"
+            />
+          </Field>
+        </View>
+      </View>
+      {error && <FormErrorBanner message={error} />}
+      <SubmitButton label="Save measurements" busy={busy} onPress={save} />
+      <TouchableOpacity
+        onPress={onCancel}
+        disabled={busy}
+        accessibilityRole="button"
+        hitSlop={8}
+        style={{ alignSelf: 'center', paddingVertical: layout.spacing.xs }}
+      >
+        <Text style={[TYPE.label, { color: colors.textSecondary }]}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 

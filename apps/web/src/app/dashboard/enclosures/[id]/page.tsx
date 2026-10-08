@@ -8,6 +8,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import { formatLocalDate, toISODateLocal } from '@/lib/date'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatTempRange } from '@/lib/units'
+import { animalDisplayName, taxonMeta } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -42,6 +43,23 @@ interface Inhabitant {
   scientific_name: string | null
   sex: string | null
   photo_url: string | null
+  /** Added with the every-taxon inhabitants API; older responses omit them. */
+  kind?: 'animal' | 'colony'
+  taxon?: string | null
+  count?: number | null
+}
+
+/** One of the keeper's animals or colonies, for "Move one here". */
+interface MoveCandidate {
+  id: string
+  label: string
+  kind: 'animal' | 'colony'
+  enclosure_id: string | null
+}
+
+/** Animals of any taxon plus colonies — not "spiders" any more. */
+function countLabel(n: number): string {
+  return `${n} ${n === 1 ? 'member' : 'members'}`
 }
 
 interface FeedingLog {
@@ -159,6 +177,90 @@ export default function EnclosureDetailPage() {
   const [editingPopulation, setEditingPopulation] = useState(false)
   const [populationInput, setPopulationInput] = useState('')
 
+  // Move an existing animal or colony into this enclosure
+  const [moveCandidates, setMoveCandidates] = useState<MoveCandidate[] | null>(null)
+  const [showMove, setShowMove] = useState(false)
+  const [moveChoice, setMoveChoice] = useState('')
+  const [memberBusy, setMemberBusy] = useState<string | null>(null)
+  const [memberError, setMemberError] = useState<string | null>(null)
+
+  const openMove = async () => {
+    setShowMove(true)
+    setMemberError(null)
+    if (moveCandidates || !token) return
+    try {
+      const headers = { Authorization: `Bearer ${token}` }
+      const [invRes, colRes] = await Promise.all([
+        fetch(`${API_URL}/api/v1/inverts/`, { headers }),
+        fetch(`${API_URL}/api/v1/colonies/`, { headers }),
+      ])
+      if (!invRes.ok) throw new Error()
+      const inverts: Array<{ id: string; name: string | null; common_name: string | null; scientific_name: string | null; taxon: string; enclosure_id: string | null }> = await invRes.json()
+      const colonies: Array<{ id: string; name: string; taxon: string; enclosure_id: string | null }> = colRes.ok ? await colRes.json() : []
+      const list: MoveCandidate[] = [
+        ...inverts.map((a) => ({
+          id: a.id,
+          label: `${taxonMeta(a.taxon).glyph} ${animalDisplayName(a)}`,
+          kind: 'animal' as const,
+          enclosure_id: a.enclosure_id ?? null,
+        })),
+        ...colonies.map((c) => ({
+          id: c.id,
+          label: `${taxonMeta(c.taxon).glyph} ${c.name} (colony)`,
+          kind: 'colony' as const,
+          enclosure_id: c.enclosure_id ?? null,
+        })),
+      ]
+      setMoveCandidates(list.sort((a, b) => a.label.localeCompare(b.label)))
+    } catch {
+      setMemberError('Couldn’t load your animals. Try again.')
+    }
+  }
+
+  const moveHere = async () => {
+    if (!token || !moveChoice) return
+    setMemberBusy(moveChoice)
+    setMemberError(null)
+    try {
+      const res = await fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/inhabitants/${moveChoice}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(typeof body?.detail === 'string' ? body.detail : 'Couldn’t move it here.')
+      }
+      setMoveChoice('')
+      setShowMove(false)
+      setMoveCandidates(null)
+      await fetchEnclosureData()
+    } catch (err: any) {
+      setMemberError(err.message || 'Couldn’t move it here.')
+    } finally {
+      setMemberBusy(null)
+    }
+  }
+
+  const takeOut = async (m: Inhabitant) => {
+    if (!token) return
+    if (!confirm(`Take ${m.name || 'this one'} out of ${enclosure?.name ?? 'this enclosure'}? Nothing is deleted.`)) return
+    setMemberBusy(m.id)
+    setMemberError(null)
+    try {
+      const res = await fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/inhabitants/${m.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      setMoveCandidates(null)
+      await fetchEnclosureData()
+    } catch {
+      setMemberError('Couldn’t take it out. Try again.')
+    } finally {
+      setMemberBusy(null)
+    }
+  }
+
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
@@ -177,7 +279,7 @@ export default function EnclosureDetailPage() {
       const [enclosureRes, inhabitantsRes, feedingsRes, moltsRes, substrateRes, incidentsRes] =
         await Promise.all([
           fetch(`${API_URL}/api/v1/enclosures/${enclosureId}`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/inhabitants`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/inhabitants?include_colonies=true`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/feedings`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/molts`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_URL}/api/v1/enclosures/${enclosureId}/substrate-changes`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -384,7 +486,7 @@ export default function EnclosureDetailPage() {
                   👥{' '}
                   {enclosure.is_communal
                     ? `${enclosure.population_count ?? inhabitants.length} total`
-                    : `${inhabitants.length} spider${inhabitants.length !== 1 ? 's' : ''}`}
+                    : countLabel(inhabitants.length)}
                 </span>
                 {enclosure.days_since_last_feeding !== null && (
                   <span
@@ -462,7 +564,7 @@ export default function EnclosureDetailPage() {
                   <dd className="text-gray-900 dark:text-white">
                     {enclosure.is_communal
                       ? `${enclosure.population_count ?? inhabitants.length} total (${inhabitants.length} tracked)`
-                      : `${inhabitants.length} spider${inhabitants.length !== 1 ? 's' : ''}`}
+                      : countLabel(inhabitants.length)}
                   </dd>
                 </div>
               </dl>
@@ -538,15 +640,66 @@ export default function EnclosureDetailPage() {
                   : inhabitants.length}
                 )
               </h2>
-              {enclosure.is_communal && (
+              <div className="flex gap-2 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => (showMove ? setShowMove(false) : void openMove())}
+                  className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition text-sm font-medium"
+                >
+                  Move one here
+                </button>
                 <Link
-                  href={`/dashboard/tarantulas/add?enclosure_id=${enclosureId}`}
+                  href={`/dashboard/inverts/add?enclosure_id=${enclosureId}`}
                   className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium"
                 >
-                  + Add Tracked Member
+                  + Add new animal
                 </Link>
-              )}
+              </div>
             </div>
+
+            {memberError && (
+              <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">{memberError}</p>
+            )}
+
+            {showMove && (
+              <div className="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 space-y-2">
+                <label htmlFor="move-choice" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Animal or colony to move into {enclosure.name}
+                </label>
+                {moveCandidates === null && !memberError ? (
+                  <div className="h-10 rounded-lg bg-gray-200 dark:bg-gray-600 animate-pulse" />
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    <select
+                      id="move-choice"
+                      value={moveChoice}
+                      onChange={(e) => setMoveChoice(e.target.value)}
+                      className="flex-1 min-w-[12rem] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Choose…</option>
+                      {(moveCandidates ?? [])
+                        .filter((c) => c.enclosure_id !== enclosureId)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}{c.enclosure_id ? ' — in another enclosure' : ''}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={moveHere}
+                      disabled={!moveChoice || memberBusy !== null}
+                      className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium disabled:opacity-50"
+                    >
+                      {memberBusy && memberBusy === moveChoice ? 'Moving…' : 'Move here'}
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Moving something here takes it out of any other enclosure.
+                </p>
+              </div>
+            )}
 
             {/* Untracked members banner */}
             {enclosure.is_communal && untrackedCount > 0 && (
@@ -624,41 +777,39 @@ export default function EnclosureDetailPage() {
             {inhabitants.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                 No tracked members yet.
-                {enclosure.is_communal ? (
-                  <>
-                    <br />
-                    <span className="text-sm">
-                      Add tracked members above, or update the population count to track the total.
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <br />
-                    <span className="text-sm">Assign animals from their individual detail pages.</span>
-                  </>
-                )}
+                <br />
+                <span className="text-sm">
+                  {enclosure.is_communal
+                    ? 'Add or move members in above, or update the population count to track the total.'
+                    : 'Add a new animal, or move one of yours in, with the buttons above.'}
+                </span>
               </p>
             ) : (
               <div className="space-y-2">
                 {inhabitants.map((t) => (
+                  <div key={t.id} className="flex items-center gap-2">
                   <Link
-                    key={t.id}
-                    href={`/dashboard/inverts/${t.id}`}
-                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                    href={t.kind === 'colony' ? `/dashboard/colonies/${t.id}` : `/dashboard/inverts/${t.id}`}
+                    className="flex-1 min-w-0 flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                   >
                     <div className="w-12 h-12 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden shrink-0">
                       {t.photo_url ? (
                         <img src={t.photo_url} alt={t.name || ''} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-xl">🕷️</span>
+                        <span className="text-xl" aria-hidden="true">{taxonMeta(t.taxon).glyph}</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">
                         {t.name || 'Unnamed'}
+                        {t.kind === 'colony' && (
+                          <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200">
+                            Colony{typeof t.count === 'number' ? ` · ${t.count}` : ''}
+                          </span>
+                        )}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 italic truncate">
-                        {t.scientific_name}
+                        {t.scientific_name || (t.taxon ? taxonMeta(t.taxon).label : '')}
                       </p>
                     </div>
                     {t.sex && (
@@ -685,6 +836,16 @@ export default function EnclosureDetailPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => takeOut(t)}
+                    disabled={memberBusy !== null}
+                    aria-label={`Take ${t.name || 'this one'} out of this enclosure`}
+                    className="shrink-0 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
+                  >
+                    {memberBusy === t.id ? 'Taking out…' : 'Take out'}
+                  </button>
+                  </div>
                 ))}
               </div>
             )}

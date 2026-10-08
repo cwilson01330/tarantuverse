@@ -33,11 +33,16 @@ from app.models.animal_genotype import AnimalGenotype
 from app.models.feeding_log import FeedingLog
 from app.models.photo import Photo
 from app.models.tarantula import Sex, Source  # shared DB enums
+from app.models.clutch import Clutch
+from app.models.reptile_offspring import ReptileOffspring
+from app.models.reptile_pairing import ReptilePairing
 from app.schemas.animal import (
     AnimalCreate,
     AnimalUpdate,
     AnimalResponse,
     AnimalFeedingStatusItem,
+    BrumationRequest,
+    DeleteImpactResponse,
 )
 from app.schemas.feeding import (
     AnimalBulkFeedingRequest,
@@ -192,6 +197,36 @@ def _animal_feeding_interval(animal: Animal) -> Optional[int]:
             if iv is not None:
                 return iv
     return None
+
+
+def closed_reason(animal) -> Optional[str]:
+    """'died' / 'transferred' when the record is history, else None."""
+    if getattr(animal, "died_at", None) is not None:
+        return "died"
+    if getattr(animal, "transferred_out_at", None) is not None:
+        return "transferred"
+    return None
+
+
+def refuse_if_closed(animal) -> None:
+    """409 on a write to an animal that died or was handed off.
+
+    Those records are kept as history (ADR-015, htr_20260707). The clients
+    hide the write actions; this is the server half, so an old build or a
+    stale tab can't edit a record that no longer describes a living animal.
+    Restoring (/revive) and deleting stay open — they're how a keeper fixes
+    a mistaken mark-died."""
+    reason = closed_reason(animal)
+    if reason == "died":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This animal is marked as died. Restore it before making changes.",
+        )
+    if reason == "transferred":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This animal was transferred to another keeper, so its record can't be changed.",
+        )
 
 
 def _coerce_enums(data: dict) -> dict:
@@ -476,12 +511,16 @@ async def list_feeding_status(
             a.feeding_paused_reason
             and (a.feeding_paused_until is None or a.feeding_paused_until >= today_local)
         )
+        # Brumation / aestivation: the keeper has said the animal is resting
+        # and won't eat. Same treatment as a pause — never overdue.
+        brumating = bool(getattr(a, "brumation_active", False))
         interval = _animal_feeding_interval(a)
         # Never-fed is NOT overdue (no cadence established yet) — matches
         # /inverts/feeding-status + the digest so the dashboard, Feeding Day,
         # and the notification all agree.
         is_overdue = (
             (not paused)
+            and (not brumating)
             and interval is not None
             and last is not None
             and days is not None
@@ -511,6 +550,7 @@ async def list_feeding_status(
                 feeds_on_cgd=bool(getattr(a, "feeds_on_cgd", False)),
                 status_mode=status_mode,
                 fed_today=fed_today,
+                is_brumating=brumating,
             )
         )
 
@@ -554,9 +594,21 @@ async def bulk_create_animal_feedings(
     created_ids = []
     skipped = []
     resumed_ids = []
+    closed_count = 0
     for aid in requested:
         if aid not in owned_ids:
             skipped.append(AnimalBulkFeedingSkip(animal_id=aid, reason="Not found or not yours"))
+            continue
+        # Died / transferred records are history — never log a feeding on
+        # one. Skipped and reported like any other miss, so one stale id in a
+        # Feeding Day selection doesn't sink the rest of the batch.
+        reason = closed_reason(owned_by_id[aid])
+        if reason is not None:
+            closed_count += 1
+            skipped.append(AnimalBulkFeedingSkip(
+                animal_id=aid,
+                reason="Marked as died" if reason == "died" else "Transferred to another keeper",
+            ))
             continue
         db.add(
             FeedingLog(
@@ -574,6 +626,18 @@ async def bulk_create_animal_feedings(
         # Taking food ends a pause; refusing confirms it. See utils/feeding_pause.
         if resume_if_accepted(owned_by_id[aid], payload.accepted):
             resumed_ids.append(aid)
+
+    # Nothing to log and at least one of the asks was a died/transferred
+    # animal: say so plainly rather than answer 201 with zero rows.
+    if not created_ids and closed_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "That animal is marked as died or was transferred, so feedings can't be logged for it."
+                if closed_count == 1
+                else "Those animals are marked as died or were transferred, so feedings can't be logged for them."
+            ),
+        )
 
     if payload.accepted and created_ids:
         db.query(Animal).filter(Animal.id.in_(created_ids)).update(
@@ -612,6 +676,7 @@ async def update_animal(
     """Partial update. Only provided fields are written. `taxon` is
     immutable — it's not in the update schema."""
     animal, access = load_animal(db, current_user, animal_id, "keeper")
+    refuse_if_closed(animal)
 
     update_data = _coerce_enums(strip_owner_only(access, animal_data.model_dump(exclude_unset=True)))
     if "enclosure_id" in update_data:
@@ -677,6 +742,89 @@ async def bulk_set_feeding_cadence(
 
     db.commit()
     return BulkCadenceResponse(updated=len(targets))
+
+
+@router.post("/{animal_id}/brumation", response_model=AnimalResponse)
+@policy("keeper")
+async def set_brumation(
+    animal_id: UUID,
+    payload: BrumationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Start or end brumation (aestivation for amphibians).
+
+    While active the animal is never overdue on Feeding Day, and the HV
+    feeding-status card reads "paused for brumation". Starting records the
+    keeper's local date (today when omitted); ending clears both fields.
+    Its own endpoint, like /died, so a whole-record edit form can't flip it
+    by sending the field back."""
+    animal, _access = load_animal(db, current_user, animal_id, "keeper")
+    refuse_if_closed(animal)
+
+    if payload.active:
+        already = bool(animal.brumation_active)
+        animal.brumation_active = True
+        # Keep the original start if it's already running and no new date
+        # was given — re-tapping "start" shouldn't reset the count.
+        if payload.started_at is not None:
+            animal.brumation_started_at = payload.started_at
+        elif not already or animal.brumation_started_at is None:
+            animal.brumation_started_at = date.today()
+    else:
+        animal.brumation_active = False
+        animal.brumation_started_at = None
+
+    db.commit()
+    db.refresh(animal)
+    return animal
+
+
+@router.get("/{animal_id}/delete-impact", response_model=DeleteImpactResponse)
+@policy("owner_only")
+async def get_delete_impact(
+    animal_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Breeding records that go with this animal if it is deleted.
+
+    Pairings the animal is a parent in are removed by the FK cascade, and
+    their clutches and offspring records go with them. Owner-only, like the
+    delete it describes. Offspring that were HELD BACK as their own animal
+    keep that animal — only the offspring row goes."""
+    animal = (
+        db.query(Animal)
+        .filter(Animal.id == animal_id, Animal.user_id == current_user.id)
+        .first()
+    )
+    if not animal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found")
+
+    pairing_ids = [
+        row[0]
+        for row in db.query(ReptilePairing.id)
+        .filter(
+            (ReptilePairing.male_animal_id == animal_id)
+            | (ReptilePairing.female_animal_id == animal_id)
+        )
+        .all()
+    ]
+    if not pairing_ids:
+        return DeleteImpactResponse()
+
+    clutch_ids = [
+        row[0]
+        for row in db.query(Clutch.id).filter(Clutch.pairing_id.in_(pairing_ids)).all()
+    ]
+    offspring = (
+        db.query(ReptileOffspring).filter(ReptileOffspring.clutch_id.in_(clutch_ids)).count()
+        if clutch_ids
+        else 0
+    )
+    return DeleteImpactResponse(
+        pairings=len(pairing_ids), clutches=len(clutch_ids), offspring=offspring
+    )
 
 
 @router.delete("/{animal_id}", status_code=status.HTTP_204_NO_CONTENT)

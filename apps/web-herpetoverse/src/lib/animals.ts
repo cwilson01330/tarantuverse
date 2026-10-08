@@ -377,8 +377,73 @@ export function resumeFeeding(id: string): Promise<Animal> {
 }
 
 /**
- * Hard delete — CASCADEs to weight logs, feedings, sheds, and photos.
- * Callers should surface that clearly before calling.
+ * Start or end brumation (aestivation for amphibians). `startedAt` is the
+ * keeper's local date (YYYY-MM-DD); the server uses today when omitted.
+ * While active the animal is never flagged overdue on Feeding Day.
+ */
+export function setBrumation(
+  id: string,
+  active: boolean,
+  startedAt?: string | null,
+): Promise<Animal> {
+  return apiFetch<Animal>(`/api/v1/animals/${encodeURIComponent(id)}/brumation`, {
+    method: 'POST',
+    json: { active, started_at: active ? startedAt ?? null : null },
+  })
+}
+
+/** "Brumation" for reptiles; amphibians also aestivate (summer rest), and
+ *  the same flag covers both. */
+export function restLabel(taxon: AnimalTaxon): string {
+  return taxon === 'frog' || taxon === 'salamander' ? 'Brumation / aestivation' : 'Brumation'
+}
+
+/** Breeding records that go with an animal if it is deleted (owner-only). */
+export interface DeleteImpact {
+  pairings: number
+  clutches: number
+  offspring: number
+}
+
+export function getDeleteImpact(id: string): Promise<DeleteImpact> {
+  return apiFetch<DeleteImpact>(
+    `/api/v1/animals/${encodeURIComponent(id)}/delete-impact`,
+  )
+}
+
+/**
+ * The body of the delete confirm (the caller supplies the "Delete X?"
+ * title). Pairings the animal is a parent in are deleted with it (FK
+ * cascade), taking their clutches and offspring records along, so the
+ * keeper is told the counts first. `impact` null = the count couldn't be
+ * loaded; say so rather than imply nothing else goes.
+ * Mirror of deleteAnimalConfirmText in the HV mobile lib — keep in step.
+ */
+export function deleteAnimalConfirmText(impact: DeleteImpact | null): string {
+  const base = 'All feedings, sheds, weigh-ins and photos are removed too.'
+  if (impact === null) {
+    return `${base} Any pairings this animal is a parent in, and their clutches and offspring records, are also deleted. This can't be undone.`
+  }
+  if (impact.pairings === 0) return `${base} This can't be undone.`
+  const parts = [plural(impact.pairings, 'pairing')]
+  if (impact.clutches > 0) parts.push(plural(impact.clutches, 'clutch', 'clutches'))
+  if (impact.offspring > 0) parts.push(plural(impact.offspring, 'offspring record'))
+  return `${base} Its breeding records go with it: ${joinList(parts)}. Animals you held back from those clutches stay in your collection. This can't be undone.`
+}
+
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items.join('')
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
+
+/**
+ * Hard delete — CASCADEs to weight logs, feedings, sheds, photos, and every
+ * pairing the animal is a parent in (with their clutches + offspring).
+ * Callers must show deleteAnimalConfirmText first.
  */
 export function deleteAnimal(id: string): Promise<void> {
   return apiFetch<void>(`/api/v1/animals/${encodeURIComponent(id)}`, {
@@ -641,6 +706,8 @@ export interface AnimalFeedingStatus {
   /** "daily" = frequent feeder (fed-today check); "interval" = days-since model. */
   status_mode: 'daily' | 'interval'
   fed_today: boolean
+  /** Brumating / aestivating — never overdue. Older API builds omit it. */
+  is_brumating?: boolean
 }
 
 /**

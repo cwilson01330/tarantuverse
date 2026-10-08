@@ -34,6 +34,7 @@ interface Due {
   interval_days: number | null;
   status_mode?: 'daily' | 'interval';
   fed_today?: boolean;
+  is_brumating?: boolean;
 }
 interface Row { id: string; name: string | null; common_name?: string | null; scientific_name?: string | null; taxon: string }
 
@@ -43,7 +44,7 @@ function title(r: { name: string | null; common_name?: string | null; scientific
 
 /** Same rule as Feeding Day: frequent feeders are "due" until fed today. */
 function isDue(d: Due): boolean {
-  if (d.is_feeding_paused) return false;
+  if (d.is_feeding_paused || d.is_brumating) return false;
   return d.status_mode === 'daily' ? !d.fed_today : d.is_overdue;
 }
 

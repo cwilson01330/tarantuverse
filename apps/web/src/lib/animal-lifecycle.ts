@@ -168,6 +168,9 @@ export interface AnimalEvent {
   severity: AnimalEventSeverity | null
   notes: string | null
   created_at: string
+  /** Co-keeper attribution — who logged it, when it wasn't the owner. */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
 }
 
 export const ANIMAL_EVENT_LABELS: Record<AnimalEventType, string> = {
@@ -231,6 +234,26 @@ export async function createInvertEvent(
 ): Promise<AnimalEvent> {
   const res = await fetch(`${API_URL}/api/v1/inverts/${id}/events`, {
     method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Could not save event')
+  return res.json()
+}
+
+/** Correct an event. Parent-agnostic, like delete. */
+export async function updateAnimalEvent(
+  token: string,
+  eventId: string,
+  payload: {
+    event_type?: AnimalEventType
+    occurred_at?: string | null
+    severity?: AnimalEventSeverity | null
+    notes?: string | null
+  },
+): Promise<AnimalEvent> {
+  const res = await fetch(`${API_URL}/api/v1/animal-events/${eventId}`, {
+    method: 'PUT',
     headers: authHeaders(token, true),
     body: JSON.stringify(payload),
   })

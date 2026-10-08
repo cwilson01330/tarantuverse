@@ -139,6 +139,11 @@ function AddReptileScreen() {
   const [taxon, setTaxon] = useState<AnimalTaxon>(
     isAnimalTaxon(params.taxon) ? params.taxon : 'snake',
   );
+  // A species arrived from a care sheet whose group we couldn't tell: make
+  // the keeper pick one rather than silently filing it as a snake.
+  const [taxonPicked, setTaxonPicked] = useState<boolean>(
+    () => !(typeof params.species_id === 'string' && params.species_id && !isAnimalTaxon(params.taxon)),
+  );
   const [name, setName] = useState('');
   const [scientificName, setScientificName] = useState(
     typeof params.scientific_name === 'string' ? params.scientific_name : '',
@@ -188,6 +193,10 @@ function AddReptileScreen() {
   async function handleSubmit() {
     if (submitting) return;
     setError(null);
+    if (!taxonPicked) {
+      setError('Pick what kind of animal this is before saving.');
+      return;
+    }
 
     // No required fields beyond the implicit "something the row can be
     // identified by" — backend allows a fully-blank reptile, but a
@@ -361,11 +370,23 @@ function AddReptileScreen() {
             />
           </Field>
 
-          <Field label="Taxon" required>
-            <ChipGroup
+          <Field
+            label="Taxon"
+            required
+            hint={
+              taxonPicked
+                ? undefined
+                : "We couldn't tell this species' group from its care sheet. Pick one to continue."
+            }
+          >
+            <ChipGroup<AnimalTaxon | ''>
               options={TAXON_OPTIONS}
-              value={taxon}
-              onChange={setTaxon}
+              value={taxonPicked ? taxon : ''}
+              onChange={(v) => {
+                if (!v) return;
+                setTaxon(v);
+                setTaxonPicked(true);
+              }}
             />
           </Field>
 

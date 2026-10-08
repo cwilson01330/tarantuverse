@@ -189,17 +189,19 @@ OFFSPRING_FIELDS = [
 COLONY_FIELDS = [
     "id", "user_id", "taxon", "species_id", "enclosure_id", "name",
     "date_acquired", "founded_date", "source", "stage_counts",
-    "count_is_estimated", "substrate_type", "substrate_depth",
+    "count_is_estimated", "enclosure_type", "enclosure_size",
+    "substrate_type", "substrate_depth",
     "last_substrate_change", "target_temp_min", "target_temp_max",
     "target_humidity_min", "target_humidity_max", "water_dish",
-    "notes", "photo_url", "visibility", "is_active", "transferred_out_at",
+    "notes", "sitter_note", "photo_url", "visibility", "is_active", "transferred_out_at",
     "ended_at", "end_reason", "end_notes", "location",
     "created_at", "updated_at",
 ]
 
 COLONY_EVENT_FIELDS = [
     "id", "colony_id", "user_id", "event_type", "stage", "count_delta",
-    "occurred_at", "severity", "destination", "notes", "created_at",
+    "occurred_at", "severity", "destination", "notes", "logged_by_user_id",
+    "created_at",
 ]
 
 # Hydration events (car_20260909). Parented on inverts rather than tarantulas,

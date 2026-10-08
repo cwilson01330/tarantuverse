@@ -10,7 +10,7 @@
  */
 
 import Link from 'next/link'
-import { use, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import UpgradeModal from '@/components/UpgradeModal'
@@ -18,7 +18,10 @@ import { useUnits } from '@/components/UnitsProvider'
 import { parseTempInput, tempUnit } from '@/lib/units'
 import {
   type CreateClutchPayload,
+  CLUTCH_COUNT_MAX,
+  breedingVocab,
   createClutch,
+  getPairing,
 } from '@/lib/breeding'
 
 interface Params {
@@ -58,6 +61,17 @@ export default function NewClutchPage({
   // lapsed after the pairing was created — show the upgrade path, not a raw
   // "Payment Required" error.
   const [capInfo, setCapInfo] = useState<{ message: string | null } | null>(null)
+  // The pairing's taxon picks the wording (eggs vs spawn, slugs vs
+  // infertile). Until it loads — or if it can't — the neutral set is used.
+  const [taxon, setTaxon] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getPairing(pairingId)
+      .then((p) => { if (!cancelled) setTaxon(p.taxon) })
+      .catch(() => { /* neutral wording is fine */ })
+    return () => { cancelled = true }
+  }, [pairingId])
+  const vocab = breedingVocab(taxon)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -132,16 +146,16 @@ export default function NewClutchPage({
         </Field>
 
         <Field
-          label="Initial egg count (optional)"
-          hint="Total eggs laid — fertile + slug + anything in-between."
+          label={`${vocab.initialCountLabel} (optional)`}
+          hint={vocab.initialCountHint}
         >
           <input
             type="number"
             min={0}
-            max={200}
+            max={CLUTCH_COUNT_MAX}
             value={expectedCount}
             onChange={(e) => setExpectedCount(e.target.value)}
-            placeholder="e.g. 8"
+            placeholder={vocab.countPlaceholder}
             className={INPUT_CLS}
           />
         </Field>
@@ -237,17 +251,17 @@ export default function NewClutchPage({
                 <input
                   type="number"
                   min={0}
-                  max={200}
+                  max={CLUTCH_COUNT_MAX}
                   value={fertileCount}
                   onChange={(e) => setFertileCount(e.target.value)}
                   className={INPUT_CLS}
                 />
               </Field>
-              <Field label="Slugs (infertile)">
+              <Field label={vocab.infertileFormLabel}>
                 <input
                   type="number"
                   min={0}
-                  max={200}
+                  max={CLUTCH_COUNT_MAX}
                   value={slugCount}
                   onChange={(e) => setSlugCount(e.target.value)}
                   className={INPUT_CLS}
@@ -257,7 +271,7 @@ export default function NewClutchPage({
                 <input
                   type="number"
                   min={0}
-                  max={200}
+                  max={CLUTCH_COUNT_MAX}
                   value={hatchedCount}
                   onChange={(e) => setHatchedCount(e.target.value)}
                   className={INPUT_CLS}
@@ -267,7 +281,7 @@ export default function NewClutchPage({
                 <input
                   type="number"
                   min={0}
-                  max={200}
+                  max={CLUTCH_COUNT_MAX}
                   value={viableCount}
                   onChange={(e) => setViableCount(e.target.value)}
                   className={INPUT_CLS}
@@ -282,7 +296,7 @@ export default function NewClutchPage({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Maternal vs. artificial incubation, candling notes, hiccups…"
+            placeholder={vocab.clutchNotesPlaceholder}
             className={INPUT_CLS}
           />
         </Field>

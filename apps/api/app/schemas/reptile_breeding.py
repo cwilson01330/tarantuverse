@@ -107,6 +107,14 @@ class CandleEntry(BaseModel):
     notes: Optional[str] = None
 
 
+# Upper bound on every clutch count. Was 200 — fine for snakes and lizards,
+# but a single frog or toad spawn routinely runs into the thousands, and the
+# 422 blocked amphibian keepers from recording at all. 5000 covers real
+# amphibian clutches while still catching a stray extra digit. The HV web +
+# mobile clutch forms mirror this number (CLUTCH_COUNT_MAX).
+CLUTCH_COUNT_MAX = 5000
+
+
 class ClutchCreate(BaseModel):
     pairing_id: UUID
     laid_date: date
@@ -119,11 +127,11 @@ class ClutchCreate(BaseModel):
     incubation_humidity_min_pct: Optional[int] = Field(None, ge=0, le=100)
     incubation_humidity_max_pct: Optional[int] = Field(None, ge=0, le=100)
 
-    expected_count: Optional[int] = Field(None, ge=0, le=200)
-    fertile_count: Optional[int] = Field(None, ge=0, le=200)
-    slug_count: Optional[int] = Field(None, ge=0, le=200)
-    hatched_count: Optional[int] = Field(None, ge=0, le=200)
-    viable_count: Optional[int] = Field(None, ge=0, le=200)
+    expected_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    fertile_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    slug_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    hatched_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    viable_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
 
     candle_log: Optional[List[CandleEntry]] = None
     notes: Optional[str] = Field(None, max_length=4000)
@@ -138,11 +146,11 @@ class ClutchUpdate(BaseModel):
     incubation_temp_max_f: Optional[Decimal] = Field(None, ge=40, le=120)
     incubation_humidity_min_pct: Optional[int] = Field(None, ge=0, le=100)
     incubation_humidity_max_pct: Optional[int] = Field(None, ge=0, le=100)
-    expected_count: Optional[int] = Field(None, ge=0, le=200)
-    fertile_count: Optional[int] = Field(None, ge=0, le=200)
-    slug_count: Optional[int] = Field(None, ge=0, le=200)
-    hatched_count: Optional[int] = Field(None, ge=0, le=200)
-    viable_count: Optional[int] = Field(None, ge=0, le=200)
+    expected_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    fertile_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    slug_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    hatched_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
+    viable_count: Optional[int] = Field(None, ge=0, le=CLUTCH_COUNT_MAX)
     candle_log: Optional[List[CandleEntry]] = None
     notes: Optional[str] = Field(None, max_length=4000)
     photo_url: Optional[str] = Field(None, max_length=500)

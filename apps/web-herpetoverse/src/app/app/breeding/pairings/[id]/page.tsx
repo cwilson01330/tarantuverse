@@ -24,6 +24,7 @@ import {
   type ReptilePairingOutcome,
   PAIRING_OUTCOME_LABEL,
   PAIRING_TYPE_LABEL,
+  breedingVocab,
   deletePairing,
   getPairing,
   listClutchesForPairing,
@@ -262,7 +263,7 @@ export default function PairingDetailPage({
           <ul className="space-y-2">
             {clutches.map((c) => (
               <li key={c.id}>
-                <ClutchRow clutch={c} />
+                <ClutchRow clutch={c} countNoun={breedingVocab(pairing.taxon).countLabel.toLowerCase()} />
               </li>
             ))}
           </ul>
@@ -287,7 +288,7 @@ export default function PairingDetailPage({
   )
 }
 
-function ClutchRow({ clutch: c }: { clutch: Clutch }) {
+function ClutchRow({ clutch: c, countNoun }: { clutch: Clutch; countNoun: string }) {
   return (
     <Link
       href={`/app/breeding/clutches/${c.id}`}
@@ -312,7 +313,7 @@ function ClutchRow({ clutch: c }: { clutch: Clutch }) {
               <span className="text-neutral-200 font-medium">
                 {c.expected_count}
               </span>{' '}
-              eggs
+              {countNoun}
             </span>
           )}
           {c.hatched_count != null && (

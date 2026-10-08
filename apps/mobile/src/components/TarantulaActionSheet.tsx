@@ -1,5 +1,6 @@
 /**
- * Bottom-sheet of quick actions for a single tarantula.
+ * Bottom-sheet of quick actions for a single animal, any taxon (the name is
+ * historical — it started tarantula-only).
  *
  * Surfaced by long-pressing a collection card or list row so the
  * keeper can log the most common events without first opening the
@@ -30,7 +31,7 @@ export interface ActionSheetTarget {
 }
 
 interface TarantulaActionSheetProps {
-  /** The tarantula the sheet acts on. `null` keeps the sheet closed. */
+  /** The animal the sheet acts on. `null` keeps the sheet closed. */
   target: ActionSheetTarget | null;
   /** True while the mark-fed POST is in flight — disables every row. */
   busy?: boolean;
@@ -38,8 +39,9 @@ interface TarantulaActionSheetProps {
   onMarkFed: () => void;
   /** Logs a refused feeding. Sits here as well as on the card because this
    *  path has no mis-tap risk — you have to long-press and then choose — and a
-   *  stray refusal is the one that corrupts premolt prediction. */
-  onMarkRefused: () => void;
+   *  stray refusal is the one that corrupts premolt prediction. Omit it to hide
+   *  the row (taxa without a live-prey cadence). */
+  onMarkRefused?: () => void;
   onLogMolt: () => void;
   onEdit: () => void;
 }
@@ -70,15 +72,17 @@ export function TarantulaActionSheet({
       icon: 'silverware-fork-knife',
       onPress: onMarkFed,
     },
-    {
-      // Adjacent to "Mark fed" because the two are one decision at the tongs,
-      // not a main action and an exception. A keeper who offered food and got
-      // nothing has made an observation worth as much as a feeding.
-      key: 'refused',
-      label: 'Mark refused today',
-      icon: 'food-off-outline',
-      onPress: onMarkRefused,
-    },
+    // Adjacent to "Mark fed" because the two are one decision at the tongs,
+    // not a main action and an exception. A keeper who offered food and got
+    // nothing has made an observation worth as much as a feeding.
+    ...(onMarkRefused
+      ? [{
+          key: 'refused' as const,
+          label: 'Mark refused today',
+          icon: 'food-off-outline' as const,
+          onPress: onMarkRefused,
+        }]
+      : []),
     { key: 'molt', label: 'Log a molt', icon: 'butterfly', onPress: onLogMolt },
     {
       key: 'edit',

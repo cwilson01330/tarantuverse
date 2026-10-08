@@ -131,13 +131,14 @@ export default function CollectionValuePage() {
           </h1>
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-800">
             <p className="mb-4 text-gray-600 dark:text-gray-400">
-              Add a tarantula before exploring collection market signals.
+              Market signals cover tarantulas only for now, and there are none in
+              your collection yet.
             </p>
             <button
               onClick={() => router.push("/dashboard/tarantulas/add")}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
             >
-              Add your first tarantula
+              Add a tarantula
             </button>
           </div>
         </div>

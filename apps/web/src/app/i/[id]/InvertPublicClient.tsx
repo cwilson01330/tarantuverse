@@ -17,7 +17,8 @@
  * answers the question a scan actually asks — what is this animal, what does
  * it need, when was it last fed — and sends the owner to the full detail
  * screen for anything else. A second 800-line page to keep in sync is how the
- * two drift.
+ * two drift. The owner's Log feeding / Log molt buttons are links into that
+ * screen's own add forms (`?log=`), not a second copy of them.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -25,6 +26,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatTempRange } from '@/lib/units'
+import { taxonHasModule } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -104,6 +106,7 @@ export default function InvertPublicClient() {
   const [animal, setAnimal] = useState<PublicInvert | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [signedIn, setSignedIn] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -112,6 +115,7 @@ export default function InvertPublicClient() {
       // page works fine unauthenticated — that's the point of a QR code.
       const token =
         typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      setSignedIn(!!token)
       const res = await fetch(`${API_URL}/api/v1/i/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
@@ -214,6 +218,39 @@ export default function InvertPublicClient() {
           </div>
         </div>
 
+        {/* Owner quick actions — the scan-and-log flow is what an enclosure
+            label is for, same as /t. Both log buttons open the shared detail
+            page's add forms via ?log= (which bails out quietly for an animal
+            that died, where logging is closed). Feeding only where the taxon
+            has a feeding cadence; grazers don't get a prey log button. */}
+        {animal.is_owner && (
+          <div className={`mt-4 grid gap-2 ${taxonHasModule(animal.taxon, 'feedingStats') ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <Link
+              href={`/dashboard/inverts/${animal.id}`}
+              className="flex flex-col items-center gap-1 p-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition"
+            >
+              <span className="text-xl" aria-hidden="true">📋</span>
+              Full detail
+            </Link>
+            {taxonHasModule(animal.taxon, 'feedingStats') && (
+              <Link
+                href={`/dashboard/inverts/${animal.id}?log=feeding`}
+                className="flex flex-col items-center gap-1 p-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold transition"
+              >
+                <span className="text-xl" aria-hidden="true">🍽️</span>
+                Log feeding
+              </Link>
+            )}
+            <Link
+              href={`/dashboard/inverts/${animal.id}?log=molt`}
+              className="flex flex-col items-center gap-1 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition"
+            >
+              <span className="text-xl" aria-hidden="true">🔄</span>
+              Log molt
+            </Link>
+          </div>
+        )}
+
         {/* Safety first — the thing you most want to know before opening a
             tub you're standing in front of. */}
         {(sp?.venom_severity === 'medically_significant' || secretion) && (
@@ -304,14 +341,14 @@ export default function InvertPublicClient() {
           </div>
         )}
 
-        {/* The owner came here from their own enclosure label — send them to
-            the screen where they can actually do something. */}
-        {animal.is_owner && (
+        {/* Keep-your-own nudge, as /t has — signed-in visitors only. The
+            collection page's add menu covers every taxon. */}
+        {!animal.is_owner && signedIn && (
           <Link
-            href={`/dashboard/inverts/${animal.id}`}
-            className="mt-5 block w-full text-center px-4 py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 transition"
+            href="/dashboard/tarantulas?add=1"
+            className="mt-5 block w-full text-center px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
           >
-            Open in my collection
+            {animal.scientific_name ? `Keeping ${animal.scientific_name}? Add yours →` : 'Track your own collection →'}
           </Link>
         )}
       </div>
