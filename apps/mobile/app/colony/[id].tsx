@@ -35,6 +35,7 @@ import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import QRSheet from '../../src/components/QRSheet';
 import { EndColonySheet } from '../../src/components/EndColonySheet';
+import { ColonyTransferSheet } from '../../src/components/colony/ColonyTransferSheet';
 import ColonyPopulationCard from '../../src/components/colony/ColonyPopulationCard';
 import ColonyQuickLogSheet, { type QuickKind } from '../../src/components/colony/ColonyQuickLogSheet';
 import ColonyActivity from '../../src/components/colony/ColonyActivity';
@@ -182,10 +183,14 @@ export default function ColonyDetailScreen() {
   // logging and editing control goes away. Only Reopen survives, and it needs
   // the raw role rather than the gated one.
   const isEnded = !!colony?.ended_at;
+  // Handed to another keeper through a claimed whole-colony transfer: a
+  // historical record like an ended colony, so logging and editing close.
+  const isTransferred = !!colony?.transferred_out_at;
   const canKeepRole = can(role, 'keeper');
-  const canLog = can(role, 'logger') && !isEnded;
-  const canKeep = canKeepRole && !isEnded;
+  const canLog = can(role, 'logger') && !isEnded && !isTransferred;
+  const canKeep = canKeepRole && !isEnded && !isTransferred;
   const [endOpen, setEndOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [reopening, setReopening] = useState(false);
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
   const [deleting, setDeleting] = useState(false);
@@ -956,6 +961,29 @@ export default function ColonyDetailScreen() {
             </View>
           ) : null}
 
+          {/* Handed off as a whole colony. Same neutral full stop as the ended
+              card: nothing was destroyed. */}
+          {isTransferred && colony.transferred_out_at ? (
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md, gap: SPACING.sm },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+                <View
+                  style={{ width: SPACING.sm + 1, height: SPACING.sm + 1, borderRadius: layout.radius.sm, backgroundColor: colors.textTertiary }}
+                />
+                <Text style={[TYPE.subheading, { color: colors.textPrimary, flex: 1 }]}>
+                  {`Transferred ${formatLocalDate(colony.transferred_out_at, { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                </Text>
+              </View>
+              <Text style={[TYPE.body, { color: colors.textSecondary }]}>
+                This colony went to a new keeper through a claim link. This is a historical record: everything below is kept, and the colony is out of your collection and your animal count.
+              </Text>
+            </View>
+          ) : null}
+
           {/* Population card — count, 30-day trend, weekly bars, stage split. */}
           <ColonyPopulationCard
             stageCounts={colony.stage_counts}
@@ -1584,6 +1612,16 @@ export default function ColonyDetailScreen() {
             </View>
           ) : null}
 
+          {/* Transfer or sell — owner only, running colonies only (the API
+              refuses ended, archived and already-transferred ones too). */}
+          {isOwner && !isEnded && !isTransferred && colony.is_active && <TouchableOpacity
+            onPress={() => setTransferOpen(true)}
+            style={[styles.ghostBtn, { alignItems: 'center', marginBottom: SPACING.md, borderRadius: layout.radius.md }]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.ghostBtnText}>Transfer or sell</Text>
+          </TouchableOpacity>}
+
           {/* End colony. Neutral, above delete: a colony that crashed or was
               sold shouldn't have to be deleted to leave the collection. */}
           {canKeep && <TouchableOpacity
@@ -1614,6 +1652,16 @@ export default function ColonyDetailScreen() {
         onClose={() => setQuick(null)}
         onSaved={fetchColony}
         onMore={(type) => openForm(type)}
+      />
+
+      <ColonyTransferSheet
+        visible={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        colonyId={colony.id}
+        name={colony.name}
+        stageCounts={colony.stage_counts}
+        estimated={colony.count_is_estimated}
+        shareLabel={colony.species_scientific_name || colony.species_display_name || colony.name}
       />
 
       <EndColonySheet

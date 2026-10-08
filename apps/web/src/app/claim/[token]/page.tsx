@@ -39,6 +39,21 @@ interface Preview {
   molt_count_at_transfer: number | null
   last_molt_at_transfer: string | null
   expires_at: string | null
+  /** 'invert' | 'animal' | 'colony'. Absent from older API builds. */
+  kind?: string | null
+  colony_mode?: 'full' | 'partial' | null
+  transfer_counts?: Record<string, number> | null
+  transfer_total?: number | null
+  colony_total?: number | null
+  count_is_estimated?: boolean | null
+}
+
+/** "20 adults, 5 juveniles" — the non-zero stages, in the order the API sent them. */
+function stagePhrase(counts: Record<string, number> | null | undefined): string {
+  return Object.entries(counts ?? {})
+    .filter(([, n]) => typeof n === 'number' && n > 0)
+    .map(([stage, n]) => `${n.toLocaleString()} ${stage.replace(/_/g, ' ')}`)
+    .join(', ')
 }
 
 export default function ClaimPage() {
@@ -107,13 +122,17 @@ export default function ClaimPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as any))
         const d = body?.detail
-        setError(typeof d === 'string' ? d : d?.message || 'Could not claim this animal.')
+        setError(typeof d === 'string' ? d : d?.message || 'Could not claim this transfer.')
         setState('ready')
         await loadPreview()
         return
       }
       const created = await res.json()
-      router.push(`/dashboard/inverts/${created.id}?welcome=1`)
+      router.push(
+        created.kind === 'colony'
+          ? `/dashboard/colonies/${created.id}`
+          : `/dashboard/inverts/${created.id}?welcome=1`,
+      )
     } catch {
       setError('Something went wrong claiming this animal. Please try again.')
       setState('ready')
@@ -145,10 +164,12 @@ export default function ClaimPage() {
     )
   }
 
+  const isColony = preview.kind === 'colony'
+
   // Non-claimable states
   if (preview.status !== 'pending') {
     const msg = preview.status === 'claimed'
-      ? 'This animal has already been claimed.'
+      ? isColony ? 'This colony has already been claimed.' : 'This animal has already been claimed.'
       : preview.status === 'cancelled'
         ? 'The seller cancelled this transfer.'
         : 'This transfer link has expired.'
@@ -158,6 +179,105 @@ export default function ClaimPage() {
         <p className="text-gray-700 dark:text-gray-200 font-medium mb-4">{msg}</p>
         <Link href="/" className="text-purple-600 dark:text-purple-400 font-semibold">Explore Tarantuverse</Link>
       </div>
+    )
+  }
+
+  const claimButton = (
+    <>
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      <button
+        onClick={handleClaim}
+        disabled={state === 'claiming'}
+        className="mt-6 w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition disabled:opacity-60"
+      >
+        {state === 'claiming' ? 'Adding…' : isAuthenticated ? 'Add to my collection' : 'Sign in to claim'}
+      </button>
+      {!isAuthenticated && (
+        <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
+          New here?{' '}
+          <Link href={`/register?redirect=${encodeURIComponent(claimPath)}`} className="text-purple-600 dark:text-purple-400 font-semibold">
+            Create a free account
+          </Link>{' '}
+          — {isColony ? 'the colony' : 'your new animal'} will be waiting.
+        </p>
+      )}
+    </>
+  )
+
+  if (isColony) {
+    const approx = preview.count_is_estimated ? '~' : ''
+    const total = preview.transfer_total ?? 0
+    const what = preview.scientific_name || preview.common_name || preview.name || 'animals'
+    const partial = preview.colony_mode === 'partial'
+    const phrase = stagePhrase(preview.transfer_counts)
+    const title = total > 0 ? `${approx}${total.toLocaleString()} ${what}` : preview.name || what
+    return wrap(
+      <>
+        {preview.photo_urls?.[0] ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview.photo_urls[0]} alt={preview.name || what} className="w-full h-56 object-cover" />
+        ) : (
+          <div className="w-full h-56 flex items-center justify-center text-6xl bg-gradient-to-br from-purple-500 to-pink-500">
+            {(isInvertTaxon(preview.taxon) ? INVERT_TAXA[preview.taxon].glyph : '🐾')}
+          </div>
+        )}
+        <div className="p-6">
+          <p className="text-xs uppercase tracking-wide text-purple-600 dark:text-purple-400 font-semibold mb-1">
+            {partial ? 'You’ve been sent part of a colony' : 'You’ve been sent a colony'}
+          </p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+          {preview.name && (
+            <p className="text-gray-500 dark:text-gray-400">From the colony “{preview.name}”</p>
+          )}
+
+          <div className="flex flex-wrap gap-2 mt-3">
+            {preview.breeder_handle && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">from @{preview.breeder_handle}</span>
+            )}
+            {preview.count_is_estimated && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">Estimated count</span>
+            )}
+          </div>
+
+          <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+              {partial ? 'What’s being handed over' : 'The whole colony'}
+            </p>
+            <dl className="text-sm text-gray-700 dark:text-gray-200 space-y-1">
+              {Object.entries(preview.transfer_counts ?? {})
+                .filter(([, n]) => n > 0)
+                .map(([stage, n]) => (
+                  <div key={stage} className="flex justify-between gap-4">
+                    <dt className="text-gray-500 dark:text-gray-400 capitalize">{stage.replace(/_/g, ' ')}</dt>
+                    <dd>{approx}{n.toLocaleString()}</dd>
+                  </div>
+                ))}
+              {partial && preview.colony_total != null && (
+                <div className="flex justify-between gap-4 pt-1 border-t border-gray-100 dark:border-gray-700">
+                  <dt className="text-gray-500 dark:text-gray-400">Out of</dt>
+                  <dd>{approx}{preview.colony_total.toLocaleString()} in the colony</dd>
+                </div>
+              )}
+              {!phrase && (
+                <p className="text-gray-500 dark:text-gray-400">The keeper hasn’t recorded any counts for this colony.</p>
+              )}
+            </dl>
+            {preview.count_is_estimated && (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                These are the keeper’s estimates, not a headcount.
+              </p>
+            )}
+          </div>
+
+          {preview.note && (
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-100 dark:border-gray-700">
+              “{preview.note}”
+            </p>
+          )}
+
+          {claimButton}
+        </div>
+      </>,
     )
   }
 
@@ -223,24 +343,7 @@ export default function ClaimPage() {
           </div>
         )}
 
-        {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
-
-        <button
-          onClick={handleClaim}
-          disabled={state === 'claiming'}
-          className="mt-6 w-full py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition disabled:opacity-60"
-        >
-          {state === 'claiming' ? 'Adding…' : isAuthenticated ? 'Add to my collection' : 'Sign in to claim'}
-        </button>
-        {!isAuthenticated && (
-          <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
-            New here?{' '}
-            <Link href={`/register?redirect=${encodeURIComponent(claimPath)}`} className="text-purple-600 dark:text-purple-400 font-semibold">
-              Create a free account
-            </Link>{' '}
-            — your new animal will be waiting.
-          </p>
-        )}
+        {claimButton}
       </div>
     </>
   )

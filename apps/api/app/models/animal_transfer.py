@@ -31,10 +31,11 @@ class AnimalTransfer(Base):
             "status IN ('pending', 'claimed', 'cancelled', 'expired')",
             name="animal_transfers_status_check",
         ),
-        # Polymorphic source — exactly one of invert_id (TV) / animal_id (HV).
-        # See htr_20260707.
+        # Polymorphic source — exactly one of invert_id (TV) / animal_id (HV) /
+        # colony_id (TV population). See htr_20260707 + ctr_20261008.
         CheckConstraint(
-            "(invert_id IS NOT NULL)::int + (animal_id IS NOT NULL)::int = 1",
+            "(invert_id IS NOT NULL)::int + (animal_id IS NOT NULL)::int"
+            " + (colony_id IS NOT NULL)::int = 1",
             name="animal_transfers_one_source_check",
         ),
     )
@@ -54,6 +55,12 @@ class AnimalTransfer(Base):
     animal_id = Column(
         UUID(as_uuid=True),
         ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=True, index=True,
+    )
+    # A colony (ctr_20261008). Whole or part — see transfer_counts.
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
         nullable=True, index=True,
     )
     # Seller.
@@ -79,6 +86,15 @@ class AnimalTransfer(Base):
         ForeignKey("animals.id", ondelete="SET NULL"),
         nullable=True,
     )
+    claimed_colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Colony transfers only. NULL = the whole colony; otherwise the
+    # {stage: n} being handed over (every n > 0). The source colony's counts
+    # are NOT touched until the claim — the keeper may still cancel.
+    transfer_counts = Column(JSONB, nullable=True)
 
     status = Column(String(16), nullable=False, default="pending", index=True)
 
@@ -102,9 +118,11 @@ class AnimalTransfer(Base):
     claimed_invert = relationship("Invert", foreign_keys=[claimed_invert_id])
     animal = relationship("Animal", foreign_keys=[animal_id])
     claimed_animal = relationship("Animal", foreign_keys=[claimed_animal_id])
+    colony = relationship("Colony", foreign_keys=[colony_id])
+    claimed_colony = relationship("Colony", foreign_keys=[claimed_colony_id])
     from_user = relationship("User", foreign_keys=[from_user_id])
     to_user = relationship("User", foreign_keys=[to_user_id])
 
     def __repr__(self):
-        src = self.invert_id or self.animal_id
+        src = self.invert_id or self.animal_id or self.colony_id
         return f"<AnimalTransfer {self.status} source={src}>"

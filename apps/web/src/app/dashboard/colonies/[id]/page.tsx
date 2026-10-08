@@ -18,6 +18,7 @@ import ColonyPopulationChart from '@/components/ColonyPopulationChart'
 const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
 const ShareCardModal = dynamic(() => import('@/components/ShareCardModal'), { ssr: false })
 import EditPanel, { type EditField, type EditValues } from './EditPanel'
+import TransferPanel from './TransferPanel'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
   COLONY_EVENT_TYPES,
@@ -143,9 +144,12 @@ export default function ColonyDetailPage() {
   // logging and editing control goes away. Only Reopen (below) survives, and it
   // needs the raw role, not the gated one.
   const isEnded = !!colony?.ended_at
+  // Handed to another keeper through a claimed whole-colony transfer. Like an
+  // ended colony it's a historical record, so logging and editing close too.
+  const isTransferred = !!colony?.transferred_out_at
   const canKeepRole = can(viewerRole, 'keeper')
-  const canKeep = canKeepRole && !isEnded
-  const canLog = can(viewerRole, 'logger') && !isEnded
+  const canKeep = canKeepRole && !isEnded && !isTransferred
+  const canLog = can(viewerRole, 'logger') && !isEnded && !isTransferred
   const canChange = (x: { logged_by_user_id?: string | null }) =>
     canKeep || (canLog && !!user?.id && x.logged_by_user_id === user.id)
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
@@ -1053,6 +1057,30 @@ export default function ColonyDetailPage() {
                 )}
               </div>
             )}
+          </section>
+        )}
+
+        {/* Handed off as a whole colony. Same quiet slate full stop as the
+            ended card: nothing was destroyed. */}
+        {isTransferred && colony.transferred_out_at && (
+          <section
+            aria-labelledby="transferred-heading"
+            className="mb-6 p-4 rounded-2xl border border-theme bg-surface"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-500" aria-hidden="true" />
+              <h2 id="transferred-heading" className="font-semibold text-theme-primary">
+                Transferred {new Date(colony.transferred_out_at).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </h2>
+            </div>
+            <p className="mt-2 text-sm text-theme-secondary">
+              This colony went to a new keeper through a claim link. This is a historical record:
+              everything below is kept, and the colony is out of your collection and your animal count.
+            </p>
           </section>
         )}
 
@@ -2191,6 +2219,12 @@ export default function ColonyDetailPage() {
             </ul>
           )}
         </section>
+
+        {/* Transfer or sell — owner only, and only for a running colony. The
+            API refuses ended, archived and already-transferred colonies too. */}
+        {token && isOwner && !isEnded && !isTransferred && colony.is_active && (
+          <TransferPanel token={token} colony={colony} />
+        )}
 
         {/* End colony. The dialog IS the confirm: the date is defaulted, so the
             flow completes in one pick and one click. Neutral ink, never the

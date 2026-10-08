@@ -54,6 +54,10 @@ interface PreviewRow {
   species_name: string | null;
   status: RowStatus;
   errors: string[];
+  /** Colony import only: things worth knowing about a row that still imports. */
+  warnings?: string[];
+  total_count?: number;
+  count_is_estimated?: boolean;
 }
 
 interface AnalyzeSummary {
@@ -62,6 +66,10 @@ interface AnalyzeSummary {
   error_rows: number;
   species_matched: number;
   unmapped_columns: string[];
+  /** Colony import only. */
+  warning_rows?: number;
+  column_warnings?: string[];
+  population_total?: number;
 }
 
 interface AnalyzeResponse {
@@ -81,7 +89,24 @@ interface CommitResponse {
   error_rows: number;
   errors: string[];
   cap_reached: boolean;
+  /** Colony import only. */
+  warning_rows?: number;
+  warnings?: string[];
+  created?: { id: string; name: string; taxon: string }[];
 }
+
+/** What the file holds: individual animals, or population colonies. */
+type ImportTarget = 'invert' | 'colony';
+
+// Colony taxa mirror the API's TAXA list (import_service.TAXA).
+const COLONY_TAXA = [
+  'isopod', 'roach', 'millipede', 'scorpion', 'tarantula', 'true_spider',
+  'centipede', 'whip_spider', 'vinegaroon', 'mantis', 'other',
+];
+
+const COLONY_EXAMPLE_HEADER =
+  'name, species, taxon, adults, juveniles, count, estimated, founded, source, location, notes';
+const COLONY_EXAMPLE_ROW = 'Dairy cow bin 1, Porcellio laevis, isopod, 40, ~150, , , 2025-03-01, bred, Rack A,';
 
 const CONFIDENCE_COLORS: Record<Confidence, string> = {
   high: '#16a34a',
@@ -115,6 +140,10 @@ export default function ImportScreen() {
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [step, setStep] = useState<Step>('source');
+
+  // What the file holds. Individual animals is the default and unchanged.
+  const [target, setTarget] = useState<ImportTarget>('invert');
+  const isColony = target === 'colony';
 
   // Source state — the keeper imports from EITHER a picked file OR a sheet link.
   const [sheetUrl, setSheetUrl] = useState('');
@@ -155,11 +184,20 @@ export default function ImportScreen() {
     </TouchableOpacity>
   );
 
+  const chooseTarget = (next: ImportTarget) => {
+    if (next === target) return;
+    setTarget(next);
+    setDefaultTaxon(next === 'colony' ? 'isopod' : 'tarantula');
+    setAnalysis(null);
+    setMapping({});
+    setError('');
+  };
+
   const resetAll = () => {
     setStep('source');
     setSheetUrl('');
     setPickedFile(null);
-    setDefaultTaxon('tarantula');
+    setDefaultTaxon(isColony ? 'isopod' : 'tarantula');
     setAnalysis(null);
     setMapping({});
     setDuplicateMode('skip');
@@ -208,6 +246,7 @@ export default function ImportScreen() {
       fd.append('sheet_url', sheetUrl.trim());
     }
     fd.append('default_taxon', defaultTaxon);
+    fd.append('target', target);
     return fd;
   };
 
@@ -231,7 +270,7 @@ export default function ImportScreen() {
         seeded[c.header] = c.suggested_field;
       });
       setMapping(seeded);
-      if (data.taxa?.length) setTaxa(data.taxa);
+      if (data.taxa?.length && !isColony) setTaxa(data.taxa);
       setStep('confirm');
     } catch (e: any) {
       if (e?.response?.status === 401) return;
@@ -278,7 +317,11 @@ export default function ImportScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Import Collection" subtitle={headerSubtitle} leftAction={backAction} />
+      <AppHeader
+        title={isColony ? 'Import Colonies' : 'Import Collection'}
+        subtitle={headerSubtitle}
+        leftAction={backAction}
+      />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
         <ScrollView
@@ -300,7 +343,69 @@ export default function ImportScreen() {
           {/* ---------- STEP 1: SOURCE ---------- */}
           {step === 'source' && (
             <View>
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Import a file</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>What are you importing?</Text>
+              <View style={styles.toggleRow}>
+                {(
+                  [
+                    { kind: 'invert' as ImportTarget, label: 'Individual animals' },
+                    { kind: 'colony' as ImportTarget, label: 'Colonies' },
+                  ]
+                ).map((opt) => {
+                  const active = target === opt.kind;
+                  return (
+                    <TouchableOpacity
+                      key={opt.kind}
+                      onPress={() => chooseTarget(opt.kind)}
+                      style={[
+                        styles.toggleBtn,
+                        {
+                          backgroundColor: active ? colors.primary : colors.surface,
+                          borderColor: active ? colors.primary : colors.border,
+                          borderRadius: layout.radius.md,
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text style={[styles.toggleText, { color: active ? '#fff' : colors.textSecondary }]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {isColony && (
+                <View
+                  style={[
+                    styles.summaryCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md, marginTop: 12 },
+                  ]}
+                >
+                  <Text style={[styles.summaryLine, { color: colors.textSecondary }]}>
+                    One row per colony. A colony counts as 1 toward your animal limit, however many animals are in it.
+                  </Text>
+                  <Text style={[styles.summaryMuted, { color: colors.textTertiary }]}>
+                    Columns we look for: name, species (scientific or common), taxon, a total count, per-stage
+                    counts (adults, juveniles, nymphs, mancae, babies, males, females…), an estimate flag,
+                    founded date, date acquired, source, location and notes. A count like "~200" is saved as an
+                    estimate.
+                  </Text>
+                  <Text style={[styles.summaryMuted, { color: colors.textTertiary }]}>
+                    Colonies with the same name and type as one you already have are skipped, not changed.
+                  </Text>
+                  <Text style={[styles.summaryMuted, { color: colors.textSecondary }]}>
+                    Example header row:
+                  </Text>
+                  <Text style={[styles.mapSample, { color: colors.textPrimary }]} selectable>
+                    {COLONY_EXAMPLE_HEADER}
+                  </Text>
+                  <Text style={[styles.mapSample, { color: colors.textTertiary }]} selectable>
+                    {COLONY_EXAMPLE_ROW}
+                  </Text>
+                </View>
+              )}
+
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginTop: 20 }]}>Import a file</Text>
               {pickedFile ? (
                 <View
                   style={[
@@ -397,6 +502,11 @@ export default function ImportScreen() {
                   {analysis.summary.new} new · {analysis.summary.duplicate} dup · {analysis.summary.error_rows} errors ·{' '}
                   {analysis.summary.species_matched} matched
                 </Text>
+                {isColony && (analysis.summary.population_total ?? 0) > 0 && (
+                  <Text style={[styles.summaryMuted, { color: colors.textTertiary }]}>
+                    The new colonies hold {(analysis.summary.population_total ?? 0).toLocaleString()} animals in total.
+                  </Text>
+                )}
                 {analysis.summary.unmapped_columns.length > 0 && (
                   <Text style={[styles.summaryMuted, { color: colors.textTertiary }]}>
                     Unmapped columns saved to notes: {analysis.summary.unmapped_columns.join(', ')}
@@ -404,8 +514,29 @@ export default function ImportScreen() {
                 )}
               </View>
 
+              {isColony && (analysis.summary.column_warnings?.length ?? 0) > 0 && (
+                <View
+                  style={[
+                    styles.summaryCard,
+                    { backgroundColor: colors.surface, borderColor: colors.warning, borderRadius: layout.radius.md, marginTop: 8 },
+                  ]}
+                >
+                  {analysis.summary.column_warnings?.map((w, i) => (
+                    <Text key={i} style={[styles.summaryMuted, { color: colors.textSecondary }]}>
+                      {w}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
               {/* Duplicate handling toggle */}
               <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>Duplicates</Text>
+              {isColony ? (
+                <Text style={[styles.hint, { color: colors.textTertiary, marginTop: 0 }]}>
+                  Duplicates (same name and type as a colony you already have, or repeated in the file) are
+                  skipped. An import never changes an existing colony's numbers.
+                </Text>
+              ) : (
               <View style={styles.toggleRow}>
                 {(['skip', 'update'] as const).map((m) => {
                   const active = duplicateMode === m;
@@ -431,6 +562,7 @@ export default function ImportScreen() {
                   );
                 })}
               </View>
+              )}
 
               {/* Column mapping cards */}
               <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>Column mapping</Text>
@@ -508,10 +640,18 @@ export default function ImportScreen() {
                       <Text style={[styles.previewMeta, { color: colors.textTertiary }]} numberOfLines={1}>
                         {titleCase(row.taxon)}
                         {row.species_matched && row.species_name ? `  ·  ✓ ${row.species_name}` : ''}
+                        {isColony && row.status !== 'error'
+                          ? `  ·  ${row.count_is_estimated ? '~' : ''}${(row.total_count ?? 0).toLocaleString()} animals`
+                          : ''}
                       </Text>
                       {row.status === 'error' && row.errors.length > 0 ? (
                         <Text style={[styles.previewError, { color: colors.error ?? '#dc2626' }]} numberOfLines={2}>
                           {row.errors.join('; ')}
+                        </Text>
+                      ) : null}
+                      {row.status !== 'error' && (row.warnings?.length ?? 0) > 0 ? (
+                        <Text style={[styles.previewError, { color: colors.warning }]} numberOfLines={3}>
+                          {row.warnings?.join('; ')}
                         </Text>
                       ) : null}
                     </View>
@@ -568,6 +708,54 @@ export default function ImportScreen() {
                 </View>
               )}
 
+              {isColony && (result.created?.length ?? 0) > 0 && (
+                <View
+                  style={[
+                    styles.errorsCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+                  ]}
+                >
+                  <Text style={[styles.errorsTitle, { color: colors.textSecondary }]}>
+                    New colonies ({result.imported})
+                  </Text>
+                  {result.created?.slice(0, 10).map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => router.push(`/colony/${c.id}` as any)}
+                      accessibilityRole="link"
+                      accessibilityLabel={`Open colony ${c.name}`}
+                    >
+                      <Text style={[styles.errorLine, { color: colors.primary }]}>
+                        • {c.name} · {titleCase(c.taxon)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {result.imported > 10 && (
+                    <Text style={[styles.errorLine, { color: colors.textTertiary }]}>
+                      and {result.imported - 10} more — they're all in your collection.
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {isColony && (result.warnings?.length ?? 0) > 0 && (
+                <View
+                  style={[
+                    styles.errorsCard,
+                    { backgroundColor: colors.surface, borderColor: colors.warning, borderRadius: layout.radius.md },
+                  ]}
+                >
+                  <Text style={[styles.errorsTitle, { color: colors.textSecondary }]}>
+                    Worth a look ({result.warning_rows ?? result.warnings?.length})
+                  </Text>
+                  {result.warnings?.slice(0, 10).map((w, i) => (
+                    <Text key={i} style={[styles.errorLine, { color: colors.textTertiary }]}>
+                      • {w}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
               {result.errors.length > 0 && (
                 <View
                   style={[
@@ -620,7 +808,9 @@ export default function ImportScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.actionBtnText}>
-                  Import {analysis.summary.new + (duplicateMode === 'update' ? analysis.summary.duplicate : 0)}
+                  Import{' '}
+                  {analysis.summary.new + (!isColony && duplicateMode === 'update' ? analysis.summary.duplicate : 0)}
+                  {isColony ? (analysis.summary.new === 1 ? ' colony' : ' colonies') : ''}
                 </Text>
               )}
             </PrimaryButton>
@@ -672,7 +862,7 @@ export default function ImportScreen() {
             </View>
             <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Default taxon</Text>
             <ScrollView style={{ maxHeight: 360 }}>
-              {taxa.map((t) => {
+              {(isColony ? COLONY_TAXA : taxa).map((t) => {
                 const active = defaultTaxon === t;
                 return (
                   <TouchableOpacity

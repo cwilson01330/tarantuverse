@@ -37,6 +37,10 @@ interface PreviewRow {
   species_name: string | null
   status: RowStatus
   errors: string[]
+  /** Colony import only: things worth knowing about a row that still imports. */
+  warnings?: string[]
+  total_count?: number
+  count_is_estimated?: boolean
 }
 
 interface AnalyzeSummary {
@@ -45,6 +49,10 @@ interface AnalyzeSummary {
   error_rows: number
   species_matched: number
   unmapped_columns: string[]
+  /** Colony import only. */
+  warning_rows?: number
+  column_warnings?: string[]
+  population_total?: number
 }
 
 interface AnalyzeResponse {
@@ -64,10 +72,36 @@ interface CommitResponse {
   error_rows: number
   errors: string[]
   cap_reached: boolean
+  /** Colony import only. */
+  warning_rows?: number
+  warnings?: string[]
+  created?: { id: string; name: string; taxon: string }[]
 }
 
 type Step = 'source' | 'confirm' | 'result'
 type SourceKind = 'file' | 'sheet'
+/** What the file holds: individual animals, or population colonies. */
+type ImportTarget = 'invert' | 'colony'
+
+// Colony taxa mirror the API's TAXA list (import_service.TAXA).
+const COLONY_TAXA = [
+  'isopod', 'roach', 'millipede', 'scorpion', 'tarantula', 'true_spider',
+  'centipede', 'whip_spider', 'vinegaroon', 'mantis', 'other',
+]
+
+const COLONY_EXAMPLE_HEADERS = [
+  'name', 'species', 'taxon', 'adults', 'juveniles', 'count',
+  'estimated', 'founded', 'source', 'location', 'notes',
+]
+const COLONY_EXAMPLE_ROWS = [
+  ['Dairy cow bin 1', 'Porcellio laevis', 'isopod', '40', '~150', '', '', '2025-03-01', 'bred', 'Rack A', ''],
+  ['Dubia breeder tub', 'Blaptica dubia', 'roach', '', '', '~1200', 'yes', '', 'bought', 'Garage', 'Feeder line'],
+]
+
+function colonyExampleCsv(): string {
+  const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+  return [COLONY_EXAMPLE_HEADERS, ...COLONY_EXAMPLE_ROWS].map((r) => r.map(esc).join(',')).join('\n') + '\n'
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -120,6 +154,10 @@ export default function ImportCollectionPage() {
   const { user, token, isAuthenticated, isLoading } = useAuth()
 
   const [step, setStep] = useState<Step>('source')
+
+  // What the file holds. Individual animals is the default and unchanged.
+  const [target, setTarget] = useState<ImportTarget>('invert')
+  const isColony = target === 'colony'
 
   // Source step state (retained so we can re-send on commit)
   const [sourceKind, setSourceKind] = useState<SourceKind>('file')
@@ -174,12 +212,31 @@ export default function ImportCollectionPage() {
     setError('')
   }
 
+  const chooseTarget = (next: ImportTarget) => {
+    if (next === target) return
+    setTarget(next)
+    setDefaultTaxon(next === 'colony' ? 'isopod' : 'tarantula')
+    setAnalysis(null)
+    setMapping({})
+    setError('')
+  }
+
+  const downloadColonyExample = () => {
+    const blob = new Blob([colonyExampleCsv()], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'colonies-example.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const startOver = () => {
     setStep('source')
     setSourceKind('file')
     setFile(null)
     setSheetUrl('')
-    setDefaultTaxon('tarantula')
+    setDefaultTaxon(isColony ? 'isopod' : 'tarantula')
     setAnalysis(null)
     setMapping({})
     setDuplicateMode('skip')
@@ -195,6 +252,7 @@ export default function ImportCollectionPage() {
       const fd = new FormData()
       appendSource(fd)
       fd.append('default_taxon', defaultTaxon)
+      fd.append('target', target)
 
       const res = await fetch(`${API_URL}/api/v1/import/analyze`, {
         method: 'POST',
@@ -235,6 +293,7 @@ export default function ImportCollectionPage() {
       fd.append('default_taxon', defaultTaxon)
       fd.append('duplicate_mode', duplicateMode)
       fd.append('unmapped_to_notes', 'true')
+      fd.append('target', target)
 
       const res = await fetch(`${API_URL}/api/v1/import/commit`, {
         method: 'POST',
@@ -277,7 +336,7 @@ export default function ImportCollectionPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-theme-primary mt-2 mb-1">
-          Import Collection
+          {isColony ? 'Import Colonies' : 'Import Collection'}
         </h1>
         <p className="text-theme-secondary mb-6">
           Upload a spreadsheet or link a Google Sheet — we&apos;ll auto-map your
@@ -330,6 +389,85 @@ export default function ImportCollectionPage() {
         {/* ── STEP 1: SOURCE ────────────────────────────────────────────── */}
         {step === 'source' && (
           <div className="space-y-6">
+            {/* What are you importing? */}
+            <div>
+              <p className="text-sm font-medium text-theme-primary mb-2">
+                What are you importing?
+              </p>
+              <div
+                role="group"
+                aria-label="What are you importing"
+                className="grid grid-cols-2 gap-2 p-1 rounded-xl border border-theme bg-surface-elevated"
+              >
+                {(
+                  [
+                    { kind: 'invert' as ImportTarget, label: 'Individual animals' },
+                    { kind: 'colony' as ImportTarget, label: 'Colonies' },
+                  ]
+                ).map((opt) => (
+                  <button
+                    key={opt.kind}
+                    type="button"
+                    onClick={() => chooseTarget(opt.kind)}
+                    aria-pressed={target === opt.kind}
+                    className={`py-2 rounded-lg text-sm font-medium transition ${
+                      target === opt.kind
+                        ? 'bg-gradient-brand text-white shadow-gradient-brand'
+                        : 'text-theme-secondary hover:text-theme-primary'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {isColony && (
+                <div className="mt-3 p-4 rounded-2xl border border-theme bg-surface text-sm text-theme-secondary space-y-2">
+                  <p>
+                    One row per colony. A colony is one entry that counts as 1 toward your
+                    animal limit, however many animals are in it.
+                  </p>
+                  <p>
+                    <span className="font-medium text-theme-primary">Columns we look for:</span>{' '}
+                    name, species (scientific or common), taxon, a total count, per-stage counts
+                    (adults, juveniles, nymphs, mancae, babies, males, females&hellip;), an
+                    estimate flag, founded date, date acquired, source, location and notes.
+                    A count like &ldquo;~200&rdquo; is saved as an estimate.
+                  </p>
+                  <p>
+                    Colonies with the same name and type as one you already have are skipped, not
+                    changed.
+                  </p>
+                  <div className="overflow-x-auto rounded-xl border border-theme bg-surface-elevated">
+                    <table className="text-xs text-theme-primary w-full">
+                      <thead>
+                        <tr className="text-left text-theme-tertiary">
+                          {COLONY_EXAMPLE_HEADERS.map((h) => (
+                            <th key={h} className="px-2 py-1 font-semibold whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {COLONY_EXAMPLE_ROWS.map((r, i) => (
+                          <tr key={i} className="border-t border-theme">
+                            {r.map((c, j) => (
+                              <td key={j} className="px-2 py-1 whitespace-nowrap">{c}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={downloadColonyExample}
+                    className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                  >
+                    Download this example as a CSV
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Source kind toggle */}
             <div
               role="group"
@@ -440,9 +578,11 @@ export default function ImportCollectionPage() {
               >
                 {/* Backend supplies the canonical list on analyze; before that,
                     offer tarantula as a sensible default. */}
-                {(analysis?.taxa && analysis.taxa.length > 0
-                  ? analysis.taxa
-                  : ['tarantula']
+                {(isColony
+                  ? COLONY_TAXA
+                  : analysis?.taxa && analysis.taxa.length > 0
+                    ? analysis.taxa
+                    : ['tarantula']
                 ).map((t) => (
                   <option key={t} value={t}>
                     {titleCaseTaxon(t)}
@@ -451,6 +591,7 @@ export default function ImportCollectionPage() {
               </select>
               <p className="text-xs text-theme-tertiary mt-2">
                 Used for rows where the type can&apos;t be inferred from a column or matched species.
+                {isColony && ' A type written in the file that we don’t recognise is flagged, not replaced with this.'}
               </p>
             </div>
 
@@ -500,6 +641,12 @@ export default function ImportCollectionPage() {
               <p className="text-xs text-theme-tertiary mt-1">
                 {analysis.row_count.toLocaleString()} row
                 {analysis.row_count === 1 ? '' : 's'} found.
+                {isColony && (analysis.summary.population_total ?? 0) > 0 && (
+                  <>
+                    {' '}The new colonies hold{' '}
+                    {(analysis.summary.population_total ?? 0).toLocaleString()} animals in total.
+                  </>
+                )}
                 {analysis.summary.unmapped_columns.length > 0 && (
                   <>
                     {' '}Unmapped columns will be saved to notes:{' '}
@@ -511,6 +658,18 @@ export default function ImportCollectionPage() {
                 )}
               </p>
             </div>
+
+            {/* Colony import: columns that look like counts but aren't placed */}
+            {isColony && (analysis.summary.column_warnings?.length ?? 0) > 0 && (
+              <div
+                role="status"
+                className="p-4 rounded-xl border border-amber-300 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-900 dark:text-amber-100 space-y-1"
+              >
+                {analysis.summary.column_warnings?.map((w, i) => (
+                  <p key={i}>{w}</p>
+                ))}
+              </div>
+            )}
 
             {/* Mapping table */}
             <section aria-labelledby="mapping-heading">
@@ -571,6 +730,13 @@ export default function ImportCollectionPage() {
             </section>
 
             {/* Duplicate handling */}
+            {isColony && (
+              <p className="text-sm text-theme-secondary">
+                Duplicates (same name and type as a colony you already have, or repeated in the
+                file) are skipped. An import never changes an existing colony&apos;s numbers.
+              </p>
+            )}
+            {!isColony && (
             <section aria-labelledby="dupe-heading">
               <h2
                 id="dupe-heading"
@@ -610,6 +776,7 @@ export default function ImportCollectionPage() {
                 ))}
               </div>
             </section>
+            )}
 
             {/* Preview */}
             <section aria-labelledby="preview-heading">
@@ -658,9 +825,21 @@ export default function ImportCollectionPage() {
                           </span>
                         )}
                       </div>
+                      {isColony && row.status !== 'error' && (
+                        <div className="text-xs text-theme-secondary mt-1">
+                          {row.count_is_estimated ? '~' : ''}
+                          {(row.total_count ?? 0).toLocaleString()} animals
+                          {row.count_is_estimated ? ' (estimate)' : ''}
+                        </div>
+                      )}
                       {row.status === 'error' && row.errors.length > 0 && (
                         <div className="text-xs text-red-700 dark:text-red-400 mt-1">
                           {row.errors.join('; ')}
+                        </div>
+                      )}
+                      {row.status !== 'error' && (row.warnings?.length ?? 0) > 0 && (
+                        <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                          {row.warnings?.join('; ')}
                         </div>
                       )}
                     </div>
@@ -694,9 +873,11 @@ export default function ImportCollectionPage() {
               >
                 {committing
                   ? 'Importing…'
-                  : newCount === 0 && duplicateMode === 'skip'
+                  : newCount === 0 && (isColony || duplicateMode === 'skip')
                     ? 'Nothing new to import'
-                    : `Import ${newCount} animal${newCount === 1 ? '' : 's'}`}
+                    : isColony
+                      ? `Import ${newCount} ${newCount === 1 ? 'colony' : 'colonies'}`
+                      : `Import ${newCount} animal${newCount === 1 ? '' : 's'}`}
               </button>
             </div>
           </div>
@@ -752,6 +933,47 @@ export default function ImportCollectionPage() {
                     </Link>{' '}
                     to import the rest.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {isColony && (result.created?.length ?? 0) > 0 && (
+              <div className="p-4 rounded-xl border border-theme bg-surface">
+                <h3 className="text-sm font-semibold text-theme-primary mb-2">
+                  New colonies ({result.imported})
+                </h3>
+                <ul className="text-sm space-y-1">
+                  {result.created?.slice(0, 15).map((c) => (
+                    <li key={c.id}>
+                      <Link
+                        href={`/dashboard/colonies/${c.id}`}
+                        className="font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                      >
+                        {c.name}
+                      </Link>{' '}
+                      <span className="text-theme-tertiary">· {titleCaseTaxon(c.taxon)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {result.imported > 15 && (
+                  <p className="text-xs text-theme-tertiary mt-2">
+                    and {result.imported - 15} more &mdash; they&apos;re all in your collection.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {isColony && (result.warnings?.length ?? 0) > 0 && (
+              <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-600/60 bg-amber-50 dark:bg-amber-900/20">
+                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">
+                  Worth a look ({result.warning_rows ?? result.warnings?.length})
+                </h3>
+                <div className="max-h-48 overflow-y-auto">
+                  <ul className="list-disc list-inside text-sm text-amber-900 dark:text-amber-100 space-y-1">
+                    {result.warnings?.map((w, idx) => (
+                      <li key={idx}>{w}</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}

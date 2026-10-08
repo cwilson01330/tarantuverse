@@ -139,6 +139,9 @@ export interface ColonyResponse {
   ended_at?: string | null
   end_reason?: ColonyEndReason | null
   end_notes?: string | null
+  /** Set once the WHOLE colony was handed to another keeper (claimed transfer).
+   *  A partial transfer never sets it. */
+  transferred_out_at?: string | null
   created_at: string
   updated_at: string | null
   total_count: number | null
@@ -305,6 +308,107 @@ export async function reopenColony(token: string, id: string): Promise<ColonyRes
     throw new Error(typeof d === 'string' ? d : 'Could not reopen the colony.')
   }
   return (await res.json()) as ColonyResponse
+}
+
+// ---------- transfers (whole colony or part of it) ----------
+
+export type ColonyTransferMode = 'full' | 'partial'
+
+export interface ColonyTransferPayload {
+  mode: ColonyTransferMode
+  /** Partial only: {stage: n}, every n > 0 and no more than the bucket holds. */
+  counts?: StageCounts
+  include_photos?: boolean
+  /** Private to the seller. Never shown to the buyer. */
+  sale_price?: number | null
+  note?: string | null
+}
+
+export interface ColonyTransferCreated {
+  token: string
+  claim_url: string
+  expires_at: string
+}
+
+export interface ColonyTransferRow {
+  id: string
+  token: string
+  status: 'pending' | 'claimed' | 'cancelled' | 'expired'
+  colony_id: string | null
+  claimed_colony_id: string | null
+  colony_mode: ColonyTransferMode | null
+  transfer_counts: StageCounts | null
+  transfer_total: number | null
+  /** Ready to show, e.g. "Whole colony" or "25 from the colony (20 adults, 5 juveniles)". */
+  label: string | null
+  /** 'invert' | 'animal' | 'colony' (the list endpoint returns every kind). */
+  kind?: string | null
+  display_name?: string | null
+  taxon?: string | null
+  invert_id?: string | null
+  counterparty: string | null
+  sale_price: number | null
+  note: string | null
+  created_at: string
+  claimed_at: string | null
+  expires_at: string
+}
+
+/**
+ * Make a claim link for a whole colony or part of it. Nothing leaves the
+ * colony until the buyer claims; the counts are checked again then.
+ */
+export async function createColonyTransfer(
+  token: string,
+  colonyId: string,
+  payload: ColonyTransferPayload,
+): Promise<ColonyTransferCreated> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/transfer`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const d = body?.detail
+    const msg = typeof d === 'string'
+      ? d
+      : Array.isArray(d) && d[0]?.msg
+        ? String(d[0].msg).replace(/^Value error, /, '')
+        : 'Could not create the transfer link.'
+    throw new Error(msg)
+  }
+  return (await res.json()) as ColonyTransferCreated
+}
+
+/** This colony's transfer links, newest first (seller's view). */
+export async function listColonyTransfers(token: string, colonyId: string): Promise<ColonyTransferRow[]> {
+  const res = await fetch(
+    `${API_URL}/api/v1/transfers/?role=sent&colony_id=${encodeURIComponent(colonyId)}`,
+    { headers: authHeaders(token) },
+  )
+  if (!res.ok) throw new Error('Could not load transfers')
+  return (await res.json()) as ColonyTransferRow[]
+}
+
+/** Every transfer link this keeper has made — animals and colonies. */
+export async function listSentTransfers(token: string): Promise<ColonyTransferRow[]> {
+  const res = await fetch(`${API_URL}/api/v1/transfers/?role=sent`, { headers: authHeaders(token) })
+  if (!res.ok) throw new Error('Could not load transfers')
+  return (await res.json()) as ColonyTransferRow[]
+}
+
+export async function cancelColonyTransfer(token: string, transferToken: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/transfers/${encodeURIComponent(transferToken)}/cancel`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: '{}',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const d = body?.detail
+    throw new Error(typeof d === 'string' ? d : 'Could not cancel the transfer.')
+  }
 }
 
 export async function getColony(token: string, id: string): Promise<ColonyResponse> {

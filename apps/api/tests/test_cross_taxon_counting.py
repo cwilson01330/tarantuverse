@@ -199,7 +199,7 @@ def test_importer_prefers_the_complete_animal_list():
 
     from app.services import import_service
 
-    src = inspect.getsource(import_service.parse_bytes)
+    src = inspect.getsource(import_service._parse_bytes)
     match = re.search(r'raw\s*=\s*raw\.get\(([^)]*)\)', src)
     assert match, "could not locate the export-key precedence line"
 

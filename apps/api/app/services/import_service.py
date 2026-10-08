@@ -104,8 +104,38 @@ def _clean_header(h: Any) -> str:
 
 # ── Parsing ──────────────────────────────────────────────────────────────────
 
-def parse_bytes(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str, Any]]]:
-    """Return (headers, rows) from csv / xlsx / json bytes."""
+# One import is one request on a 512 MB instance that commits row by row, so
+# it must stay bounded: past this, split the file.
+MAX_IMPORT_ROWS = 2000
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
+
+
+def parse_bytes(
+    content: bytes,
+    filename: str,
+    json_keys: Optional[Tuple[str, ...]] = None,
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """(headers, rows), refusing files past MAX_IMPORT_ROWS rows."""
+    from fastapi import HTTPException
+
+    headers, rows = _parse_bytes(content, filename, json_keys)
+    if len(rows) > MAX_IMPORT_ROWS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"That file has {len(rows):,} rows. Imports take up to {MAX_IMPORT_ROWS:,} at a time, so split it into smaller files.",
+        )
+    return headers, rows
+
+
+def _parse_bytes(
+    content: bytes,
+    filename: str,
+    json_keys: Optional[Tuple[str, ...]] = None,
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Return (headers, rows) from csv / xlsx / json bytes.
+
+    `json_keys` names the top-level lists to read from a JSON export, in order
+    (default: the animal lists). The colony importer passes ("colonies",)."""
     name = (filename or "").lower()
     if name.endswith(".json"):
         raw = json.loads(content.decode("utf-8"))
@@ -115,7 +145,10 @@ def parse_bytes(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str
             # very same rows. Reading `tarantulas` first would silently import
             # only the tarantulas out of a mixed collection — and nothing at
             # all for a keeper who has none.
-            raw = raw.get("inverts") or raw.get("tarantulas") or raw.get("animals") or [raw]
+            if json_keys:
+                raw = next((raw[k] for k in json_keys if raw.get(k)), None) or [raw]
+            else:
+                raw = raw.get("inverts") or raw.get("tarantulas") or raw.get("animals") or [raw]
         rows = [dict(r) for r in raw if isinstance(r, dict)]
         headers = list({k for r in rows for k in r.keys()})
         return headers, rows

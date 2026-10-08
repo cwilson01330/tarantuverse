@@ -7,6 +7,10 @@ active counts/cap/reminders.
 
 Bright line (§1): no payments/brokering. sale_price is a PRIVATE seller ledger,
 never returned to the buyer.
+
+Colonies (ctr_20261008) ride the same table: a whole colony, or some of its
+animals ("25 of 360"). A partial claim takes the counts out of the source
+colony through 'removed' events, so its population history stays honest.
 """
 import logging
 import secrets
@@ -27,13 +31,17 @@ from app.models.offspring import Offspring
 from app.models.egg_sac import EggSac
 from app.models.pairing import Pairing
 from app.models.molt_log import MoltLog
+from app.models.colony import Colony, ColonyEvent
+from app.models.invert_species import InvertSpecies
 from app.models.user import User
 from app.utils.dependencies import get_current_user
 from app.routers.qr import _optional_user  # reuse the never-raise bearer resolver
+from app.routers.colonies import _apply_delta  # the one bucket-adjust rule
 from app.services.storage import storage_service
 from app.services import analytics_events
 from app.schemas.transfer import (
-    TransferCreate, TransferCreateResponse, TransferPreview, TransferListItem,
+    ColonyTransferCreate, TransferCreate, TransferCreateResponse, TransferPreview,
+    TransferListItem,
 )
 from app.config import settings
 from app.utils.access import policy
@@ -171,6 +179,140 @@ def _build_animal_snapshot(db: Session, animal: Animal, seller: User) -> dict:
     }
 
 
+# ─── colony helpers (ctr_20261008) ──────────────────────────────────────────
+
+def _counts_total(counts: Optional[dict]) -> int:
+    """Sum a {stage: n} map. Same rule as colonies._total_count: ints only."""
+    if not counts:
+        return 0
+    return sum(int(v) for v in counts.values() if isinstance(v, int) and not isinstance(v, bool))
+
+
+def _stage_word(stage: str) -> str:
+    return stage.replace("_", " ").strip()
+
+
+def _counts_phrase(counts: Optional[dict]) -> str:
+    """'20 adults, 5 juveniles' — the non-zero buckets, in stored order."""
+    parts = [
+        f"{int(n)} {_stage_word(s)}"
+        for s, n in (counts or {}).items()
+        if isinstance(n, int) and not isinstance(n, bool) and n > 0
+    ]
+    return ", ".join(parts)
+
+
+def partial_counts_error(stage_counts: Optional[dict], counts: dict, *, at_claim: bool) -> Optional[str]:
+    """Why these partial-transfer counts can't come out of this colony, or None.
+
+    Checked when the link is made AND again when it is claimed, because the
+    keeper keeps logging births and deaths in between. At claim time a partial
+    that happens to take everything left is allowed (the link was valid when
+    made and the buyer is owed what was promised); at create time it isn't --
+    taking every animal is a whole-colony transfer.
+    """
+    have = dict(stage_counts or {})
+    for stage, n in counts.items():
+        if stage not in have:
+            if at_claim:
+                return (
+                    f"This colony no longer has a '{_stage_word(stage)}' count. "
+                    f"Ask the keeper for a new link."
+                )
+            return f"This colony has no '{_stage_word(stage)}' count to take from."
+        available = int(have.get(stage) or 0)
+        if int(n) > available:
+            if at_claim:
+                return (
+                    f"The keeper no longer has {int(n)} {_stage_word(stage)} in this colony "
+                    f"(there are {available} now). Ask them for a new link."
+                )
+            return (
+                f"You can hand over at most {available} {_stage_word(stage)}. "
+                f"That's all this colony has."
+            )
+    if not at_claim and _counts_total(counts) >= _counts_total(have):
+        return "That's every animal in the colony. Choose Whole colony instead."
+    return None
+
+
+def _build_colony_snapshot(
+    db: Session, colony: Colony, seller: User, mode: str, counts: Optional[dict],
+) -> dict:
+    """Freeze what the buyer is being offered. Never location, notes or price."""
+    sp = None
+    if colony.species_id:
+        sp = db.query(InvertSpecies).filter(InvertSpecies.id == colony.species_id).first()
+    stage_counts = dict(colony.stage_counts or {})
+    return {
+        "domain": "colony",
+        "taxon": colony.taxon,
+        "name": colony.name,
+        "scientific_name": sp.scientific_name if sp is not None else None,
+        "common_name": (sp.common_names[0] if sp is not None and sp.common_names else None),
+        "species_id": str(colony.species_id) if colony.species_id else None,
+        "mode": mode,
+        "transfer_counts": dict(counts) if counts else None,
+        "stage_counts_at_transfer": stage_counts,
+        "total_at_transfer": _counts_total(stage_counts),
+        "count_is_estimated": bool(colony.count_is_estimated),
+        "breeder_handle": seller.username,
+        "bred_by_user_id": str(seller.id),
+        "origin_keeper_name": seller.display_name or seller.username,
+        "founded_date": colony.founded_date.isoformat() if colony.founded_date else None,
+        "source_colony_id": str(colony.id),
+        "transferred_at": None,  # stamped at claim
+    }
+
+
+def _transfer_kind(t: AnimalTransfer) -> str:
+    if t.colony_id is not None:
+        return "colony"
+    if t.animal_id is not None:
+        return "animal"
+    return "invert"
+
+
+def _colony_offer(db: Session, t: AnimalTransfer) -> dict:
+    """What a colony transfer hands over, read against the colony as it is NOW.
+
+    Partial: the requested counts. Full: every non-zero bucket the colony
+    currently holds (that is what "the whole colony" means at claim time).
+    Falls back to the frozen snapshot if the source row is gone.
+    """
+    snap = t.snapshot or {}
+    source = db.query(Colony).filter(Colony.id == t.colony_id).first()
+    if source is not None:
+        live = dict(source.stage_counts or {})
+        estimated = bool(source.count_is_estimated)
+    else:
+        live = dict(snap.get("stage_counts_at_transfer") or {})
+        estimated = bool(snap.get("count_is_estimated"))
+    if t.transfer_counts:
+        mode = "partial"
+        handed = {k: int(v) for k, v in t.transfer_counts.items()}
+    else:
+        mode = "full"
+        handed = {k: int(v) for k, v in live.items() if isinstance(v, int) and v > 0}
+    return {
+        "colony_mode": mode,
+        "transfer_counts": handed,
+        "transfer_total": _counts_total(handed),
+        # A partial sale shows only what's being handed over: the seller's
+        # whole headcount is their business, not the link holder's.
+        "colony_total": _counts_total(live) if mode == "full" else None,
+        "count_is_estimated": estimated,
+    }
+
+
+def _colony_label(mode: Optional[str], counts: Optional[dict]) -> str:
+    if mode != "partial":
+        return "Whole colony"
+    phrase = _counts_phrase(counts)
+    total = _counts_total(counts)
+    return f"{total} from the colony" + (f" ({phrase})" if phrase else "")
+
+
 def _web_base() -> str:
     return getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
 
@@ -282,6 +424,75 @@ async def create_animal_transfer(
     )
 
 
+@router.post("/colonies/{colony_id}/transfer", response_model=TransferCreateResponse)
+@policy("owner_only")
+async def create_colony_transfer(
+    colony_id: uuidlib.UUID,
+    body: ColonyTransferCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a claim link for a whole colony or part of it. Free, like the
+    animal transfer. Nothing is taken out of the colony yet: the keeper can
+    still cancel, so counts move only when the buyer claims."""
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+    if colony.transferred_out_at is not None:
+        raise HTTPException(status_code=400, detail="This colony has already been transferred.")
+    if colony.ended_at is not None:
+        raise HTTPException(status_code=400, detail="This colony has ended, so it can't be transferred.")
+    if not colony.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="This colony is archived. Unarchive it before transferring it.",
+        )
+
+    counts = None
+    if body.mode == "partial":
+        counts = {k: int(v) for k, v in (body.counts or {}).items()}
+        err = partial_counts_error(colony.stage_counts, counts, at_claim=False)
+        if err:
+            raise HTTPException(status_code=400, detail=err)
+
+    snapshot = _build_colony_snapshot(db, colony, current_user, body.mode, counts)
+    token = secrets.token_urlsafe(32)
+    expires_at = _now() + timedelta(days=body.expires_in_days or TRANSFER_DEFAULT_TTL_DAYS)
+
+    transfer = AnimalTransfer(
+        id=uuidlib.uuid4(),
+        token=token,
+        colony_id=colony.id,
+        from_user_id=current_user.id,
+        status="pending",
+        snapshot=snapshot,
+        transfer_counts=counts,
+        note=(body.note or None),
+        sale_price=body.sale_price,
+        include_photos=body.include_photos,
+        expires_at=expires_at,
+    )
+    db.add(transfer)
+    db.commit()
+    db.refresh(transfer)
+
+    analytics_events.capture("transfer_created", current_user.id, {
+        "taxon": colony.taxon,
+        "species_id": snapshot.get("species_id"),
+        "domain": "colony",
+        "colony_mode": body.mode,
+    })
+
+    return TransferCreateResponse(
+        token=token,
+        claim_url=f"{_web_base()}/claim/{token}",
+        expires_at=transfer.expires_at,
+    )
+
+
 @router.get("/transfers/{token}", response_model=TransferPreview)
 @policy("public")
 async def preview_transfer(
@@ -295,14 +506,17 @@ async def preview_transfer(
         raise HTTPException(status_code=404, detail="Transfer not found")
 
     snap = transfer.snapshot or {}
+    kind = _transfer_kind(transfer)
     photo_urls: list[str] = []
     if transfer.include_photos:
-        # Polymorphic source — HV animals attach photos via Photo.animal_id.
-        photo_filter = (
-            Photo.animal_id == transfer.animal_id
-            if transfer.animal_id is not None
-            else Photo.invert_id == transfer.invert_id
-        )
+        # Polymorphic source — HV animals attach photos via Photo.animal_id,
+        # colonies via Photo.colony_id.
+        if kind == "colony":
+            photo_filter = Photo.colony_id == transfer.colony_id
+        elif kind == "animal":
+            photo_filter = Photo.animal_id == transfer.animal_id
+        else:
+            photo_filter = Photo.invert_id == transfer.invert_id
         photos = (
             db.query(Photo)
             .filter(photo_filter)
@@ -315,7 +529,15 @@ async def preview_transfer(
         "authed": viewer is not None,
     })
 
+    # Colony: what is being handed over, "25 of ~360". Deliberately nothing
+    # else from the colony row -- no location, notes or price.
+    colony_fields: dict = {}
+    if kind == "colony":
+        colony_fields = _colony_offer(db, transfer)
+
     return TransferPreview(
+        kind=kind,
+        **colony_fields,
         status=_effective_status(transfer),
         taxon=snap.get("taxon", "other"),
         name=snap.get("name"),
@@ -469,9 +691,249 @@ async def _claim_animal_transfer(
 
     return {
         "id": str(new_animal.id),
+        "kind": "animal",
         "taxon": new_animal.taxon,
         "name": new_animal.name,
         "scientific_name": new_animal.scientific_name,
+    }
+
+
+def _was_new_signup(current_user: User, body: "Optional[ClaimBody]"):
+    """Same attribution rule as the invert/animal claim paths."""
+    if body is not None and body.new_signup is not None:
+        return body.new_signup, "resume_marker"
+    was_new = False
+    try:
+        created = current_user.created_at
+        if created is not None:
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            was_new = (_now() - created) <= timedelta(minutes=15)
+    except Exception:
+        pass
+    return was_new, "age_backstop"
+
+
+async def _claim_colony_transfer(
+    db: Session,
+    transfer: AnimalTransfer,
+    current_user: User,
+    body: "Optional[ClaimBody]",
+) -> dict:
+    """Colony claim path (ctr_20261008). One transaction:
+
+    Full    -- a new colony for the buyer carrying the whole population; the
+               source is badged transferred_out_at and leaves the seller's
+               list and cap.
+    Partial -- the counts are re-checked against the source AS IT IS NOW (409
+               if the keeper no longer has them), the buyer gets a colony with
+               exactly those counts, and the source is reduced through one
+               'removed' event per stage so its population history stays true.
+               The source stays active.
+
+    In both cases the buyer's counts arrive as 'added' events, so their
+    population history starts complete instead of from a number with no
+    events behind it.
+
+    Like the animal claim, this never 402s: the buyer is often a brand-new free
+    keeper and a claimed record is exempt from the cap on claim.
+    """
+    # Lock the transfer and the source colony so two claims of the same link,
+    # or two partial links racing for the same animals, can't both succeed.
+    locked = (
+        db.query(AnimalTransfer)
+        .filter(AnimalTransfer.id == transfer.id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if locked is None or locked.status != "pending":
+        raise HTTPException(status_code=409, detail="This colony has already been claimed.")
+    transfer = locked
+
+    source = (
+        db.query(Colony)
+        .filter(Colony.id == transfer.colony_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="The source colony no longer exists.")
+    if source.transferred_out_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="This colony has already gone to another keeper.",
+        )
+    if source.ended_at is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="The keeper has ended this colony, so it can't be claimed. Ask them about it.",
+        )
+
+    partial = bool(transfer.transfer_counts)
+    if partial:
+        handed = {k: int(v) for k, v in transfer.transfer_counts.items()}
+        err = partial_counts_error(source.stage_counts, handed, at_claim=True)
+        if err:
+            raise HTTPException(status_code=409, detail=err)
+    else:
+        handed = {
+            k: int(v) for k, v in (source.stage_counts or {}).items()
+            if isinstance(v, int) and not isinstance(v, bool)
+        }
+
+    snap = transfer.snapshot or {}
+    today = _now().date()
+    seller_handle = snap.get("breeder_handle")
+
+    new_colony = Colony(
+        id=uuidlib.uuid4(),
+        user_id=current_user.id,
+        taxon=source.taxon,
+        species_id=source.species_id,
+        name=source.name,
+        # Same rule as an invert claim: acquired today, bought.
+        date_acquired=today,
+        # A whole colony keeps the line's start date; a split starts a new line.
+        founded_date=(today if partial else source.founded_date),
+        source="bought",
+        # Buckets start at zero and are filled by the 'added' events below.
+        stage_counts={k: 0 for k in handed},
+        count_is_estimated=bool(source.count_is_estimated),
+        # Husbandry setup (the buyer starts their own logs). Not location,
+        # notes, sitter note, enclosure link or visibility -- those are the
+        # seller's.
+        enclosure_type=source.enclosure_type,
+        enclosure_size=source.enclosure_size,
+        substrate_type=source.substrate_type,
+        substrate_depth=source.substrate_depth,
+        target_temp_min=source.target_temp_min,
+        target_temp_max=source.target_temp_max,
+        target_humidity_min=source.target_humidity_min,
+        target_humidity_max=source.target_humidity_max,
+        water_dish=source.water_dish,
+        visibility="private",
+        is_active=True,
+    )
+    db.add(new_colony)
+    db.flush()  # need new_colony.id for events, photos and the transfer link
+
+    arrived_note = (
+        f"Arrived through a transfer from @{seller_handle}" if seller_handle
+        else "Arrived through a transfer"
+    )
+    for stage, n in handed.items():
+        if n <= 0:
+            continue
+        db.add(ColonyEvent(
+            id=uuidlib.uuid4(),
+            colony_id=new_colony.id,
+            user_id=current_user.id,
+            event_type="added",
+            stage=stage,
+            count_delta=n,
+            occurred_at=today,
+            notes=arrived_note,
+        ))
+        _apply_delta(new_colony, stage, n)
+
+    if partial:
+        # Through the same bucket rule as a keeper-logged removal.
+        for stage, n in handed.items():
+            if n <= 0:
+                continue
+            db.add(ColonyEvent(
+                id=uuidlib.uuid4(),
+                colony_id=source.id,
+                user_id=source.user_id,
+                event_type="removed",
+                stage=stage,
+                count_delta=-n,
+                occurred_at=today,
+                destination=f"@{current_user.username}"[:200] if current_user.username else None,
+                notes="Transferred to a new keeper",
+            ))
+            _apply_delta(source, stage, -n)
+    else:
+        source.transferred_out_at = _now()
+
+    if transfer.include_photos:
+        src_photos = (
+            db.query(Photo)
+            .filter(Photo.colony_id == source.id)
+            .order_by(Photo.created_at.desc())
+            .all()
+        )
+        hero_set = False
+        for p in src_photos:
+            try:
+                new_url, new_thumb = await storage_service.copy_photo(p.url, p.thumbnail_url)
+            except Exception:
+                logger.exception("photo copy failed during claim (transfer %s, photo %s)", transfer.id, p.id)
+                continue
+            db.add(Photo(
+                id=uuidlib.uuid4(),
+                colony_id=new_colony.id,
+                url=new_url,
+                thumbnail_url=new_thumb,
+                caption=p.caption,
+                taken_at=p.taken_at,
+                created_at=datetime.utcnow(),
+            ))
+            if not hero_set:
+                new_colony.photo_url = new_url
+                hero_set = True
+
+    # Parity with colony create: the buyer is now keeping this species.
+    if new_colony.species_id:
+        sp = db.query(InvertSpecies).filter(InvertSpecies.id == new_colony.species_id).first()
+        if sp is not None:
+            sp.times_kept = (sp.times_kept or 0) + 1
+
+    transfer.status = "claimed"
+    transfer.to_user_id = current_user.id
+    transfer.claimed_colony_id = new_colony.id
+    transfer.claimed_at = _now()
+
+    db.commit()
+    db.refresh(new_colony)
+
+    was_new_signup, signup_attribution = _was_new_signup(current_user, body)
+    analytics_events.capture("transfer_claimed", current_user.id, {
+        "taxon": new_colony.taxon,
+        "was_new_signup": was_new_signup,
+        "signup_attribution": signup_attribution,
+        "domain": "colony",
+        "colony_mode": "partial" if partial else "full",
+    })
+    if was_new_signup:
+        analytics_events.capture("transfer_signup", current_user.id, {"taxon": new_colony.taxon})
+
+    try:
+        from app.services.notification_service import create_notification
+        colony_label = source.name or "your colony"
+        what = (
+            f"{_counts_total(handed)} from {colony_label}" if partial else colony_label
+        )
+        create_notification(
+            db,
+            user_id=transfer.from_user_id,
+            type="transfer_claimed",
+            title="Transfer claimed",
+            body=f"{current_user.username} claimed {what}.",
+            deeplink="/transfers",
+            data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
+        )
+    except Exception:
+        pass  # never block the claim on notification issues
+
+    return {
+        "id": str(new_colony.id),
+        "kind": "colony",
+        "taxon": new_colony.taxon,
+        "name": new_colony.name,
+        "scientific_name": snap.get("scientific_name"),
     }
 
 
@@ -494,7 +956,13 @@ async def claim_transfer(
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
     if transfer.status == "claimed":
-        raise HTTPException(status_code=409, detail="This animal has already been claimed.")
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This colony has already been claimed." if transfer.colony_id is not None
+                else "This animal has already been claimed."
+            ),
+        )
     if transfer.status == "cancelled":
         raise HTTPException(status_code=409, detail="This transfer was cancelled by the seller.")
     if transfer.status != "pending" or _is_expired(transfer):
@@ -509,6 +977,9 @@ async def claim_transfer(
     # HV animals take the parallel claim path (creates an Animal, not an Invert).
     if transfer.animal_id is not None:
         return await _claim_animal_transfer(db, transfer, current_user, body)
+    # Colonies too (creates a Colony; may be part of the source's population).
+    if transfer.colony_id is not None:
+        return await _claim_colony_transfer(db, transfer, current_user, body)
 
     source = db.query(Invert).filter(Invert.id == transfer.invert_id).first()
     if not source:
@@ -659,6 +1130,7 @@ async def claim_transfer(
 
     return {
         "id": str(new_invert.id),
+        "kind": "invert",
         "taxon": new_invert.taxon,
         "name": new_invert.name,
         "scientific_name": new_invert.scientific_name,
@@ -680,9 +1152,17 @@ async def cancel_transfer(
         raise HTTPException(status_code=403, detail="Not your transfer.")
     if transfer.status != "pending":
         raise HTTPException(status_code=409, detail=f"Can't cancel a {transfer.status} transfer.")
-    transfer.status = "cancelled"
-    transfer.cancelled_at = _now()
+    # Conditional UPDATE: a claim that commits between the read above and
+    # this write must win, or the seller would see "Cancelled" for animals
+    # the buyer already has (and, for a partial sale, already counted out).
+    changed = (
+        db.query(AnimalTransfer)
+        .filter(AnimalTransfer.id == transfer.id, AnimalTransfer.status == "pending")
+        .update({"status": "cancelled", "cancelled_at": _now()}, synchronize_session=False)
+    )
     db.commit()
+    if not changed:
+        raise HTTPException(status_code=409, detail="This transfer was claimed before it could be cancelled.")
     return {"status": "cancelled"}
 
 
@@ -690,25 +1170,34 @@ async def cancel_transfer(
 @policy("owner_only")
 async def list_transfers(
     role: str = "sent",
+    colony_id: Optional[uuidlib.UUID] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List the caller's transfers. role=sent (as seller) | received (as buyer)."""
+    """List the caller's transfers. role=sent (as seller) | received (as buyer).
+    `colony_id` narrows to one colony's links (the colony detail page)."""
     if role not in ("sent", "received"):
         raise HTTPException(status_code=400, detail="role must be 'sent' or 'received'")
 
     if role == "sent":
-        rows = db.query(AnimalTransfer).filter(
-            AnimalTransfer.from_user_id == current_user.id
-        ).order_by(AnimalTransfer.created_at.desc()).all()
+        q = db.query(AnimalTransfer).filter(AnimalTransfer.from_user_id == current_user.id)
     else:
-        rows = db.query(AnimalTransfer).filter(
-            AnimalTransfer.to_user_id == current_user.id
-        ).order_by(AnimalTransfer.created_at.desc()).all()
+        q = db.query(AnimalTransfer).filter(AnimalTransfer.to_user_id == current_user.id)
+    if colony_id is not None:
+        q = q.filter(AnimalTransfer.colony_id == colony_id)
+    rows = q.order_by(AnimalTransfer.created_at.desc()).all()
 
     out: list[TransferListItem] = []
     for t in rows:
         snap = t.snapshot or {}
+        kind = _transfer_kind(t)
+        colony_mode = None
+        transfer_counts = None
+        if kind == "colony":
+            colony_mode = "partial" if t.transfer_counts else "full"
+            transfer_counts = (
+                {k: int(v) for k, v in t.transfer_counts.items()} if t.transfer_counts else None
+            )
         counterparty = None
         if role == "sent" and t.to_user_id:
             buyer = db.query(User).filter(User.id == t.to_user_id).first()
@@ -724,6 +1213,13 @@ async def list_transfers(
             claimed_invert_id=str(t.claimed_invert_id) if t.claimed_invert_id else None,
             animal_id=str(t.animal_id) if t.animal_id else None,
             claimed_animal_id=str(t.claimed_animal_id) if t.claimed_animal_id else None,
+            colony_id=str(t.colony_id) if t.colony_id else None,
+            claimed_colony_id=str(t.claimed_colony_id) if t.claimed_colony_id else None,
+            kind=kind,
+            colony_mode=colony_mode,
+            transfer_counts=transfer_counts,
+            transfer_total=_counts_total(transfer_counts) if transfer_counts else None,
+            label=_colony_label(colony_mode, transfer_counts) if kind == "colony" else None,
             taxon=snap.get("taxon"),
             display_name=snap.get("name") or snap.get("common_name") or snap.get("scientific_name"),
             counterparty=counterparty,

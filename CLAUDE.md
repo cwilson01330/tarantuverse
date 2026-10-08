@@ -451,6 +451,8 @@
 
 - **Colony lifecycle (2026-10-08)**: `is_active=false` = archived (un-archiving enforces the free cap); `ended_at`/`end_reason` (crashed|sold|merged|other) = ended (`POST /colonies/{id}/end`, `/reopen`; reopen, like invert revive, is not capped). Both leave lists and the cap; ended colonies 404 on `/col` for non-owners.
 
+- **Colony transfers (2026-10-08)**: `animal_transfers` takes a third source, `colony_id` (one-source CHECK = exactly one of invert/animal/colony; migration `ctr_20261008_colony_transfers`). `POST /colonies/{id}/transfer` (owner-only) with `mode` full|partial + `counts`; `transfer_counts` NULL = whole colony. Nothing leaves the source until claim; a partial claim re-checks counts (409 if the colony shrank) and decrements the source through `removed` colony_events; the buyer's colony gets its counts as `added` events. Full claim sets `colonies.transferred_out_at`. Claim is cap-exempt like animal claims. Preview never carries price/location/notes.
+
 - **Full ZIP export streams from a spooled temp file** and only fetches photo URLs under `R2_PUBLIC_URL` (`_is_our_photo_url`), max 25 MB each — never build it as one in-memory bytes blob on the 512 MB instance.
 
 - **Password & Secret Management**:

@@ -28,6 +28,7 @@ import {
   type SharedCollection,
   type SharedWithMe,
 } from '@/lib/coKeepers'
+import { cancelColonyTransfer, listSentTransfers, type ColonyTransferRow } from '@/lib/colonies'
 
 const BTN = 'px-4 py-2 rounded-xl font-medium transition disabled:opacity-50'
 const BTN_PRIMARY = `${BTN} bg-gradient-brand text-white shadow-gradient-brand hover:opacity-90`
@@ -225,6 +226,8 @@ export default function SharingPage() {
               onInvite={(email, role) => act('invite', async () => { setJustInvited(await coKeeperApi.invite(token, email, role)) })} />
           )}
         </section>
+
+        {token && <SentTransfers token={token} />}
       </div>
       <UpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} source="shared_keeping"
         feature="Co-keepers" description={upgrade ?? ''} />
@@ -269,6 +272,94 @@ function InviteForm({ disabled, ownEmail, onInvite }: {
       {err && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{err}</p>}
       <button type="submit" className={BTN_PRIMARY} disabled={disabled}>Send invite</button>
     </form>
+  )
+}
+
+const TRANSFER_STATUS: Record<string, string> = {
+  pending: 'Waiting to be claimed',
+  claimed: 'Claimed',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+}
+
+/** Claim links this keeper has made, for animals and colonies (whole or part). */
+function SentTransfers({ token }: { token: string }) {
+  const [rows, setRows] = useState<ColonyTransferRow[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      // Herpetoverse animals ride the same table; they belong on that site.
+      setRows((await listSentTransfers(token)).filter((r) => r.kind !== 'animal'))
+      setErr(null)
+    } catch {
+      setErr('Couldn’t load your transfer links.')
+    }
+  }, [token])
+
+  useEffect(() => { void load() }, [load])
+
+  const cancel = async (r: ColonyTransferRow) => {
+    if (!confirm('Cancel this transfer link? Anyone holding it won’t be able to claim.')) return
+    setBusy(r.token)
+    try {
+      await cancelColonyTransfer(token, r.token)
+      await load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not cancel the transfer.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const href = (r: ColonyTransferRow): string | null =>
+    r.kind === 'colony' && r.colony_id
+      ? `/dashboard/colonies/${r.colony_id}`
+      : r.invert_id ? `/dashboard/inverts/${r.invert_id}` : null
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold text-theme-primary">Transfers you&apos;ve sent</h2>
+        <p className="text-sm text-theme-secondary">
+          Claim links you made for animals and colonies. Make a new one from an animal&apos;s or colony&apos;s page.
+        </p>
+      </div>
+      {err && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{err}</p>}
+      {rows === null && !err && <div className="h-16 rounded-xl bg-surface-elevated animate-pulse" />}
+      {rows?.length === 0 && <p className="text-theme-secondary">No transfer links yet.</p>}
+      {rows?.map((r) => {
+        const link = href(r)
+        const name = r.display_name || (r.kind === 'colony' ? 'Colony' : 'Animal')
+        return (
+          <div key={r.id} className="p-4 rounded-2xl bg-surface border border-theme flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="font-semibold text-theme-primary">
+                {link ? <Link href={link} className="hover:underline">{name}</Link> : name}
+                {r.kind === 'colony' && (
+                  <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200">
+                    Colony
+                  </span>
+                )}
+              </p>
+              {r.kind === 'colony' && r.label && <p className="text-sm text-theme-secondary">{r.label}</p>}
+              <p className="text-xs text-theme-tertiary">
+                {TRANSFER_STATUS[r.status] ?? r.status}
+                {r.status === 'claimed' && r.counterparty ? ` by @${r.counterparty}` : ''}
+                {r.status === 'claimed' && r.claimed_at ? ` · ${fmt(r.claimed_at)}` : ''}
+                {r.status === 'pending' ? ` · link works until ${fmt(r.expires_at)}` : ''}
+              </p>
+            </div>
+            {r.status === 'pending' && (
+              <button className={BTN_SECONDARY} disabled={busy === r.token} onClick={() => cancel(r)}>
+                {busy === r.token ? 'Cancelling…' : 'Cancel link'}
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </section>
   )
 }
 

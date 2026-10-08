@@ -286,6 +286,33 @@ export async function listWeightLogs(animalId: string): Promise<WeightLog[]> {
   return data;
 }
 
+export interface WeightTrendPoint {
+  weighed_at: string;
+  weight_g: string;
+}
+
+/**
+ * `GET /animals/{id}/weight-logs/trend`. `loss_pct_30d` is POSITIVE when the
+ * animal lost weight and NEGATIVE when it gained. `alert` is already
+ * suppressed server-side while the animal is brumating, and is only ever true
+ * when the species has a threshold (`alert_threshold_pct`).
+ */
+export interface WeightTrendResponse {
+  /** Ascending by `weighed_at`. */
+  series: WeightTrendPoint[];
+  latest_weight_g: string | null;
+  loss_pct_30d: string | null;
+  alert: boolean;
+  alert_threshold_pct: string | null;
+}
+
+export async function getWeightTrend(animalId: string): Promise<WeightTrendResponse> {
+  const { data } = await apiClient.get<WeightTrendResponse>(
+    `/animals/${encodeURIComponent(animalId)}/weight-logs/trend`,
+  );
+  return data;
+}
+
 export async function listFeedings(animalId: string): Promise<FeedingLog[]> {
   const { data } = await apiClient.get<FeedingLog[]>(
     `/animals/${encodeURIComponent(animalId)}/feedings`,

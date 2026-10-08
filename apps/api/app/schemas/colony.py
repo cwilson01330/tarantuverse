@@ -195,6 +195,10 @@ class ColonyResponse(BaseModel):
     end_reason: Optional[str] = None
     end_notes: Optional[str] = None
 
+    # Set when the whole colony was handed to another keeper through a claimed
+    # transfer link (ctr_20261008). A partial transfer never sets it.
+    transferred_out_at: Optional[datetime] = None
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 

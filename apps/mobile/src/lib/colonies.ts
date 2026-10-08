@@ -126,6 +126,9 @@ export interface Colony {
   ended_at?: string | null;
   end_reason?: ColonyEndReason | null;
   end_notes?: string | null;
+  /** Set once the WHOLE colony was handed to another keeper (claimed transfer).
+   *  A partial transfer never sets it. */
+  transferred_out_at?: string | null;
   created_at: string;
   updated_at: string | null;
   total_count: number;
@@ -241,6 +244,66 @@ export async function endColony(id: string, payload: EndColonyPayload): Promise<
 export async function reopenColony(id: string): Promise<Colony> {
   const { data } = await apiClient.post<Colony>(`/colonies/${id}/reopen`, {});
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Transfers — the whole colony or part of it ("25 of 360"). Claiming happens
+// on the web claim page, same as an animal transfer.
+// ---------------------------------------------------------------------------
+
+export type ColonyTransferMode = 'full' | 'partial';
+
+export interface ColonyTransferPayload {
+  mode: ColonyTransferMode;
+  /** Partial only: {stage: n}, every n > 0 and no more than the bucket holds. */
+  counts?: StageCounts;
+  include_photos?: boolean;
+  /** Private to the seller. Never shown to the buyer. */
+  sale_price?: number | null;
+  note?: string | null;
+}
+
+export interface ColonyTransferCreated {
+  token: string;
+  claim_url: string;
+  expires_at: string;
+}
+
+export interface ColonyTransferRow {
+  id: string;
+  token: string;
+  status: 'pending' | 'claimed' | 'cancelled' | 'expired';
+  colony_id: string | null;
+  colony_mode: ColonyTransferMode | null;
+  transfer_counts: StageCounts | null;
+  transfer_total: number | null;
+  /** Ready to show, e.g. "Whole colony" or "25 from the colony (20 adults, 5 juveniles)". */
+  label: string | null;
+  counterparty: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  expires_at: string;
+}
+
+/** Make a claim link. Nothing leaves the colony until the buyer claims. */
+export async function createColonyTransfer(
+  id: string,
+  payload: ColonyTransferPayload,
+): Promise<ColonyTransferCreated> {
+  const { data } = await apiClient.post<ColonyTransferCreated>(`/colonies/${id}/transfer`, payload);
+  return data;
+}
+
+/** This colony's transfer links, newest first. */
+export async function listColonyTransfers(id: string): Promise<ColonyTransferRow[]> {
+  const { data } = await apiClient.get<ColonyTransferRow[]>('/transfers/', {
+    params: { role: 'sent', colony_id: id },
+  });
+  return data;
+}
+
+export async function cancelColonyTransfer(transferToken: string): Promise<void> {
+  await apiClient.post(`/transfers/${encodeURIComponent(transferToken)}/cancel`, {});
 }
 
 export async function getColony(id: string): Promise<Colony> {

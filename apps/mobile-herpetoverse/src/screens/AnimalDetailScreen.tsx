@@ -58,14 +58,17 @@ import { AnimalHero } from '../components/reptile-detail/AnimalHero';
 import { AnimalTimeline } from '../components/reptile-detail/AnimalTimeline';
 import { FeedingCard } from '../components/reptile-detail/FeedingCard';
 import { StatStrip } from '../components/reptile-detail/StatStrip';
+import { WeightCard } from '../components/reptile-detail/WeightCard';
 import {
   ANIMAL_TAXA,
   type Animal,
   type FeedingLog,
   type ShedLog,
   type WeightLog,
+  type WeightTrendResponse,
   animalTitle,
   getAnimal,
+  getWeightTrend,
   listFeedings,
   listSheds,
   listWeightLogs,
@@ -94,6 +97,8 @@ export function AnimalDetailScreen() {
   const [animal, setAnimal] = useState<Animal | null>(null);
   const [animalError, setAnimalError] = useState<string | null>(null);
   const [weights, setWeights] = useState<WeightLog[]>([]);
+  const [trend, setTrend] = useState<WeightTrendResponse | null>(null);
+  const [trendFailed, setTrendFailed] = useState(false);
   const [feedings, setFeedings] = useState<FeedingLog[]>([]);
   const [sheds, setSheds] = useState<ShedLog[]>([]);
   const [photos, setPhotos] = useState<Photo[] | null>(null);
@@ -152,6 +157,25 @@ export function AnimalDetailScreen() {
       weightsR.status === 'rejected' || feedingsR.status === 'rejected' || shedsR.status === 'rejected',
     );
     if (photosR.status === 'fulfilled') setPhotos(photosR.value);
+
+    // 30-day weight-loss notice. Fetched after the animal resolves so a died
+    // animal (a closed historical record) never asks for it, and not awaited
+    // so it can't hold up the rest of the screen. A failure leaves the chart
+    // (drawn from the weigh-ins above) and shows a one-line note.
+    if (animalR.status === 'fulfilled' && !animalR.value.died_at) {
+      getWeightTrend(id)
+        .then((t) => {
+          setTrend(t);
+          setTrendFailed(false);
+        })
+        .catch(() => {
+          setTrend(null);
+          setTrendFailed(true);
+        });
+    } else {
+      setTrend(null);
+      setTrendFailed(false);
+    }
   }, [id]);
 
   const undoDied = useCallback(async () => {
@@ -336,6 +360,11 @@ export function AnimalDetailScreen() {
         />}
 
         <StatStrip animal={animal} weights={weights} feedings={feedings} />
+
+        {/* Weight — chart (2+ weigh-ins), latest + change, and the 30-day
+            loss notice. Same place as HV web: after the animal's header
+            stats, before the log history. */}
+        <WeightCard weights={weights} trend={trend} trendFailed={trendFailed} canLog={canLog} />
 
         <Section title="Photos">
           <PhotosStrip

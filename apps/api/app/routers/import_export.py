@@ -19,10 +19,12 @@ from app.database import get_db
 from app.models.user import User
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import limiter
-from app.services import import_service
+from app.services import colony_import_service, import_service
 from app.services.export_service import ExportService
 from app.services.activity_service import create_activity
+from app.routers.colonies import create_colony_row
 from app.routers.inverts import create_invert_row
+from app.schemas.colony import ColonyCreate
 from app.schemas.invert import InvertCreate
 from app.models.animal import Animal
 from app.models.tarantula import Sex, Source
@@ -54,8 +56,16 @@ async def _read_source(
     Published to web, or Google returns an HTML sign-in page (handled below).
     OAuth account-connect is a planned fast-follow.
     """
+    from app.services.import_service import MAX_IMPORT_BYTES
+    too_big = HTTPException(
+        status_code=413,
+        detail="That file is over 5 MB. Split it into smaller files and import them one at a time.",
+    )
     if file is not None:
-        return await file.read(), (file.filename or "upload.csv")
+        content = await file.read(MAX_IMPORT_BYTES + 1)
+        if len(content) > MAX_IMPORT_BYTES:
+            raise too_big
+        return content, (file.filename or "upload.csv")
     if sheet_url and sheet_url.strip():
         url = sheet_url.strip()
         if "format=csv" in url or "output=csv" in url:
@@ -81,6 +91,8 @@ async def _read_source(
                     "then paste the link again."
                 ),
             )
+        if len(resp.content) > MAX_IMPORT_BYTES:
+            raise too_big
         return resp.content, "sheet.csv"
     raise HTTPException(status_code=400, detail="Provide a file or a Google Sheet link.")
 
@@ -100,13 +112,19 @@ async def import_analyze(
     screen. No writes.
 
     `target` picks the destination surface: "invert" (Tarantuverse `inverts`,
-    default) or "animal" (Herpetoverse `animals`). Each has its own field set,
-    header synonyms, taxa, and species catalog."""
+    default), "colony" (Tarantuverse population colonies) or "animal"
+    (Herpetoverse `animals`). Each has its own field set, header synonyms,
+    taxa, and species catalog."""
     content, filename = await _read_source(file, sheet_url)
     try:
         if target == "animal":
             return import_service.analyze_animals(
                 db, current_user, content, filename, default_taxon or "snake"
+            )
+        if target == "colony":
+            return colony_import_service.analyze_colonies(
+                db, current_user, content, filename,
+                default_taxon or colony_import_service.COLONY_DEFAULT_TAXON,
             )
         return import_service.analyze(db, current_user, content, filename, default_taxon or "tarantula")
     except HTTPException:
@@ -241,6 +259,100 @@ async def _import_commit_animals(
     }
 
 
+MAX_CREATED_REPORTED = 100
+
+
+async def _import_commit_colonies(
+    db: Session,
+    current_user: User,
+    content: bytes,
+    filename: str,
+    col_map: Dict[str, Optional[str]],
+    default_taxon: str,
+    unmapped_to_notes: bool,
+) -> Dict[str, Any]:
+    """Create population colonies from the confirmed mapping.
+
+    Every row goes through `create_colony_row`, the helper the create endpoint
+    uses, so the free-tier cap (a colony counts as 1), species times_kept,
+    location canonicalisation and default visibility behave as for a colony
+    added by hand. Cap-aware: the first 402 stops the run and is reported.
+
+    Duplicates (same name + taxon as an active colony, or an earlier row in the
+    same file) are always skipped. There is no "update" mode here on purpose:
+    an import that overwrote a colony's headcount would change the number
+    without a population event, leaving its history out of step with its count.
+    """
+    _headers, rows = import_service.parse_bytes(content, filename, json_keys=("colonies",))
+
+    seen = colony_import_service.existing_colony_keys(db, current_user.id)
+
+    imported = skipped = error_rows = warning_rows = 0
+    errors: List[str] = []
+    warnings: List[str] = []
+    created: List[Dict[str, Any]] = []
+    cap_reached = False
+
+    for i, raw in enumerate(rows):
+        norm = colony_import_service.normalize_colony_row(
+            db, raw, col_map, default_taxon, unmapped_to_notes
+        )
+        if norm["errors"]:
+            error_rows += 1
+            errors.append(f"Row {i + 1} ({norm['display_name']}): {', '.join(norm['errors'])}")
+            continue
+
+        payload = norm["payload"]
+        key = colony_import_service.colony_key(payload)
+        if key in seen:
+            skipped += 1
+            continue
+
+        try:
+            create = ColonyCreate(**payload)
+        except Exception as e:
+            error_rows += 1
+            errors.append(f"Row {i + 1} ({norm['display_name']}): {e}")
+            continue
+
+        try:
+            colony = create_colony_row(db, current_user, create, enforce_limit=True)
+        except HTTPException as he:
+            if he.status_code == status.HTTP_402_PAYMENT_REQUIRED:
+                cap_reached = True
+                break
+            raise
+        imported += 1
+        seen.add(key)  # dedupe later rows within the same file
+        if norm["warnings"]:
+            warning_rows += 1
+            warnings.append(f"Row {i + 1} ({norm['display_name']}): {'; '.join(norm['warnings'])}")
+        if len(created) < MAX_CREATED_REPORTED:
+            created.append({"id": str(colony.id), "name": colony.name, "taxon": colony.taxon})
+
+    if imported:
+        await create_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="import_collection",
+            target_type="collection",
+            target_id=current_user.id,
+            metadata={"imported": imported, "updated": 0, "target": "colony"},
+        )
+
+    return {
+        "imported": imported,
+        "updated": 0,
+        "skipped_duplicates": skipped,
+        "error_rows": error_rows,
+        "errors": errors[:50],
+        "warning_rows": warning_rows,
+        "warnings": warnings[:50],
+        "cap_reached": cap_reached,
+        "created": created,
+    }
+
+
 @router.post("/import/commit", status_code=status.HTTP_200_OK)
 @policy("owner_only")
 async def import_commit(
@@ -258,12 +370,20 @@ async def import_commit(
     stops at the free-tier limit and reports it. Duplicates (same name +
     scientific name) are skipped or updated per `duplicate_mode`.
 
-    `target="animal"` routes to the Herpetoverse `animals` table instead."""
+    `target="animal"` routes to the Herpetoverse `animals` table instead;
+    `target="colony"` creates population colonies (duplicates always skipped)."""
     content, filename = await _read_source(file, sheet_url)
     try:
         col_map: Dict[str, Optional[str]] = json.loads(mapping)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid column mapping.")
+
+    if target == "colony":
+        return await _import_commit_colonies(
+            db, current_user, content, filename, col_map,
+            default_taxon or colony_import_service.COLONY_DEFAULT_TAXON,
+            unmapped_to_notes,
+        )
 
     if target == "animal":
         return await _import_commit_animals(

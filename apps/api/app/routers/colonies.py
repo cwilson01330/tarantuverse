@@ -241,18 +241,23 @@ async def list_colonies(
     return items
 
 
-@router.post("/", response_model=ColonyResponse, status_code=status.HTTP_201_CREATED)
-@policy("keeper")
-async def create_colony(
+def create_colony_row(
+    db: Session,
+    owner: User,
     payload: ColonyCreate,
-    collection: Optional[UUID] = Query(None, description="Owner's user id to add to a shared collection."),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
-    owner = access.owner  # the colony, its cap and its enclosure are the OWNER's
-    # A colony counts as 1 animal toward the free-tier cap.
-    enforce_collection_limit(db, owner)
+    enforce_limit: bool = True,
+) -> Colony:
+    """Create one colony for `owner`. Shared by the create endpoint and the bulk
+    importer so both go through the same cap check, enclosure/species
+    validation, location canonicalisation, default visibility and species
+    times_kept bump.
+
+    A colony counts as 1 animal toward the free-tier cap. enforce_limit=False
+    lets a caller gate capacity itself; the importer leaves it on and stops at
+    the first 402.
+    """
+    if enforce_limit:
+        enforce_collection_limit(db, owner)
     _verify_enclosure(db, payload.enclosure_id, owner)
     _verify_species(db, payload.species_id)
 
@@ -270,6 +275,20 @@ async def create_colony(
 
     db.commit()
     db.refresh(colony)
+    return colony
+
+
+@router.post("/", response_model=ColonyResponse, status_code=status.HTTP_201_CREATED)
+@policy("keeper")
+async def create_colony(
+    payload: ColonyCreate,
+    collection: Optional[UUID] = Query(None, description="Owner's user id to add to a shared collection."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
+    owner = access.owner  # the colony, its cap and its enclosure are the OWNER's
+    colony = create_colony_row(db, owner, payload)
     return ColonyResponse(**_build_response(colony, db))
 
 
