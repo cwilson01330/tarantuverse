@@ -11,7 +11,8 @@ from datetime import date, datetime
 import uuid
 
 from app.models.invert_species import INVERT_TAXON_VALUES
-from app.models.colony import COLONY_EVENT_TYPES
+from app.models.colony import COLONY_EVENT_TYPES, COLONY_END_REASONS
+from app.schemas.death import latest_local_today
 
 _SOURCES = ("bought", "bred", "wild_caught")
 _VISIBILITY = ("private", "public")
@@ -188,6 +189,12 @@ class ColonyResponse(BaseModel):
     visibility: str
     is_active: bool
 
+    # Set when the colony has ended (POST /colonies/{id}/end); all None while
+    # it is still running. Optional so older clients never see a new shape.
+    ended_at: Optional[date] = None
+    end_reason: Optional[str] = None
+    end_notes: Optional[str] = None
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -215,6 +222,10 @@ class ColonyListItem(BaseModel):
     species_scientific_name: Optional[str] = None
     species_missing: bool = False
 
+    # Only populated on the "ended" / "past" views; None for a running colony.
+    ended_at: Optional[date] = None
+    end_reason: Optional[str] = None
+
     # Last ACCEPTED feeding, so the collection card can say "Fed 4d ago" like
     # every other card. No overdue flag: a colony has no life_stage to resolve
     # a cadence from, and guessing one would be fabrication.
@@ -225,6 +236,43 @@ class ColonyListItem(BaseModel):
     change_30d: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ColonyEndRequest(BaseModel):
+    """End a colony. The colony equivalent of MarkDiedRequest.
+
+    Only `reason` is required: a population doesn't die, it ends, and why is the
+    one thing worth recording. The date defaults to today; notes are optional.
+    """
+
+    ended_at: Optional[date] = None
+    reason: str
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _known_reason(cls, v: str) -> str:
+        if v not in COLONY_END_REASONS:
+            raise ValueError(f"reason must be one of: {', '.join(COLONY_END_REASONS)}")
+        return v
+
+    @field_validator("ended_at")
+    @classmethod
+    def _not_in_future(cls, v: Optional[date]) -> Optional[date]:
+        # Judged against the latest calendar day anywhere on earth (UTC+14), not
+        # the server's UTC date -- same rule as MarkDiedRequest -- so a keeper
+        # ahead of UTC recording "today" isn't told it hasn't happened yet.
+        if v is not None and v > latest_local_today():
+            raise ValueError("ended_at cannot be in the future")
+        return v
+
+    @field_validator("notes")
+    @classmethod
+    def _blank_notes_are_none(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None
 
 
 # ---------- ColonyEvent ----------

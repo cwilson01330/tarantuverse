@@ -22,7 +22,7 @@
  */
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, apiFetch } from '@/lib/apiClient'
 import {
   ANIMAL_TAXA,
@@ -36,6 +36,21 @@ import {
   relativeDays,
 } from '@/lib/animals'
 import { lastFedTextClass } from '@/lib/cgd'
+import { LocationRenameDialog } from '@/components/LocationPicker'
+import {
+  groupByLocation,
+  listLocations,
+  locationKey,
+  renameLocation,
+  UNASSIGNED_KEY,
+  type LocationItem,
+} from '@/lib/locations'
+import {
+  COPY as LIFE,
+  fmtDay,
+  listDeceasedAnimals,
+  tenureLabel,
+} from '@/lib/lifecycle'
 
 type Taxon = AnimalTaxon
 
@@ -58,6 +73,8 @@ interface ReptileRow {
   last_fed_at: string | null
   /** Drives the CGD-aware Last fed coloring on the card. */
   feeds_on_cgd: boolean
+  /** Room / rack / shelf (see lib/locations). */
+  location: string | null
   created_at: string
 }
 
@@ -71,6 +88,7 @@ function animalRow(a: Animal): ReptileRow {
     current_weight_g: a.current_weight_g,
     last_fed_at: a.last_fed_at,
     feeds_on_cgd: a.feeds_on_cgd,
+    location: a.location ?? null,
     created_at: a.created_at,
   }
 }
@@ -95,6 +113,69 @@ export default function ReptilesPage() {
   const [activeTaxon, setActiveTaxon] = useState<Taxon | null>(null)
   // Free-tier usage counter (X / N). null until loaded; hidden for premium.
   const [limits, setLimits] = useState<AnimalLimits | null>(null)
+  // The "Deceased" archive (ADR-015, handoff §14.5). The default list above
+  // is the living collection only; died animals are kept in full and reached
+  // through this view. Best-effort and hidden until there is at least one.
+  const [deceased, setDeceased] = useState<Animal[]>([])
+  const [view, setView] = useState<'active' | 'deceased'>('active')
+  // Group by keeper-defined location (room / rack / shelf). The toggle only
+  // renders once a location exists somewhere, so a keeper who never set one
+  // sees exactly the page they had before.
+  const [groupByLoc, setGroupByLoc] = useState(false)
+  const [keeperLocations, setKeeperLocations] = useState<LocationItem[]>([])
+  const [renameTarget, setRenameTarget] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      setGroupByLoc(window.localStorage.getItem('hv_collection_group_by_location') === '1')
+    } catch {
+      // storage unavailable — default off
+    }
+  }, [])
+
+  function toggleGroupByLoc() {
+    const next = !groupByLoc
+    setGroupByLoc(next)
+    try {
+      window.localStorage.setItem('hv_collection_group_by_location', next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
+  const loadLocations = useCallback(async () => {
+    try {
+      setKeeperLocations(await listLocations())
+    } catch {
+      // Best-effort — without the list the toggle falls back to the
+      // locations on the rows themselves.
+      setKeeperLocations([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadLocations()
+  }, [loadLocations])
+
+  useEffect(() => {
+    let cancelled = false
+    listDeceasedAnimals()
+      .then((data) => {
+        if (!cancelled) setDeceased(data)
+      })
+      .catch(() => {
+        // A failed archive fetch only hides the link; never blocks the grid.
+        if (!cancelled) setDeceased([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // With nothing deceased there is no archive to be viewing.
+  useEffect(() => {
+    if (view === 'deceased' && deceased.length === 0) setView('active')
+  }, [view, deceased.length])
 
   useEffect(() => {
     let cancelled = false
@@ -169,6 +250,52 @@ export default function ReptilesPage() {
     return activeTaxon ? rows.filter((r) => r.taxon === activeTaxon) : rows
   }, [rows, activeTaxon])
 
+  const hasAnyLocation =
+    keeperLocations.length > 0 || (rows ?? []).some((r) => !!r.location)
+  const grouped = groupByLoc && hasAnyLocation
+  const locationGroups = useMemo(
+    () => (grouped && visibleRows ? groupByLocation(visibleRows, (r) => r.location) : []),
+    [grouped, visibleRows],
+  )
+
+  /** Rename (or merge) a location from its group header. Merging is
+   *  confirmed with the count — it's the one action here that can't be undone
+   *  with a single click. */
+  async function submitRename(oldName: string, newName: string) {
+    const targetKey = locationKey(newName)
+    if (!targetKey || targetKey === locationKey(oldName)) {
+      setRenameTarget(null)
+      return
+    }
+    const existing = keeperLocations.find((l) => locationKey(l.name) === targetKey)
+    if (existing) {
+      const moving =
+        keeperLocations.find((l) => locationKey(l.name) === locationKey(oldName))?.count ?? 0
+      if (
+        !window.confirm(
+          `Merge into ${existing.name}? ${moving} ${moving === 1 ? 'animal' : 'animals'} from “${oldName}” will move to “${existing.name}”.`,
+        )
+      ) {
+        return
+      }
+    }
+    try {
+      const res = await renameLocation(oldName, newName)
+      setRenameTarget(null)
+      const landed = res.name ?? existing?.name ?? newName.replace(/\s+/g, ' ').trim()
+      setRows((prev) =>
+        prev
+          ? prev.map((r) =>
+              locationKey(r.location) === locationKey(oldName) ? { ...r, location: landed } : r,
+            )
+          : prev,
+      )
+      await loadLocations()
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : 'Could not rename location.')
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
       <header className="mb-8 flex items-start justify-between gap-4">
@@ -240,6 +367,58 @@ export default function ReptilesPage() {
         </div>
       )}
 
+      {/* Active / Deceased switch — only once something has died. Died
+          animals are kept in full but are not part of the living collection. */}
+      {rows !== null && deceased.length > 0 && (
+        <div className="mb-6 flex items-center gap-3 text-sm">
+          {view === 'active' ? (
+            <button
+              type="button"
+              onClick={() => setView('deceased')}
+              className="inline-flex items-center gap-1.5 text-neutral-400 hover:text-neutral-200 transition-colors"
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 rounded-full bg-neutral-500"
+              />
+              Deceased ({deceased.length})
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setView('active')}
+              className="inline-flex items-center gap-1.5 text-herp-teal hover:text-herp-lime transition-colors"
+            >
+              <span aria-hidden="true">←</span> Back to your collection
+            </button>
+          )}
+        </div>
+      )}
+
+      {view === 'deceased' && deceased.length > 0 ? (
+        <DeceasedArchive items={deceased} />
+      ) : (
+      <>
+      {/* Group by location — only once a location exists anywhere. */}
+      {rows !== null && rows.length > 0 && hasAnyLocation && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={toggleGroupByLoc}
+            role="switch"
+            aria-checked={groupByLoc}
+            title="Group by location"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+              groupByLoc
+                ? 'border-herp-teal/60 bg-herp-teal/10 text-herp-lime'
+                : 'border-neutral-800 bg-neutral-900/40 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+            }`}
+          >
+            <span aria-hidden="true">📍</span> By location
+          </button>
+        </div>
+      )}
+
       {/* Taxon filter — only shown when the keeper owns more than one
           taxon (a single-taxon collection needs no filter). Chips are
           registry-driven; only owned taxa appear. */}
@@ -280,6 +459,35 @@ export default function ReptilesPage() {
         <div className="p-8 rounded-lg border border-dashed border-neutral-800 bg-neutral-900/30 text-center text-sm text-neutral-400">
           No {activeTaxon ? ANIMAL_TAXA[activeTaxon].plural.toLowerCase() : 'animals'} in your collection yet.
         </div>
+      ) : grouped ? (
+        <div className="space-y-8">
+          {locationGroups.map((g) => (
+            <section key={g.key} aria-label={g.label}>
+              <div className="flex items-center gap-2 mb-3">
+                <span aria-hidden="true">{g.key === UNASSIGNED_KEY ? '∅' : '📍'}</span>
+                <h2 className="text-lg font-semibold text-white truncate">{g.label}</h2>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-neutral-800 text-neutral-400 tabular-nums">
+                  {g.rows.length}
+                </span>
+                {g.key !== UNASSIGNED_KEY && (
+                  <button
+                    type="button"
+                    onClick={() => setRenameTarget(g.label)}
+                    aria-label={`Rename ${g.label}`}
+                    className="text-xs text-neutral-500 hover:text-neutral-200 underline transition-colors"
+                  >
+                    Rename
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {g.rows.map((row) => (
+                  <ReptileCard key={`${row.taxon}:${row.id}`} row={row} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {(visibleRows ?? []).map((row) => (
@@ -287,7 +495,121 @@ export default function ReptilesPage() {
           ))}
         </div>
       )}
+      </>
+      )}
+
+      <LocationRenameDialog
+        open={renameTarget !== null}
+        current={renameTarget ?? ''}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={(next) => submitRename(renameTarget ?? '', next)}
+      />
     </div>
+  )
+}
+
+type ArchiveSort = 'recent' | 'tenure'
+
+function tenureMs(a: Animal): number {
+  if (!a.date_acquired || !a.died_at) return -1
+  const from = new Date(`${a.date_acquired.slice(0, 10)}T12:00:00`).getTime()
+  const to = new Date(`${a.died_at.slice(0, 10)}T12:00:00`).getTime()
+  return Number.isFinite(from) && Number.isFinite(to) ? to - from : -1
+}
+
+/** The "Deceased" view of the collection — mirrors HV mobile's DeceasedArchive
+ *  (§14.5). Flat and factual: a neutral dot, the date, and how long the animal
+ *  was in the keeper's care. "Longest in your care" is a sort, never the
+ *  default — it must not read as a leaderboard. */
+function DeceasedArchive({ items }: { items: Animal[] }) {
+  const [sort, setSort] = useState<ArchiveSort>('recent')
+
+  const rows = useMemo(
+    () =>
+      [...items].sort((a, b) =>
+        sort === 'tenure'
+          ? tenureMs(b) - tenureMs(a)
+          : (b.died_at ?? '').localeCompare(a.died_at ?? ''),
+      ),
+    [items, sort],
+  )
+
+  const sortChip = (value: ArchiveSort, label: string) => {
+    const on = sort === value
+    return (
+      <button
+        type="button"
+        onClick={() => setSort(value)}
+        aria-pressed={on}
+        className={`px-3 py-1 rounded-full border text-xs font-medium transition-colors ${
+          on
+            ? 'border-neutral-500 text-neutral-100'
+            : 'border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+        }`}
+      >
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <section aria-label="Deceased">
+      <p className="text-xs text-neutral-400">{LIFE.archiveSub(items.length)}</p>
+      <div className="flex flex-wrap gap-2 mt-3 mb-4" role="group" aria-label="Sort">
+        {sortChip('recent', 'Most recent')}
+        {sortChip('tenure', 'Longest in your care')}
+      </div>
+      <ul className="space-y-2">
+        {rows.map((a) => {
+          const name = animalTitle(a)
+          const species =
+            a.scientific_name && a.scientific_name !== name ? a.scientific_name : null
+          const tenure = tenureLabel(a.date_acquired, a.died_at)
+          const line = [
+            `Died ${fmtDay(a.died_at)}`,
+            tenure ? `in your care ${tenure}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+          const { glyph } = taxonMeta(a.taxon)
+          return (
+            <li key={a.id}>
+              <Link
+                href={`/app/reptiles/${a.id}`}
+                className="flex items-center gap-3 p-3 rounded-lg border border-neutral-800 bg-neutral-900/40 hover:border-neutral-700 hover:bg-neutral-900/60 transition-colors"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-neutral-900 text-lg"
+                >
+                  {glyph}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-neutral-100 truncate">
+                    {name}
+                  </span>
+                  {species && (
+                    <span className="block text-xs italic text-neutral-500 truncate">
+                      {species}
+                    </span>
+                  )}
+                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-400">
+                    <span
+                      aria-hidden="true"
+                      className="inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-neutral-500"
+                    />
+                    <span className="truncate">{line}</span>
+                  </span>
+                </span>
+                <span aria-hidden="true" className="text-neutral-600">
+                  ›
+                </span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 

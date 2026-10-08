@@ -368,7 +368,7 @@ function NewPairingScreen() {
                 required
                 hint={
                   males.length === 0
-                    ? `No ${taxon}s with male or unknown sex in your collection yet.`
+                    ? `No ${ANIMAL_TAXA[taxon].plural.toLowerCase()} with male or unknown sex in your collection yet.`
                     : 'Male or unknown-sex reptiles only.'
                 }
               >
@@ -386,7 +386,7 @@ function NewPairingScreen() {
                 required
                 hint={
                   females.length === 0
-                    ? `No ${taxon}s with female or unknown sex in your collection yet.`
+                    ? `No ${ANIMAL_TAXA[taxon].plural.toLowerCase()} with female or unknown sex in your collection yet.`
                     : 'Female or unknown-sex reptiles only.'
                 }
               >

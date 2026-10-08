@@ -122,6 +122,9 @@ export interface Animal {
 
   photo_url: string | null
 
+  /** Room / rack / shelf (see lib/locations). Canonicalised server-side. */
+  location?: string | null
+
   is_public: boolean
   visibility: Visibility | null
 
@@ -137,6 +140,11 @@ export interface Animal {
   // action is suppressed. `provenance` is a frozen snapshot present only when
   // the animal arrived via a claimed transfer. See lib/transfers.ts.
   transferred_out_at?: string | null
+  // Death (ADR-015). A non-null `died_at` (YYYY-MM-DD) makes this a historical
+  // record. Set only via POST /animals/{id}/died; cleared by /revive.
+  died_at?: string | null
+  death_cause?: string | null
+  death_notes?: string | null
   origin_keeper_name?: string | null
   bred_by_user_id?: string | null
   source_transfer_id?: string | null
@@ -299,6 +307,9 @@ export interface CreateAnimalPayload {
   price_paid?: string | number | null
   current_weight_g?: string | number | null
   current_length_in?: string | number | null
+  /** Room / rack / shelf. null or "" clears it; the server snaps it to the
+   *  keeper's existing spelling. */
+  location?: string | null
   notes?: string | null
   // Pause fields — accepted by AnimalUpdate. Pass `null` on both to
   // resume. See migration pse_20260502.
@@ -618,6 +629,8 @@ export interface AnimalFeedingStatus {
   scientific_name: string | null
   taxon: AnimalTaxon
   photo_url: string | null
+  /** Room / rack / shelf — drives Feeding Day's "By location" grouping. */
+  location?: string | null
   last_feeding_date: string | null
   days_since_last_feeding: number | null
   is_feeding_paused: boolean

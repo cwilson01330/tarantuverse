@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FieldNotesCard, fieldNotesPhotoSize } from './FieldNotesCard'
 import { HerbariumCard, herbariumPhotoBox } from './HerbariumCard'
-import { CardPayload, Frame, PhotoFocus, SHAPE_SIZE, Shape, SpecimenCard, specimenPhotoSize } from './SpecimenCard'
+import { CARD_KINDS, CardKind, CardPayload, Frame, PhotoFocus, SHAPE_SIZE, Shape, SpecimenCard, specimenPhotoSize } from './SpecimenCard'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -203,7 +203,8 @@ export function sanitizePayload(raw: unknown, shapeOverride?: Shape): CardPayloa
   }
   return {
     app: o.app === 'herpetoverse' ? 'herpetoverse' : 'tarantuverse',
-    kind: o.kind === 'molt' ? 'molt' : 'profile',
+    // Unknown kinds (a newer API) still draw: the text is all server-made.
+    kind: (CARD_KINDS as readonly unknown[]).includes(o.kind) ? (o.kind as CardKind) : 'profile',
     taxon: typeof o.taxon === 'string' ? o.taxon.slice(0, 40) : '',
     header: clamp(o.header, 120) ?? '',
     name: clamp(o.name, 120),

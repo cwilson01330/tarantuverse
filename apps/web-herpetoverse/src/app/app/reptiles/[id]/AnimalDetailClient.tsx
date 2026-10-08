@@ -81,6 +81,16 @@ import {
   type InitiateTransferResponse,
   initiateTransfer,
 } from '@/lib/transfers'
+import MarkDiedDialog from '@/components/MarkDiedDialog'
+import {
+  COPY as LIFE,
+  fmtDay,
+  historicalRecordLine,
+  lifecycleErrorMessage,
+  pronounsFor,
+  reviveAnimal,
+  tenureLabel,
+} from '@/lib/lifecycle'
 import { useAuth } from '@/lib/auth'
 import { ROLE_HELP, ROLE_LABEL, attribution, can, useCollectionRole } from '@/lib/coKeepers'
 
@@ -98,16 +108,22 @@ interface Access {
   /** Keeper or above: edit the animal, pause, cadence, any entry, hero photo. */
   canKeep: boolean
   myId: string | null
+  /** The animal has died (ADR-015): a historical record, closed to new logs
+   *  and to edits of existing entries. `canKeep` stays true so the keeper can
+   *  still restore it. */
+  closed: boolean
 }
 
-const AccessContext = createContext<Access>({ isOwner: false, canLog: false, canKeep: false, myId: null })
+const AccessContext = createContext<Access>({ isOwner: false, canLog: false, canKeep: false, myId: null, closed: false })
 
 function useAccess(): Access {
   return useContext(AccessContext)
 }
 
-/** Loggers may change only their own entries; keepers and the owner, any. */
+/** Loggers may change only their own entries; keepers and the owner, any.
+ *  Nobody changes entries on a died animal. */
 function canChangeEntry(a: Access, entry: { logged_by_user_id?: string | null }): boolean {
+  if (a.closed) return false
   return a.canKeep || (a.canLog && !!a.myId && entry.logged_by_user_id === a.myId)
 }
 
@@ -133,12 +149,20 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   // Whose animal this is, and what we may do with it.
   const { user, token } = useAuth()
   const { role, ownerName } = useCollectionRole(token, user?.id, animal?.user_id)
+  const dead = !!animal?.died_at
   const access = useMemo<Access>(() => ({
     isOwner: role === 'owner',
-    canLog: can(role, 'logger'),
+    canLog: can(role, 'logger') && !dead,
     canKeep: can(role, 'keeper'),
     myId: user?.id ?? null,
-  }), [role, user?.id])
+    closed: dead,
+  }), [role, user?.id, dead])
+
+  // Mark as died / restore (ADR-015)
+  const [diedOpen, setDiedOpen] = useState(false)
+  const [endOpen, setEndOpen] = useState(false)
+  const [reviving, setReviving] = useState(false)
+  const [reviveError, setReviveError] = useState<string | null>(null)
 
   // Weight slice
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
@@ -167,6 +191,8 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   // QR upload-session modal
   const [qrOpen, setQrOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // One shed or one weigh-in being shared as its own card.
+  const [shareEvent, setShareEvent] = useState<{ kind: 'shed' | 'weight'; id: string } | null>(null)
 
   const refetchAll = useCallback(async () => {
     const [animalR, weightsR, trendR, preyR, feedingsR, shedsR] =
@@ -296,6 +322,26 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   }
   if (!animal) return null
 
+  // Restore a died animal to the collection. Confirm first — it returns the
+  // animal to the plan count and the reminders. The API never blocks this on
+  // the free cap, but if it ever answers 402 we show its message, not a crash.
+  async function restoreFromDied() {
+    if (!animal || reviving) return
+    if (!window.confirm(LIFE.restoreConfirm(animalTitle(animal)))) return
+    setReviving(true)
+    setReviveError(null)
+    try {
+      await reviveAnimal(animal.id)
+      await refetchAll()
+    } catch (err) {
+      setReviveError(
+        lifecycleErrorMessage(err, 'Couldn’t restore that. Nothing has changed — try again.'),
+      )
+    } finally {
+      setReviving(false)
+    }
+  }
+
   const sharedBack = !access.isOwner && role ? `/app/shared/${animal.user_id}` : undefined
 
   return (
@@ -307,6 +353,53 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           {ownerName ? `${ownerName}'s animal. ` : ''}You&apos;re a <strong className="text-neutral-200">{ROLE_LABEL[role]}</strong> — {ROLE_HELP[role]}
         </p>
       )}
+      {/* Handoff §14.3 — the page changes in place after marking died. No
+          toast, no checkmark, no success colour: this card IS the
+          acknowledgement. A neutral dot, never red. */}
+      {animal.died_at && (
+        <section
+          aria-label={`Died ${fmtDay(animal.died_at)}`}
+          className="p-4 rounded-lg border border-neutral-800 bg-neutral-900/60 space-y-1.5"
+        >
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full bg-neutral-500"
+            />
+            <p className="text-sm font-semibold text-neutral-100">
+              Died {fmtDay(animal.died_at)}
+            </p>
+          </div>
+          {(() => {
+            const t = tenureLabel(animal.date_acquired, animal.died_at)
+            return t ? (
+              <p className="text-sm text-neutral-400">In your care {t}</p>
+            ) : null
+          })()}
+          <p className="text-sm text-neutral-400">
+            {historicalRecordLine(animal.death_cause, pronounsFor(animal.sex))}
+          </p>
+          {animal.death_notes && (
+            <p className="text-sm text-neutral-200 whitespace-pre-wrap">
+              {animal.death_notes}
+            </p>
+          )}
+          {reviveError && <InlineError message={reviveError} />}
+          {access.canKeep && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={restoreFromDied}
+                disabled={reviving}
+                className="text-sm font-medium text-herp-teal hover:text-herp-lime disabled:opacity-50 transition-colors"
+              >
+                {reviving ? 'Restoring…' : LIFE.restore}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       <AnimalHeader animal={animal} suggestion={preySuggestion} />
 
       {/* Photos section — heading + QR action live in a flex row so the
@@ -350,6 +443,18 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
       {token && access.canKeep && (
         <ShareCardModal open={shareOpen} onClose={() => setShareOpen(false)} app="herpetoverse" animalId={animal.id} kind="profile" token={token} />
       )}
+      {token && access.canKeep && !access.closed && (
+        <ShareCardModal
+          open={!!shareEvent}
+          onClose={() => setShareEvent(null)}
+          app="herpetoverse"
+          animalId={animal.id}
+          kind={shareEvent?.kind ?? 'shed'}
+          shedId={shareEvent?.kind === 'shed' ? shareEvent.id : undefined}
+          weightLogId={shareEvent?.kind === 'weight' ? shareEvent.id : undefined}
+          token={token}
+        />
+      )}
 
       {qrOpen && (
         <ReptileQRModal
@@ -380,6 +485,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           logs={weightLogs}
           onDelete={refetchWeights}
           onEdit={setEditingWeight}
+          onShare={(id) => setShareEvent({ kind: 'weight', id })}
         />
       </Section>
 
@@ -421,7 +527,12 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           editing={editingShed}
           onEditDone={() => setEditingShed(null)}
         />}
-        <ShedList sheds={sheds} onDelete={refetchSheds} onEdit={setEditingShed} />
+        <ShedList
+          sheds={sheds}
+          onDelete={refetchSheds}
+          onEdit={setEditingShed}
+          onShare={(id) => setShareEvent({ kind: 'shed', id })}
+        />
       </Section>
 
       {/* Provenance — only when the animal arrived via a claimed transfer.
@@ -451,6 +562,59 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           <TransferSection animal={animal} />
         )}
       </Section>}
+
+      {access.closed && (
+        <p className="text-xs text-neutral-500">{LIFE.logsClosed}</p>
+      )}
+
+      {/* End of record (§14.1) — collapsed, after transfer. Marking died is
+          the exit for an animal that's gone; Delete (on the edit page) stays
+          for records added by mistake. Neutral styling, never red. Keeper and
+          up, matching the API's keeper-level policy. */}
+      {access.canKeep && !access.closed && (
+        <section className="rounded-md border border-neutral-800 bg-neutral-900/40">
+          <button
+            type="button"
+            onClick={() => setEndOpen((o) => !o)}
+            aria-expanded={endOpen}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <span className="text-sm font-medium text-neutral-100">
+              {LIFE.endOfRecord}
+            </span>
+            <span aria-hidden="true" className="text-neutral-500 text-xs">
+              {endOpen ? '▲' : '▼'}
+            </span>
+          </button>
+          {endOpen && (
+            <div className="px-4 pb-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => setDiedOpen(true)}
+                className="px-4 py-2 rounded-md border border-neutral-700 bg-neutral-900 text-sm font-medium text-neutral-100 hover:border-neutral-500 hover:text-white transition-colors"
+              >
+                {LIFE.menuItem}
+              </button>
+              <p className="text-xs text-neutral-500 leading-relaxed">
+                {LIFE.menuItemSub(pronounsFor(animal.sex))}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
+      <MarkDiedDialog
+        open={diedOpen}
+        onClose={() => setDiedOpen(false)}
+        animalId={animal.id}
+        animalName={animalTitle(animal)}
+        sex={animal.sex}
+        onDone={() => {
+          setDiedOpen(false)
+          setEndOpen(false)
+          void refetchAll()
+        }}
+      />
     </article>
     </AccessContext.Provider>
   )
@@ -760,6 +924,14 @@ function AnimalHeader({
               ) : (
                 animal.scientific_name
               )}
+            </p>
+          )}
+          {/* Room / rack / shelf — only when the keeper has set one. */}
+          {animal.location && (
+            <p className="mt-1 text-sm text-neutral-400">
+              <span aria-hidden="true">📍</span>{' '}
+              <span className="sr-only">Location: </span>
+              {animal.location}
             </p>
           )}
         </div>
@@ -1106,10 +1278,12 @@ function WeightLogList({
   logs,
   onDelete,
   onEdit,
+  onShare,
 }: {
   logs: WeightLog[]
   onDelete: () => void
   onEdit?: (log: WeightLog) => void
+  onShare?: (id: string) => void
 }) {
   const access = useAccess()
   const sorted = useMemo(
@@ -1151,6 +1325,9 @@ function WeightLogList({
               {l.notes}
             </span>
             <AttributionChip entry={l} />
+            {onShare && access.canKeep && !access.closed && (
+              <ShareRowButton label="weigh-in" onShare={() => onShare(l.id)} />
+            )}
             {canChangeEntry(access, l) && <>
               {onEdit && <EditRowButton label="weight" onEdit={() => onEdit(l)} />}
               <DeleteRowButton
@@ -2109,10 +2286,12 @@ function ShedList({
   sheds,
   onDelete,
   onEdit,
+  onShare,
 }: {
   sheds: ShedLog[]
   onDelete: () => void
   onEdit?: (log: ShedLog) => void
+  onShare?: (id: string) => void
 }) {
   const access = useAccess()
   const sorted = useMemo(
@@ -2163,6 +2342,9 @@ function ShedList({
               {s.notes}
             </span>
             <AttributionChip entry={s} />
+            {onShare && access.canKeep && !access.closed && (
+              <ShareRowButton label="shed" onShare={() => onShare(s.id)} />
+            )}
             {canChangeEntry(access, s) && <>
               {onEdit && <EditRowButton label="shed" onEdit={() => onEdit(s)} />}
               <DeleteRowButton
@@ -2258,6 +2440,20 @@ function EditRowButton({
       className="flex-shrink-0 text-neutral-500 hover:text-herp-teal transition-colors px-1.5 py-0.5 text-xs"
     >
       ✎
+    </button>
+  )
+}
+
+function ShareRowButton({ label, onShare }: { label: string; onShare: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onShare}
+      aria-label={`Share this ${label} as a card`}
+      title={`Share this ${label} as a card`}
+      className="flex-shrink-0 text-neutral-500 hover:text-herp-teal transition-colors px-1.5 py-0.5 text-xs"
+    >
+      Share
     </button>
   )
 }

@@ -56,8 +56,10 @@ import {
 } from '../../src/lib/inverts';
 import { AppHeader } from '../../src/components/AppHeader';
 import DeceasedArchive from '../../src/components/DeceasedArchive';
+import ArchivedColonies from '../../src/components/ArchivedColonies';
 import {
   listColonies,
+  listPastColonies,
   type ColonyListItem,
 } from '../../src/lib/colonies';
 import { groupByLocation, renameLocation, useLocations, locationKey } from '../../src/lib/locations';
@@ -135,7 +137,7 @@ interface PremoltPrediction {
 /** The Died chip's status mark (handoff §14.4: a dot, not a symbol). */
 const CHIP_DOT = 7;
 
-type TaxonFilter = 'all' | 'due' | 'died' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
+type TaxonFilter = 'all' | 'due' | 'died' | 'archived' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
 
 /**
  * Chip key for a taxon.
@@ -282,6 +284,7 @@ function CollectionScreen() {
       fetchWhipSpiders();
       fetchOtherInverts();
       fetchColonies();
+      fetchArchivedColonies();
       fetchDeceased();
       loadFeedingStatuses();
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,6 +400,30 @@ function CollectionScreen() {
   useEffect(() => {
     if (taxonFilter === 'died' && deceased.length === 0) setTaxonFilter('all');
   }, [taxonFilter, deceased.length]);
+
+  // Archived (is_active = false) and ended (ended_at set) colonies. Kept apart
+  // from `colonies` so they can never reach the main list, the chip counts or
+  // the plan-cap notice. A failure just leaves the chip off, like the Died
+  // archive.
+  const [archivedColonies, setArchivedColonies] = useState<ColonyListItem[]>([]);
+  const fetchArchivedColonies = async () => {
+    try {
+      setArchivedColonies(await listPastColonies());
+    } catch {
+      /* keep whatever we had */
+    }
+  };
+
+  // "Past colonies" once any has ended; "Archived colonies" while it's only
+  // shelved ones. Ended colonies never reach the main list.
+  const hasEndedColony = archivedColonies.some((c) => !!c.ended_at);
+  const pastNoun = hasEndedColony ? 'past' : 'archived';
+
+  // Last colony unarchived → the chip disappears; don't strand the keeper on
+  // a filter they can no longer see.
+  useEffect(() => {
+    if (taxonFilter === 'archived' && archivedColonies.length === 0) setTaxonFilter('all');
+  }, [taxonFilter, archivedColonies.length]);
 
   const fetchColonies = async () => {
     // Colony mode (ADR-010) — a separate first-class collection source merged
@@ -658,6 +685,7 @@ function CollectionScreen() {
       fetchWhipSpiders(),
       fetchOtherInverts(),
       fetchColonies(),
+      fetchArchivedColonies(),
       fetchDeceased(),
       loadFeedingStatuses(),
       refreshLocations(),
@@ -1954,6 +1982,10 @@ function CollectionScreen() {
         })}
         {/* Last, after the living taxa: a status, not a kind of animal. */}
         {deceased.length > 0 ? chip('died', 'Died', deceased.length, { dot: true }) : null}
+        {/* Also a status, and also only when there's something in it. */}
+        {archivedColonies.length > 0
+          ? chip('archived', hasEndedColony ? 'Past colonies' : 'Archived colonies', archivedColonies.length, { dot: true })
+          : null}
       </ScrollView>
     );
   };
@@ -2156,7 +2188,16 @@ function CollectionScreen() {
         ) : null}
       </AppHeader>
 
-      {taxonFilter === 'died' ? (
+      {taxonFilter === 'archived' ? (
+        <ArchivedColonies
+          items={archivedColonies}
+          search={searchQuery}
+          header={<TaxonFilterChips />}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          onOpen={(c) => router.push(`/colony/${c.id}` as any)}
+        />
+      ) : taxonFilter === 'died' ? (
         <DeceasedArchive
           items={deceased}
           search={searchQuery}
@@ -2211,6 +2252,18 @@ function CollectionScreen() {
             >
               <Text style={[styles.filteredEmptyAction, { color: colors.accent }]}>
                 {deceased.length} {deceased.length === 1 ? 'record' : 'records'} kept — view
+              </Text>
+            </TouchableOpacity>
+          )}
+          {/* Same for a keeper whose only colony is archived. */}
+          {archivedColonies.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setTaxonFilter('archived')}
+              style={styles.emptyArchiveLink}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.filteredEmptyAction, { color: colors.accent }]}>
+                {archivedColonies.length} {pastNoun} {archivedColonies.length === 1 ? 'colony' : 'colonies'} — view
               </Text>
             </TouchableOpacity>
           )}

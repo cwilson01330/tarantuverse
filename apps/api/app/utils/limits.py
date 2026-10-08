@@ -85,12 +85,15 @@ def active_colonies_query(db: Session, user_id):
     A colony is a first-class collection entry, so it counts as 1 animal
     toward the free-tier cap. Excludes archived (`is_active=False`) and
     handed-off (`transferred_out_at`) colonies — same exclusions the
-    collection list uses, so counts and lists agree.
+    collection list uses, so counts and lists agree. Also excludes ENDED
+    colonies (`ended_at IS NOT NULL`) -- the colony counterpart of a deceased
+    animal, which never counts toward the cap either.
     """
     return db.query(Colony).filter(
         Colony.user_id == user_id,
         Colony.transferred_out_at.is_(None),
         Colony.is_active.is_(True),
+        Colony.ended_at.is_(None),
     )
 
 

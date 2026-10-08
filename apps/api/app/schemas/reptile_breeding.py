@@ -27,7 +27,13 @@ PairingOutcomeStr = Literal[
     "abandoned",
     "unknown",
 ]
-TaxonStr = Literal["snake", "lizard", "frog"]
+# Every HV taxon may be bred. Must stay in lockstep with
+# ANIMAL_TAXON_VALUES (models/animal.py) — a Literal can't be built from a
+# runtime tuple, so the values are spelled out;
+# tests/test_reptile_breeding_taxa.py fails if the two drift.
+TaxonStr = Literal[
+    "snake", "lizard", "turtle", "tortoise", "frog", "salamander", "other"
+]
 
 
 class ReptilePairingCreate(BaseModel):

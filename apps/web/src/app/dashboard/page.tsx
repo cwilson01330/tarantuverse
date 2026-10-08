@@ -551,9 +551,7 @@ export default function DashboardHub() {
                       : t.taxon === 'isopod' ? '🪲'
                       : t.taxon === 'mantis' ? '🦗'
                       : '🐛'
-                    const detailHref = t.taxon === 'tarantula'
-                      ? `/dashboard/tarantulas/${t.id}`
-                      : `/dashboard/inverts/${t.id}`
+                    const detailHref = `/dashboard/inverts/${t.id}`
                     return (
                       <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated">
                         <div className="flex items-center gap-3">
@@ -658,7 +656,7 @@ export default function DashboardHub() {
                     return (
                       <div
                         key={t.id}
-                        onClick={() => router.push(`/dashboard/tarantulas/${t.id}`)}
+                        onClick={() => router.push(`/dashboard/inverts/${t.id}`)}
                         className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated hover:shadow-md transition cursor-pointer"
                       >
                         <div className="flex items-center gap-3">

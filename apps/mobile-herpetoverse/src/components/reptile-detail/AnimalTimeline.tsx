@@ -137,6 +137,7 @@ export function AnimalTimeline({
   weights,
   sheds,
   onOpen,
+  onShare,
   canChange = () => true,
 }: {
   feedings: FeedingLog[];
@@ -144,6 +145,9 @@ export function AnimalTimeline({
   sheds: ShedLog[];
   /** Opens the matching edit form for a row. */
   onOpen: (kind: TimelineKind, id: string) => void;
+  /** Share-card action on shed and weigh-in rows. Omit it (keepers only, and
+   *  not for a died animal) and the rows carry no share button. */
+  onShare?: (kind: 'shed' | 'weight', id: string) => void;
   /** Co-keepers: rows the viewer can't change read as plain history. Defaults to all. */
   canChange?: (entry: { logged_by_user_id?: string | null }) => boolean;
 }) {
@@ -332,6 +336,18 @@ export function AnimalTimeline({
                 {e.trailing}
               </Text>
             )}
+
+            {onShare && (e.kind === 'shed' || e.kind === 'weight') && (
+              <TouchableOpacity
+                onPress={() => onShare(e.kind as 'shed' | 'weight', e.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.shareBtn}
+                accessibilityRole="button"
+                accessibilityLabel={e.kind === 'shed' ? 'Share shed card' : 'Share weigh-in card'}
+              >
+                <MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -432,6 +448,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 13.5, fontWeight: '600' },
   rowDate: { fontSize: 11.5, marginTop: 1 },
   rowTrailing: { fontSize: 13, fontWeight: '700' },
+  shareBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
   more: { paddingVertical: 12, alignItems: 'center' },
   moreText: { fontSize: 13, fontWeight: '600' },

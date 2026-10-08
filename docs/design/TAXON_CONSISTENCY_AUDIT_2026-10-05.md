@@ -60,11 +60,11 @@ newer one while the older one kept serving tarantulas:
 | --- | --- | --- |
 | B1 | **Colonies: no QR label, no QR photo upload, no public page** (the reported bug). Needs `colony_id` on upload sessions, a colony upload-session route, a public colony page, and colony support in `QRModal` / `QRSheet`. | M |
 | B2 | **Scanning any non-tarantula label opens the browser, not the app.** Universal/App Links only cover `/t/*`. Adding `/i/*` (and the colony path) needs a native build. | S + build |
-| B3 | Colonies on web: no photo gallery/upload, no archive toggle. | S–M |
+| B3 | **[FIXED 2026-10-08: web gallery/upload/set-hero/delete; archive toggle; archived + ended colonies findable on web + mobile]** Colonies on web: no photo gallery/upload, no archive toggle. | S–M |
 | B4 | **[FIXED 2026-10-06]** Colonies: feeding rows can't be edited or deleted; event edit not wired; molt/water/substrate entries can't be edited. API already supports all of it. | S |
-| B5 | Web invert page lacks pause feeding and the public/private toggle that the tarantula page has. | M |
-| B6 | Colonies: no share card, no mark-died, no transfer, no import. | M–L |
-| B7 | HV: no rack/room locations; breeding limited to snake/lizard/frog; no mark-died on HV web; no shed/weight share card; no growth chart on HV mobile. | M each |
+| B5 | **[FIXED 2026-10-08: pause, visibility (enforced on /t, /i, previews), premolt, rich feeding stats, husbandry extras, species picker on the shared page; /dashboard/tarantulas/[id] (+edit, husbandry) now redirect]** Web invert page lacks pause feeding and the public/private toggle that the tarantula page has. | M |
+| B6 | **[PARTLY FIXED 2026-10-08: colony share card; End colony with reason + reopen (cen_20261007). OPEN: full + partial transfer (sell 25 of 360), import]** Colonies: no share card, no mark-died, no transfer, no import. | M–L |
+| B7 | **[PARTLY FIXED 2026-10-08: locations (hloc_20261007), breeding for all 7 taxa, mark-died on HV web, shed + weigh-in share cards (shk_20261007). OPEN: weight chart on HV mobile]** HV: no rack/room locations; breeding limited to snake/lizard/frog; no mark-died on HV web; no shed/weight share card; no growth chart on HV mobile. | M each |
 
 ### C. Copy and small drift — **[DONE 2026-10-06]** (consistency pass; see git log) (cheap, removes most of the "this screen is from another app" feel)
 

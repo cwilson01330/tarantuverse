@@ -69,7 +69,13 @@ function buildDescription(s: Species): string {
   const name = s.common_names?.[0] || s.scientific_name
   if (s.care_guide && s.care_guide.trim()) {
     const flat = s.care_guide.replace(/[#*_>`\-]/g, ' ').replace(/\s+/g, ' ').trim()
-    if (flat.length > 0) return flat.slice(0, 155)
+    if (flat.length > 0) {
+      if (flat.length <= 155) return flat
+      // Cut at the last whole word, not mid-word ("This genus is notable f").
+      const cut = flat.slice(0, 155)
+      const lastSpace = cut.lastIndexOf(' ')
+      return `${(lastSpace > 100 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.—-]+$/, '')}…`
+    }
   }
   const bits = [
     `${name} care guide`,

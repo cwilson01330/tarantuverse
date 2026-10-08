@@ -11,9 +11,14 @@ export type PhotoFocus = { x: number; y: number; zoom: number }
 /** The Field notes frame's handwritten copy, composed on the server. */
 export type CardNotes = { headline: string | null; species_line: string | null; facts: string[] }
 
+/** Every card kind the API composes (services/share_card.py::CARD_KINDS).
+ *  The renderer only draws the server's text, so a kind changes no layout. */
+export const CARD_KINDS = ['molt', 'profile', 'colony', 'shed', 'weight'] as const
+export type CardKind = (typeof CARD_KINDS)[number]
+
 export type CardPayload = {
   app: 'tarantuverse' | 'herpetoverse'
-  kind: 'molt' | 'profile'
+  kind: CardKind
   taxon: string
   header: string
   name: string | null
@@ -57,7 +62,7 @@ function Photo({ url, taxon, w, h }: { url: string | null; taxon: string; w: num
   }
   return (
     <div style={{ width: w, height: h, background: PHOTO_BG, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: RULE, fontSize: Math.round(h / 5) }}>
-      {GLYPH[taxon] ?? '·'}
+      {taxonGlyph(taxon)}
     </div>
   )
 }
@@ -72,6 +77,12 @@ function Ruler({ width }: { width: number }) {
     </div>
   )
 }
+
+/** The value side of a label/value row: takes the width the label leaves and
+ *  wraps, right-aligned, inside it. Shared by every frame's row layout. */
+export const WRAP_VALUE = {
+  display: 'flex', flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, justifyContent: 'flex-end', textAlign: 'right',
+} as const
 
 /** Values like "3.2 → 4.1 in": the arrow is drawn as SVG so satori never shapes
  *  U+2192 (none of our card fonts have it; satori would fetch a Google font at
@@ -109,8 +120,11 @@ function Label({ p, scale, width }: { p: CardPayload; scale: number; width: numb
       {p.facts.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', borderTop: `1.5px solid ${RULE}`, marginTop: s(20), paddingTop: s(12) }}>
           {p.facts.map((f) => (
+            // A value too long for one line (a colony's stage split) wraps,
+            // right-aligned, instead of running off the card.
             <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: s(30), lineHeight: 1.5 }}>
-              <span>{f.label}</span><FactValue value={f.value} size={s(30)} />
+              <span style={{ flexShrink: 0, marginRight: s(24) }}>{f.label}</span>
+              <div style={WRAP_VALUE}><FactValue value={f.value} size={s(30)} /></div>
             </div>
           ))}
         </div>
@@ -132,7 +146,8 @@ function estimateLabelHeight(p: CardPayload, scale: number): number {
   if (p.name) h += 6 + 64 * 1.15
   if (p.scientific_name) h += 4 + 34 * 1.3
   if (p.common_name) h += 2 + 26 * 1.3
-  if (p.facts.length > 0) h += 32 + p.facts.length * 45
+  // Rows that wrap (label + value wider than the label column) count twice.
+  if (p.facts.length > 0) h += 32 + p.facts.reduce((n, f) => n + ((f.label.length + f.value.length) * 15 > 984 ? 2 : 1), 0) * 45
   h += 32 // ruler
   return Math.ceil(h * scale)
 }

@@ -29,6 +29,7 @@ from app.models.tarantula import Sex, Source
 from app.schemas.animal import AnimalCreate
 from app.utils.limits import active_inverts_query, enforce_animal_limit
 from app.utils.access import policy
+from app.utils.locations import SCOPE_HERPETOVERSE, canonical_location
 
 router = APIRouter(
     tags=["import-export"]
@@ -171,6 +172,8 @@ async def _import_commit_animals(
                             val = Source(val)
                         except ValueError:
                             continue
+                    if fld == "location":
+                        val = canonical_location(db, current_user.id, val, SCOPE_HERPETOVERSE)
                     if hasattr(existing, fld):
                         setattr(existing, fld, val)
                 db.commit()
@@ -207,6 +210,9 @@ async def _import_commit_animals(
                 data["source"] = Source(data["source"])
             except ValueError:
                 data["source"] = None
+
+        # One spelling per place per keeper (Herpetoverse scope).
+        data["location"] = canonical_location(db, current_user.id, data.get("location"), SCOPE_HERPETOVERSE)
 
         animal = Animal(user_id=current_user.id, **data)
         db.add(animal)
@@ -419,11 +425,22 @@ async def export_full(
     This may take longer for large collections with many photos.
     Available to all users (free and premium).
     """
-    data = await ExportService.export_full_zip(db, current_user)
+    spool = await ExportService.export_full_zip_file(db, current_user)
     filename = f"tarantuverse_{current_user.username}_{datetime.utcnow().strftime('%Y-%m-%d')}_full.zip"
 
+    def _chunks():
+        # Stream from the spooled file in 1 MB pieces, then free it.
+        try:
+            while True:
+                chunk = spool.read(1024 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            spool.close()
+
     return StreamingResponse(
-        io.BytesIO(data),
+        _chunks(),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -51,6 +51,12 @@ from app.utils.access import load_animal, policy, require_own_enclosure, scope_c
 from app.utils.feeding_pause import resume_if_accepted
 from app.schemas.death import MarkDiedRequest
 from app.utils.photo_cleanup import collect_for_animal, delete_files
+from app.utils.locations import (
+    SCOPE_HERPETOVERSE,
+    canonical_location,
+    list_locations,
+    rename_location,
+)
 
 router = APIRouter()
 
@@ -283,6 +289,11 @@ async def create_animal(
     require_own_enclosure(db, animal_data.enclosure_id, access.owner)
 
     animal_dict = _coerce_enums(strip_owner_only(access, animal_data.model_dump()))
+    # One spelling per place per keeper — see utils/locations. Herpetoverse
+    # scope: only this keeper's animals are consulted, never their TV rows.
+    animal_dict["location"] = canonical_location(
+        db, access.owner.id, animal_dict.get("location"), SCOPE_HERPETOVERSE
+    )
 
     new_animal = Animal(user_id=access.owner.id, **animal_dict)
     db.add(new_animal)
@@ -320,6 +331,98 @@ async def get_animal_limits(
         "remaining": None if is_premium else max(0, limit - current_count),
         "at_limit": (not is_premium) and current_count >= limit,
     }
+
+
+class LocationItem(BaseModel):
+    name: str
+    count: int
+
+
+class RenameLocationRequest(BaseModel):
+    old: str = Field(..., min_length=1, max_length=120)
+    new: str = Field(..., min_length=1, max_length=120)
+
+
+class RenameLocationResponse(BaseModel):
+    moved: int
+    # The spelling everything now sits under — the target's EXISTING spelling
+    # when the rename merged into a place already on file.
+    name: Optional[str] = None
+
+
+class BulkLocationRequest(BaseModel):
+    """Set (or clear, with null) one location across many animals. Mirrors
+    /inverts/bulk-location minus colonies, which Herpetoverse doesn't have."""
+    location: Optional[str] = Field(None, max_length=120)
+    animal_ids: List[UUID] = Field(default_factory=list)
+
+
+class BulkLocationResponse(BaseModel):
+    updated: int
+    # The canonical spelling that was stored (None when clearing).
+    location: Optional[str] = None
+
+
+@router.get("/locations", response_model=List[LocationItem])
+@policy("viewer")
+async def get_locations(
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Every location this keeper has on file for Herpetoverse animals, with
+    how many living animals sit there. Empty for a keeper who has never set
+    one — and the clients hide the whole feature on an empty list, so nothing
+    changes for anyone who doesn't use it. Tarantuverse locations are a
+    separate list (/inverts/locations)."""
+    access = scope_collection(db, current_user, "herpetoverse", collection)
+    return [LocationItem(**e) for e in list_locations(db, access.owner.id, SCOPE_HERPETOVERSE)]
+
+
+@router.post("/locations/rename", response_model=RenameLocationResponse)
+@policy("keeper")
+async def rename_location_endpoint(
+    payload: RenameLocationRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Rename one location everywhere it's used. Renaming onto a name that
+    already exists MERGES the two groups under the existing spelling — the
+    escape hatch when a keeper ends up with "Rack 1" and "Rack #1"."""
+    access = scope_collection(db, current_user, "herpetoverse", collection, need="keeper")
+    target = canonical_location(db, access.owner.id, payload.new, SCOPE_HERPETOVERSE)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Give the location a name.")
+    moved = rename_location(db, access.owner.id, payload.old, payload.new, SCOPE_HERPETOVERSE)
+    db.commit()
+    return RenameLocationResponse(moved=moved, name=target)
+
+
+@router.post("/bulk-location", response_model=BulkLocationResponse)
+@policy("keeper")
+async def bulk_set_location(
+    payload: BulkLocationRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Apply one location to many animals at once. Scoped to the caller's
+    own living, untransferred animals; deceased and transferred records keep
+    whatever they had, since they no longer live anywhere."""
+    if not payload.animal_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose which animals to apply this to.")
+
+    access = scope_collection(db, current_user, "herpetoverse", collection, need="keeper")
+    target = canonical_location(db, access.owner.id, payload.location, SCOPE_HERPETOVERSE)
+
+    updated = 0
+    for a in active_animals_query(db, access.owner.id).filter(Animal.id.in_(payload.animal_ids)).all():
+        a.location = target
+        updated += 1
+
+    db.commit()
+    return BulkLocationResponse(updated=updated, location=target)
 
 
 @router.get("/feeding-status", response_model=List[AnimalFeedingStatusItem])
@@ -399,6 +502,7 @@ async def list_feeding_status(
                 scientific_name=a.scientific_name,
                 taxon=a.taxon,
                 photo_url=a.photo_url,
+                location=a.location,
                 last_feeding_date=last,
                 days_since_last_feeding=days,
                 is_feeding_paused=paused,
@@ -512,6 +616,10 @@ async def update_animal(
     update_data = _coerce_enums(strip_owner_only(access, animal_data.model_dump(exclude_unset=True)))
     if "enclosure_id" in update_data:
         require_own_enclosure(db, update_data["enclosure_id"], access.owner)
+    if "location" in update_data:
+        update_data["location"] = canonical_location(
+            db, access.owner.id, update_data["location"], SCOPE_HERPETOVERSE
+        )
     for field, value in update_data.items():
         setattr(animal, field, value)
 

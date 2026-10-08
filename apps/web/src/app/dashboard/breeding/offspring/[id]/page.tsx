@@ -652,13 +652,8 @@ export default function OffspringDetailPage() {
               </p>
               {linkedTarantula ? (
                 <Link
-                  // Tarantulas keep their bespoke detail screen; every other
-                  // taxon renders through the generic one.
-                  href={
-                    linkedTarantula.taxon && linkedTarantula.taxon !== 'tarantula'
-                      ? `/dashboard/inverts/${linkedTarantula.id}`
-                      : `/dashboard/tarantulas/${linkedTarantula.id}`
-                  }
+                  // One detail page for every taxon (B5).
+                  href={`/dashboard/inverts/${linkedTarantula.id}`}
                   className="text-sm font-semibold text-blue-700 dark:text-blue-300 hover:underline"
                 >
                   {tarantulaName(linkedTarantula)} ›

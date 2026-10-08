@@ -6,7 +6,7 @@ interface PreyTypeCount {
   percentage: number;
 }
 
-interface FeedingStats {
+export interface FeedingStats {
   tarantula_id: string;
   total_feedings: number;
   total_accepted: number;
@@ -50,6 +50,9 @@ interface FeedingStatsCardProps {
   /** ADR-017 — opens the cadence dialog. Optional: pages that don't offer it
    *  simply don't pass it, and the prompt never renders. */
   onSetCadence?: () => void;
+  /** Hide the "Last fed" / paused banner. The shared detail page shows its own
+   *  verdict above this card, and two status banners could disagree. */
+  hideStatus?: boolean;
 }
 
 const preyBarColors = [
@@ -61,7 +64,7 @@ const preyBarColors = [
   'bg-cyan-500 dark:bg-cyan-400',
 ];
 
-export default function FeedingStatsCard({ data, onSetCadence }: FeedingStatsCardProps) {
+export default function FeedingStatsCard({ data, onSetCadence, hideStatus = false }: FeedingStatsCardProps) {
   // Determine feeding status color
   const getFeedingStatusColor = (days?: number) => {
     if (!days) return "gray";
@@ -124,7 +127,7 @@ export default function FeedingStatsCard({ data, onSetCadence }: FeedingStatsCar
           post-rehouse, recovering, etc.) we don't want a 200-day-old
           last feeding flashing red; we want a quiet "she's in premolt,
           we know" tile. */}
-      {data.is_feeding_paused ? (
+      {hideStatus ? null : data.is_feeding_paused ? (
         <div className="rounded-xl p-4 border-2 border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-200">
           <div className="flex items-center justify-between gap-4">
             <div>

@@ -45,7 +45,9 @@ router = APIRouter()
 
 
 def _animal_display(a: Animal) -> str:
-    return a.name or a.common_name or a.scientific_name or f"Unnamed {a.taxon.value}"
+    # `taxon` is a plain VARCHAR (ADR-011); tolerate an enum-like object too.
+    taxon = a.taxon.value if hasattr(a.taxon, "value") else a.taxon
+    return a.name or a.common_name or a.scientific_name or f"Unnamed {taxon}"
 
 
 def _enrich_response(

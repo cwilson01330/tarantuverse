@@ -48,7 +48,7 @@ def colony(owner_id):
 
 
 def run(**kw):
-    return asyncio.run(inspect.unwrap(cr.list_colonies)(include_inactive=False, collection=None, **kw))
+    return asyncio.run(inspect.unwrap(cr.list_colonies)(include_inactive=False, status_filter=None, collection=None, **kw))
 
 
 def test_change_is_the_sum_of_logged_deltas_in_the_window():

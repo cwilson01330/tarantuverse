@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { TYPE } from '../../src/theme/tokens';
 import { AppHeader } from '../../src/components/AppHeader';
-import { CardLinkItem, listCardLinks, revokeCardLink } from '../../src/lib/share-cards';
+import { CardLinkItem, cardKindLabel, listCardLinks, revokeCardLink } from '../../src/lib/share-cards';
 
 export default function SharedCardsScreen() {
   const router = useRouter();
@@ -46,7 +46,7 @@ export default function SharedCardsScreen() {
           renderItem={({ item: c }) => (
             <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>{c.name || 'Specimen'} · {c.kind === 'molt' ? 'molt' : 'profile'}</Text>
+                <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>{c.name || (c.kind === 'colony' ? 'Colony' : 'Specimen')} · {cardKindLabel(c.kind)}</Text>
                 <Text style={[TYPE.caption, { color: colors.textSecondary }]} numberOfLines={1}>{madeOn(c.created_at)} · {c.revoked_at ? 'Off' : c.url}</Text>
               </View>
               {!c.revoked_at ? (

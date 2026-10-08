@@ -43,6 +43,7 @@ import {
   extractErrorMessage,
 } from '../components/forms/FormPrimitives';
 import { EnclosurePicker } from '../components/forms/EnclosurePicker';
+import { LocationPicker } from '../components/LocationPicker';
 import { useAuth } from '../contexts/AuthContext';
 import { ReptileSpeciesAutocomplete } from '../components/forms/ReptileSpeciesAutocomplete';
 import {
@@ -94,6 +95,7 @@ export function EditReptileScreen() {
   const [scientificName, setScientificName] = useState('');
   const [speciesId, setSpeciesId] = useState<string | null>(null);
   const [enclosureId, setEnclosureId] = useState<string | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
   const [commonName, setCommonName] = useState('');
   const [sex, setSex] = useState<Sex>('unknown');
   const [hatchDate, setHatchDate] = useState('');
@@ -129,6 +131,7 @@ export function EditReptileScreen() {
           setScientificName(data.scientific_name ?? '');
           setSpeciesId(data.herp_species_id);
           setEnclosureId(data.enclosure_id);
+          setLocation(data.location ?? null);
           setCommonName(data.common_name ?? '');
           setSex(data.sex ?? 'unknown');
           setHatchDate(data.hatch_date ?? '');
@@ -191,6 +194,7 @@ export function EditReptileScreen() {
       common_name: trimmedCommon || null,
       herp_species_id: speciesId,
       enclosure_id: enclosureId,
+      location,
       sex,
       hatch_date: hatchIso,
       source: source === 'unset' ? null : source,
@@ -349,6 +353,17 @@ export function EditReptileScreen() {
           >
             <EnclosurePicker value={enclosureId} onChange={setEnclosureId} />
           </Field>}
+
+          <Field
+            label="Location"
+            hint="Optional. A room, rack or shelf — pick one you've used, or name a new place."
+          >
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              collection={isOwner ? null : animal?.user_id}
+            />
+          </Field>
 
           <Field
             label="Current weight (g)"

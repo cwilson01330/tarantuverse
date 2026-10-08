@@ -25,6 +25,14 @@ import {
   listAnimalFeedingStatus,
   resumeFeeding,
 } from '@/lib/animals'
+import { LocationDialog } from '@/components/LocationPicker'
+import {
+  UNASSIGNED_KEY,
+  bulkSetLocation,
+  groupByLocation,
+  listLocations,
+  type LocationItem,
+} from '@/lib/locations'
 
 type FilterKey = 'all' | 'overdue' | 'never_fed'
 type Outcome = 'fed' | 'refused'
@@ -75,12 +83,39 @@ export default function FeedingDayPage() {
   const [resumingId, setResumingId] = useState<string | null>(null)
   const [resultMessage, setResultMessage] = useState('')
 
+  // Walk the shelves: group the list by location so the page matches the
+  // order the keeper walks the house. Only offered once at least one animal
+  // HAS a location; a keeper who never set one sees none of this.
+  const [groupByLoc, setGroupByLoc] = useState(false)
+  const [locations, setLocations] = useState<LocationItem[]>([])
+  const [locDialogOpen, setLocDialogOpen] = useState(false)
+  const [locBusy, setLocBusy] = useState(false)
+  useEffect(() => {
+    try {
+      setGroupByLoc(window.localStorage.getItem('hv_feeding_day_group_by_location') === '1')
+    } catch {
+      // storage unavailable — default off
+    }
+  }, [])
+  const toggleGroupByLoc = () => {
+    const next = !groupByLoc
+    setGroupByLoc(next)
+    try {
+      window.localStorage.setItem('hv_feeding_day_group_by_location', next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
   const fetchStatus = useCallback(async () => {
     setLoadError('')
     try {
       const tzOffset = new Date().getTimezoneOffset()
       const data = await listAnimalFeedingStatus(tzOffset)
       setAnimals(Array.isArray(data) ? data : [])
+      listLocations()
+        .then(setLocations)
+        .catch(() => setLocations([]))
     } catch (e) {
       // 401 is handled by apiClient (clears session + redirects); show an
       // empty state rather than a scary banner while that fires.
@@ -149,6 +184,36 @@ export default function FeedingDayPage() {
 
   const clearSelection = () => setSelectedIds(new Set())
   const selectedCount = selectedIds.size
+
+  const hasLocations = useMemo(
+    () => locations.length > 0 || animals.some((a) => !!a.location),
+    [locations, animals],
+  )
+
+  /** Tag every selected animal with one location (or clear it). This is the
+   *  path that makes locations usable on a big collection: one pass with
+   *  multi-select instead of sixty edit forms. */
+  const applyLocation = async (location: string | null) => {
+    if (selectedCount === 0) return
+    setLocBusy(true)
+    setActionError('')
+    try {
+      const res = await bulkSetLocation(location, Array.from(selectedIds))
+      setResultMessage(
+        res.location
+          ? `${res.updated} moved to ${res.location}.`
+          : `Location cleared on ${res.updated}.`,
+      )
+      // First location ever set — turn grouping on so the tag is visible.
+      if (res.location && !groupByLoc && !hasLocations) toggleGroupByLoc()
+      clearSelection()
+      await fetchStatus()
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : 'Could not set location')
+    } finally {
+      setLocBusy(false)
+    }
+  }
 
   /** Lift a pause directly from the list.
    *
@@ -288,6 +353,68 @@ export default function FeedingDayPage() {
     )
   }
 
+  const renderRow = (a: AnimalFeedingStatus) => {
+      const selected = selectedIds.has(a.id)
+      return (
+        <li key={a.id}>
+          <label
+            className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+              selected
+                ? 'border-herp-teal/60 bg-herp-teal/10'
+                : a.is_overdue && a.status_mode !== 'daily'
+                  ? 'border-orange-500/30 bg-neutral-900/40 hover:bg-neutral-900/60'
+                  : 'border-neutral-800 bg-neutral-900/40 hover:bg-neutral-900/60'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => toggleOne(a.id)}
+              className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 accent-herp-teal flex-shrink-0"
+              aria-label={`Select ${displayName(a)}`}
+            />
+            {/* Thumbnail or taxon glyph */}
+            <div className="w-10 h-10 rounded-md overflow-hidden bg-neutral-800 flex items-center justify-center flex-shrink-0">
+              {a.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={getImageUrl(a.photo_url)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-lg" aria-hidden="true">
+                  {taxonGlyph(a.taxon)}
+                </span>
+              )}
+            </div>
+            {/* Name + scientific + cadence */}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-white truncate">
+                {displayName(a)}
+              </p>
+              {a.scientific_name && (
+                <p className="text-sm text-neutral-500 italic truncate">
+                  {a.scientific_name}
+                </p>
+              )}
+              {a.interval_days != null && (
+                <p className="text-xs text-neutral-500 truncate">
+                  every ~{a.interval_days}d
+                </p>
+              )}
+            </div>
+            {/* Status pill */}
+            <StatusPill
+              animal={a}
+              onResume={handleResume}
+              resuming={resumingId === a.id}
+            />
+          </label>
+        </li>
+      )
+  }
+
   const filterChips: { key: FilterKey; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: counts.all },
     { key: 'overdue', label: 'Overdue', count: counts.overdue },
@@ -355,6 +482,24 @@ export default function FeedingDayPage() {
               </button>
             )
           })}
+          {/* A view option, not a filter — grouping, not hiding. Only once a
+              location exists. */}
+          {hasLocations && (
+            <button
+              type="button"
+              onClick={toggleGroupByLoc}
+              role="switch"
+              aria-checked={groupByLoc}
+              title="Group by location"
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+                groupByLoc
+                  ? 'border-herp-teal/60 bg-herp-teal/10 text-herp-lime'
+                  : 'border-neutral-800 bg-neutral-900/40 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+              }`}
+            >
+              <span aria-hidden="true">📍</span> By location
+            </button>
+          )}
         </div>
 
         {/* Select-all + selected count */}
@@ -391,69 +536,24 @@ export default function FeedingDayPage() {
             No animals match this filter.
           </div>
         ) : (
-          <ul className="space-y-2">
-            {shownAnimals.map((a) => {
-              const selected = selectedIds.has(a.id)
-              return (
-                <li key={a.id}>
-                  <label
-                    className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
-                      selected
-                        ? 'border-herp-teal/60 bg-herp-teal/10'
-                        : a.is_overdue && a.status_mode !== 'daily'
-                          ? 'border-orange-500/30 bg-neutral-900/40 hover:bg-neutral-900/60'
-                          : 'border-neutral-800 bg-neutral-900/40 hover:bg-neutral-900/60'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleOne(a.id)}
-                      className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 accent-herp-teal flex-shrink-0"
-                      aria-label={`Select ${displayName(a)}`}
-                    />
-                    {/* Thumbnail or taxon glyph */}
-                    <div className="w-10 h-10 rounded-md overflow-hidden bg-neutral-800 flex items-center justify-center flex-shrink-0">
-                      {a.photo_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={getImageUrl(a.photo_url)}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-lg" aria-hidden="true">
-                          {taxonGlyph(a.taxon)}
-                        </span>
-                      )}
-                    </div>
-                    {/* Name + scientific + cadence */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-white truncate">
-                        {displayName(a)}
-                      </p>
-                      {a.scientific_name && (
-                        <p className="text-sm text-neutral-500 italic truncate">
-                          {a.scientific_name}
-                        </p>
-                      )}
-                      {a.interval_days != null && (
-                        <p className="text-xs text-neutral-500 truncate">
-                          every ~{a.interval_days}d
-                        </p>
-                      )}
-                    </div>
-                    {/* Status pill */}
-                    <StatusPill
-                      animal={a}
-                      onResume={handleResume}
-                      resuming={resumingId === a.id}
-                    />
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
+          groupByLoc ? (
+            <div className="space-y-6">
+              {groupByLocation<AnimalFeedingStatus>(shownAnimals, (a) => a.location).map((g) => (
+                <section key={g.key} aria-label={g.label}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span aria-hidden="true">{g.key === UNASSIGNED_KEY ? '∅' : '📍'}</span>
+                    <h2 className="text-sm font-semibold text-neutral-200 truncate">{g.label}</h2>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-neutral-800 text-neutral-400 tabular-nums">
+                      {g.rows.length}
+                    </span>
+                  </div>
+                  <ul className="space-y-2">{g.rows.map(renderRow)}</ul>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-2">{shownAnimals.map(renderRow)}</ul>
+          )
         )}
       </div>
 
@@ -466,13 +566,24 @@ export default function FeedingDayPage() {
                 Log feeding for {selectedCount} animal
                 {selectedCount === 1 ? '' : 's'}
               </span>
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
-              >
-                Clear
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setLocDialogOpen(true)}
+                  disabled={locBusy}
+                  className="text-xs text-neutral-300 hover:text-white transition-colors disabled:opacity-50"
+                  aria-label={`Set location for ${selectedCount} selected`}
+                >
+                  <span aria-hidden="true">📍</span> Set location
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
 
             {actionError && (
@@ -588,6 +699,15 @@ export default function FeedingDayPage() {
           </div>
         </div>
       )}
+
+      <LocationDialog
+        open={locDialogOpen}
+        title={`Set location for ${selectedCount}`}
+        locations={locations}
+        confirmLabel="Apply"
+        onClose={() => setLocDialogOpen(false)}
+        onPick={applyLocation}
+      />
     </>
   )
 }

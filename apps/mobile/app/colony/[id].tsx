@@ -34,11 +34,12 @@ import DateInput from '../../src/components/DateInput';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import QRSheet from '../../src/components/QRSheet';
+import { EndColonySheet } from '../../src/components/EndColonySheet';
 import ColonyPopulationCard from '../../src/components/colony/ColonyPopulationCard';
 import ColonyQuickLogSheet, { type QuickKind } from '../../src/components/colony/ColonyQuickLogSheet';
 import ColonyActivity from '../../src/components/colony/ColonyActivity';
 import { taxonMdiIcon } from '../../src/lib/inverts';
-import { TYPE } from '../../src/theme/tokens';
+import { SPACING, TYPE } from '../../src/theme/tokens';
 import { COLONY_EVENT_MDI } from '../../src/lib/colony-events';
 import { getImageUrl } from '../../src/utils/image-url';
 import { getErrorMessage } from '../../src/utils/errors';
@@ -79,6 +80,8 @@ import {
   createColonyEvent,
   deleteColonyEvent,
   deleteColony,
+  reopenColony,
+  colonyEndReasonLabel,
   eventHasSeverity,
   COLONY_EVENT_LABELS,
   type Colony,
@@ -175,8 +178,15 @@ export default function ColonyDetailScreen() {
   const { user } = useAuth();
   const { role, ownerName } = useCollectionRole(user?.id, colony?.user_id);
   const isOwner = role === 'owner';
-  const canLog = can(role, 'logger');
-  const canKeep = can(role, 'keeper');
+  // An ended colony is a historical record: like a died animal's screen, every
+  // logging and editing control goes away. Only Reopen survives, and it needs
+  // the raw role rather than the gated one.
+  const isEnded = !!colony?.ended_at;
+  const canKeepRole = can(role, 'keeper');
+  const canLog = can(role, 'logger') && !isEnded;
+  const canKeep = canKeepRole && !isEnded;
+  const [endOpen, setEndOpen] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
   const [deleting, setDeleting] = useState(false);
   const [showAllFeed, setShowAllFeed] = useState(false);
@@ -345,6 +355,33 @@ export default function ColonyDetailScreen() {
     }
   };
 
+  /** Undo an end. A correction, so confirmed gently and never blocked by the
+   *  plan cap (the colony starts counting again). */
+  const handleReopen = () => {
+    if (!colony || reopening) return;
+    Alert.alert(
+      `Reopen ${colony.name}?`,
+      'It will return to your collection, count toward your plan again, and logging will be open.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reopen',
+          onPress: async () => {
+            setReopening(true);
+            try {
+              await reopenColony(colony.id);
+              await fetchColony();
+            } catch (e) {
+              Alert.alert('Could not reopen', getErrorMessage(e));
+            } finally {
+              setReopening(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const backAction = (
     <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" style={{ paddingRight: 4 }}>
       <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
@@ -372,8 +409,21 @@ export default function ColonyDetailScreen() {
     </TouchableOpacity>
   ) : null;
 
-  const editAction = qrAction || editButton ? (
+  // Share card: keeper-level like sharing an animal. canKeep is already false
+  // for an ended colony, which the API refuses a new card for (409).
+  const shareButton = colony && canKeep ? (
+    <TouchableOpacity
+      onPress={() => router.push(`/share/${colony.id}?kind=colony` as any)}
+      accessibilityLabel="Share card"
+      style={{ paddingHorizontal: 4 }}
+    >
+      <MaterialCommunityIcons name="share-variant" size={24} color={iconColor} />
+    </TouchableOpacity>
+  ) : null;
+
+  const editAction = qrAction || editButton || shareButton ? (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {shareButton}
       {qrAction}
       {editButton}
     </View>
@@ -859,12 +909,52 @@ export default function ColonyDetailScreen() {
                 </TouchableOpacity>
               ) : null}
             </View>
-            {!colony.is_active && (
+            {!colony.is_active && !isEnded && (
               <View style={[styles.archivedPill, styles.archivedInline, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={styles.archivedText}>Archived</Text>
               </View>
             )}
           </View>
+
+          {/* Status card for an ended colony. A neutral dot, the same quiet
+              full stop the died-animal card uses: never colors.error (nothing
+              was destroyed), no checkmark, no success colour. */}
+          {isEnded && colony.ended_at ? (
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md, gap: SPACING.sm },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+                <View
+                  style={{ width: SPACING.sm + 1, height: SPACING.sm + 1, borderRadius: layout.radius.sm, backgroundColor: colors.textTertiary }}
+                />
+                <Text style={[TYPE.subheading, { color: colors.textPrimary, flex: 1 }]}>
+                  {[
+                    `Ended ${formatLocalDate(colony.ended_at, { month: 'short', day: 'numeric', year: 'numeric' })}`,
+                    colonyEndReasonLabel(colony.end_reason),
+                  ].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+              <Text style={[TYPE.body, { color: colors.textSecondary }]}>
+                This is a historical record. Everything below is kept. The colony is out of your collection and your animal count.
+              </Text>
+              {colony.end_notes ? (
+                <Text style={[TYPE.body, { color: colors.textTertiary, fontStyle: 'italic' }]}>{colony.end_notes}</Text>
+              ) : null}
+              <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                Logging is closed. Records stay readable and exportable.
+              </Text>
+              {canKeepRole ? (
+                <TouchableOpacity onPress={handleReopen} disabled={reopening} accessibilityRole="button">
+                  <Text style={[TYPE.bodyStrong, { color: colors.textSecondary }]}>
+                    {reopening ? 'Saving…' : 'Reopen colony'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
 
           {/* Population card — count, 30-day trend, weekly bars, stage split. */}
           <ColonyPopulationCard
@@ -1494,6 +1584,16 @@ export default function ColonyDetailScreen() {
             </View>
           ) : null}
 
+          {/* End colony. Neutral, above delete: a colony that crashed or was
+              sold shouldn't have to be deleted to leave the collection. */}
+          {canKeep && <TouchableOpacity
+            onPress={() => setEndOpen(true)}
+            style={[styles.ghostBtn, { alignItems: 'center', marginBottom: SPACING.md, borderRadius: layout.radius.md }]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.ghostBtnText}>End colony</Text>
+          </TouchableOpacity>}
+
           {/* Delete colony */}
           {isOwner && <TouchableOpacity
             onPress={() => setConfirmDelete(true)}
@@ -1514,6 +1614,14 @@ export default function ColonyDetailScreen() {
         onClose={() => setQuick(null)}
         onSaved={fetchColony}
         onMore={(type) => openForm(type)}
+      />
+
+      <EndColonySheet
+        visible={endOpen}
+        onClose={() => setEndOpen(false)}
+        colonyId={colony.id}
+        name={colony.name}
+        onDone={() => { setEndOpen(false); fetchColony(); }}
       />
 
       {/* Delete colony modal */}

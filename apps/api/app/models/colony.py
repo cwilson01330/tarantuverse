@@ -40,9 +40,21 @@ COLONY_EVENT_TYPES = (
 )
 
 
+# Why a colony ended. A population doesn't "die" like an individual animal
+# (inverts.died_at); it crashes, is sold on, is folded into another colony, or
+# ends for some other reason. Kept in lockstep with the colonies_end_reason_check
+# CHECK and migration cen_20261007_colony_end.
+COLONY_END_REASONS = ("crashed", "sold", "merged", "other")
+
+
 class Colony(Base):
     __tablename__ = "colonies"
     __table_args__ = (
+        CheckConstraint(
+            "end_reason IS NULL OR end_reason IN "
+            "('crashed', 'sold', 'merged', 'other')",
+            name="colonies_end_reason_check",
+        ),
         CheckConstraint(
             "taxon IN ('tarantula', 'scorpion', 'centipede', "
             "'whip_spider', 'vinegaroon', 'true_spider', "
@@ -127,6 +139,16 @@ class Colony(Base):
     # Reserved for a future transfer flow — mirrors inverts so a colony-aware
     # count can exclude handed-off colonies consistently.
     transferred_out_at = Column(DateTime(timezone=True), nullable=True)
+
+    # --- Ended (cen_20261007) -------------------------------------------------
+    # The colony equivalent of inverts.died_at. A terminal state, NOT a delete:
+    # every event, feeding and photo is kept, and the colony drops out of the
+    # default list and the free-tier count (utils/limits.active_colonies_query).
+    # NULL = still running. Set only through POST /colonies/{id}/end and undone
+    # through /reopen, never by the generic update.
+    ended_at = Column(Date, nullable=True, index=True)
+    end_reason = Column(String(20), nullable=True)  # one of COLONY_END_REASONS
+    end_notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)

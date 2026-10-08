@@ -1,0 +1,41 @@
+# Tarantuverse
+
+> Husbandry tracker for invertebrate keepers on iOS, Android and the web.
+> Keepers log feedings, molts, substrate changes and water for each animal,
+> and look up species care guides. Operated by Appalachian Tarantulas, LLC.
+
+## What it tracks
+- Tarantulas, scorpions, centipedes, whip spiders, vinegaroons, true spiders
+  (including jumping spiders), millipedes, mantises, roaches and isopods
+- Feedings, including logging a whole feeding day at once
+- Molts, growth measurements, and instar or stage
+- Substrate changes and water
+- Colonies, tracked as populations with headcounts by life stage
+- Breeding: pairings, egg sacs and offspring
+
+## Species care guides
+- Index: https://www.tarantuverse.com/species
+- Each guide lists temperature, humidity, enclosure sizes by life stage,
+  substrate, feeding frequency, temperament and safety notes, with its source.
+
+## Pricing (as listed at https://www.tarantuverse.com/pricing)
+- Free: up to 15 animals, 5 photos per animal
+- Premium: USD 4.99 per month, USD 44.99 per year, or USD 149.99 one-time lifetime
+
+## Get the app
+- iOS: https://apps.apple.com/us/app/tarantuverse/id6756224640
+- Android: https://play.google.com/store/apps/details?id=com.tarantuverse.app
+- Web: https://www.tarantuverse.com
+
+## Key pages
+- Features: https://www.tarantuverse.com/features
+- Pricing: https://www.tarantuverse.com/pricing
+- Help: https://www.tarantuverse.com/help
+- Privacy: https://www.tarantuverse.com/privacy
+
+## Contact
+- cory@appalachiantarantulas.com
+
+## Related
+- Herpetoverse, the sibling app for reptiles and amphibians from the same
+  company: https://herpetoverse.com

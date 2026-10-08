@@ -1,17 +1,17 @@
 'use client'
 
 /**
- * Generic invert detail page (web) — ADR-006 web parity B2.
+ * Animal detail page (web) for every taxon on the unified `inverts` surface.
  *
- * Lean detail for non-tarantula taxa (scorpion / centipede / whip spider)
- * on the unified `inverts` surface. Tarantulas keep their rich
- * /dashboard/tarantulas/[id] page. Reads GET /inverts/{id}; logs are
- * fetched through the per-taxon facade prefix (e.g. /whip-spiders/{id}/
- * feedings). Add/edit + log forms are B3 — the buttons here route to
- * those pages.
+ * Since B5 (2026-10-07) this is the ONLY web detail page: the bespoke
+ * /dashboard/tarantulas/[id] page redirects here, the way mobile's
+ * tarantula/[id] already redirects to invert/[id] (ADR-013). Tarantula-only
+ * extras (premolt, the richer feeding stats) are gated by the module
+ * registry in lib/inverts.ts, not by a second page. Reads GET /inverts/{id};
+ * logs come from the generic /inverts/{id}/… endpoints.
  */
-import { useState, useEffect, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -29,6 +29,7 @@ import {
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
   tracksInstars, formatStage, stageSummary, elapsedSince, stageCountLabel, adultStageHint,
+  INVERT_TAXA, isInvertTaxon, type InvertTaxon,
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
@@ -36,6 +37,9 @@ import SpeciesLinkBanner from '@/components/SpeciesLinkBanner'
 import InvertFeedingStatus, {
   type InvertFeedingStats,
 } from '@/components/InvertFeedingStatus'
+import FeedingStatsCard, { type FeedingStats as TarantulaFeedingStats } from '@/components/FeedingStatsCard'
+import PauseFeedingModal from '@/components/PauseFeedingModal'
+import PremoltPredictionSection from '@/components/PremoltPredictionSection'
 import QRModal from '@/components/QRModal'
 import { ROLE_LABEL, attribution, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 
@@ -63,19 +67,17 @@ function todayIso(): string {
  */
 type LoadState = 'loading' | 'ok' | 'error' 
 
-type TaxonKey = 'scorpion' | 'centipede' | 'whip_spider' | 'tarantula'
-
-const TAXON_META: Record<TaxonKey, { glyph: string; label: string; prefix: string }> = {
-  scorpion: { glyph: '🦂', label: 'Scorpion', prefix: 'scorpions' },
-  centipede: { glyph: '🐛', label: 'Centipede', prefix: 'centipedes' },
-  whip_spider: { glyph: '🕸️', label: 'Whip spider', prefix: 'whip-spiders' },
-  tarantula: { glyph: '🕷', label: 'Tarantula', prefix: 'tarantulas' },
+// Glyph + label come from the shared registry. This page used to keep its own
+// four-taxon table, so a mantis, jumper, millipede or roach resolved to no
+// meta at all and the page rendered nothing but the back link.
+function taxonMeta(taxon: string) {
+  return INVERT_TAXA[isInvertTaxon(taxon) ? taxon : 'other']
 }
 
 interface Invert {
   id: string
   user_id?: string
-  taxon: TaxonKey
+  taxon: InvertTaxon
   name?: string | null
   common_name?: string | null
   scientific_name?: string | null
@@ -92,7 +94,20 @@ interface Invert {
   target_humidity_min?: string | number | null
   target_humidity_max?: string | number | null
   water_dish?: boolean | null
+  misting_schedule?: string | null
+  last_substrate_change?: string | null
+  last_enclosure_cleaning?: string | null
   enclosure_notes?: string | null
+  /** Room / rack / shelf (lib/locations). */
+  location?: string | null
+  // Feeding pause (pst_20260502). The page reads the live state from
+  // feedingStats, which also applies the "until" date; these are the stored
+  // values.
+  feeding_paused_reason?: string | null
+  feeding_paused_until?: string | null
+  /** 'public' | 'private' is the source of truth; is_public is kept in step. */
+  visibility?: string | null
+  is_public?: boolean | null
   photo_url?: string | null
   notes?: string | null
   species_id?: string | null
@@ -112,7 +127,7 @@ interface Invert {
 
 interface Attributed { logged_by_user_id?: string | null; logged_by_name?: string | null; sitter_name?: string | null }
 interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
-interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null; outcome?: string | null; is_ultimate?: boolean }
+interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null; outcome?: string | null; is_ultimate?: boolean; leg_span_after?: string | number | null }
 interface SubstrateChange extends Attributed { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
 /** Hydration events (car_20260909). Three types, because a top-up, a
  *  deliberate overflow to damp the substrate, and a misting are three
@@ -125,6 +140,44 @@ const CARE_LOG_LABELS: Record<CareLogType, string> = {
   misted: 'Misted',
 }
 interface Photo { id: string; url: string; thumbnail_url?: string | null; caption?: string | null }
+
+/** The tarantula-only feeding analytics. Null on any failure — the card is an
+ *  extra, and the verdict above it already says whether she's due. */
+function fetchTarantulaStats(id: string, headers: Record<string, string>): Promise<TarantulaFeedingStats | null> {
+  return fetch(
+    `${API_URL}/api/v1/tarantulas/${id}/feeding-stats?tz_offset_minutes=${new Date().getTimezoneOffset()}`,
+    { headers },
+  ).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+}
+
+function fetchInvertStats(id: string, headers: Record<string, string>): Promise<InvertFeedingStats | null> {
+  return fetch(
+    `${API_URL}/api/v1/inverts/${id}/feeding-stats?tz_offset_minutes=${new Date().getTimezoneOffset()}`,
+    { headers },
+  ).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+}
+
+/**
+ * `?log=molt` / `?log=feeding` deep links (the public /t/ and /i/ pages send
+ * them). Its own component so useSearchParams sits inside a Suspense boundary,
+ * which Next 14 requires. Acts once, and only for someone who can log here.
+ * The query is stripped from history first, so Back from the form returns to
+ * this page instead of bouncing into the form again.
+ */
+function LogDeepLink({ id, canLog, ready }: { id: string; canLog: boolean; ready: boolean }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const done = useRef(false)
+  const log = searchParams?.get('log')
+  useEffect(() => {
+    if (done.current || !ready || !id) return
+    if (log !== 'molt' && log !== 'feeding') return
+    done.current = true
+    window.history.replaceState(null, '', `/dashboard/inverts/${id}`)
+    if (canLog) router.push(`/dashboard/inverts/${id}/add-${log}`)
+  }, [log, id, canLog, ready, router])
+  return null
+}
 
 export default function InvertDetailPage() {
   const params = useParams()
@@ -156,6 +209,14 @@ export default function InvertDetailPage() {
   // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
   const [moltsToAdult, setMoltsToAdult] = useState<number | null>(null)
   const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null)
+  // Tarantulas only: the richer card (streak, longest gap, prey mix) from
+  // /tarantulas/{id}/feeding-stats. The verdict above it still comes from
+  // feedingStats, so every taxon reads its feeding status the same way.
+  const [tarantulaStats, setTarantulaStats] = useState<TarantulaFeedingStats | null>(null)
+  const [pauseOpen, setPauseOpen] = useState(false)
+  const [pauseError, setPauseError] = useState<string | null>(null)
+  const [visibilityBusy, setVisibilityBusy] = useState(false)
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [shareMolt, setShareMolt] = useState<string | null>(null)
@@ -239,7 +300,7 @@ export default function InvertDetailPage() {
         }
       }
 
-      const [f, m, s, p, g, c, fs] = await Promise.all([
+      const [f, m, s, p, g, c, fs, ts] = await Promise.all([
         load<any>('feedings'),
         load<any>('molts'),
         load<any>('substrate-changes'),
@@ -260,6 +321,7 @@ export default function InvertDetailPage() {
               { headers },
             ).then((r) => (r.ok ? r.json() : null)).catch(() => null)
           : Promise.resolve(null),
+        data.taxon === 'tarantula' ? fetchTarantulaStats(id, headers) : Promise.resolve(null),
       ])
       setFeedings(f.data)
       setMolts(m.data)
@@ -275,6 +337,7 @@ export default function InvertDetailPage() {
       })
       setGrowth(g)
       setFeedingStats(fs)
+      setTarantulaStats(ts)
 
       // Breeding module (registry-gated — ADR-021 Phase D). Fetch this
       // animal's pairings + the same-taxon collection for the mate picker.
@@ -357,6 +420,74 @@ export default function InvertDetailPage() {
       router.push('/dashboard/tarantulas')
     } catch {
       alert('Could not delete this animal. Please try again.')
+    }
+  }
+
+  // ── Feeding pause + visibility (ported from the legacy tarantula page) ──
+  // Both write PUT /inverts/{id}. Pause is keeper-level; visibility is
+  // owner-only, and the server strips it from a co-keeper's write anyway.
+  const putInvert = async (body: Record<string, unknown>): Promise<Invert> => {
+    const res = await fetch(`${API_URL}/api/v1/inverts/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new Error(typeof data?.detail === 'string' ? data.detail : 'Couldn’t save that. Nothing has changed.')
+    }
+    return res.json()
+  }
+
+  // Re-reads only what a pause changes, without the full-page loading state.
+  const refreshFeeding = async (updated?: Invert) => {
+    if (!token || !id) return
+    const headers = { Authorization: `Bearer ${token}` }
+    const taxon = updated?.taxon ?? invert?.taxon
+    if (updated) setInvert(updated)
+    const [fs, ts] = await Promise.all([
+      taxon && taxonHasModule(taxon, 'feedingStats') ? fetchInvertStats(id, headers) : Promise.resolve(null),
+      taxon === 'tarantula' ? fetchTarantulaStats(id, headers) : Promise.resolve(null),
+    ])
+    setFeedingStats(fs)
+    setTarantulaStats(ts)
+  }
+
+  /** PauseFeedingModal shows its own error when this throws, and stays open. */
+  const handlePauseFeeding = async (reason: string, until: string | null) => {
+    if (!token) throw new Error('Not signed in')
+    const updated = await putInvert({ feeding_paused_reason: reason, feeding_paused_until: until })
+    setPauseError(null)
+    await refreshFeeding(updated)
+  }
+
+  const handleResumeFeeding = async () => {
+    if (!token) return
+    setPauseError(null)
+    try {
+      const updated = await putInvert({ feeding_paused_reason: null, feeding_paused_until: null })
+      await refreshFeeding(updated)
+    } catch (e) {
+      setPauseError(e instanceof Error ? e.message : 'Couldn’t resume feeding. Nothing has changed.')
+    }
+  }
+
+  // `visibility` is what the keeper profile filters on; `is_public` is written
+  // in step so nothing reading the old flag disagrees. The legacy page wrote
+  // only is_public, which the profile never reads — its toggle did nothing.
+  const isPublic = invert?.visibility ? invert.visibility === 'public' : !!invert?.is_public
+  const handleVisibilityToggle = async () => {
+    if (!token || !invert || visibilityBusy) return
+    setVisibilityBusy(true)
+    setVisibilityError(null)
+    try {
+      const next = !isPublic
+      const updated = await putInvert({ visibility: next ? 'public' : 'private', is_public: next })
+      setInvert(updated)
+    } catch (e) {
+      setVisibilityError(e instanceof Error ? e.message : 'Couldn’t change visibility. Nothing has changed.')
+    } finally {
+      setVisibilityBusy(false)
     }
   }
 
@@ -479,7 +610,7 @@ export default function InvertDetailPage() {
       .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
       .join('&')
 
-  const meta = invert ? TAXON_META[invert.taxon] : null
+  const meta = invert ? taxonMeta(invert.taxon) : null
   const isWhipSpider = invert?.taxon === 'whip_spider'
 
   return (
@@ -600,7 +731,50 @@ export default function InvertDetailPage() {
               <InvertFeedingStatus
                 stats={feedingStats}
                 onSetCadence={canKeep ? () => setCadenceOpen(true) : undefined}
+                actions={canKeep && feedingStats && !invert.died_at ? (
+                  // Mirrors mobile app/invert/[id].tsx: pause sits with the
+                  // feeding status, and a paused animal gets the way back
+                  // out in the same place.
+                  feedingStats.is_feeding_paused ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleResumeFeeding}
+                        className="px-3 py-1.5 rounded-full border border-current text-xs font-bold hover:opacity-80 transition"
+                      >
+                        Resume feeding
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPauseOpen(true)}
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold hover:underline"
+                      >
+                        Manage pause
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setPauseError(null); setPauseOpen(true) }}
+                      className="px-3 py-1.5 rounded-full border border-current text-xs font-semibold opacity-80 hover:opacity-100 transition"
+                      aria-label="Pause feeding reminders"
+                    >
+                      Pause feeding
+                    </button>
+                  )
+                ) : undefined}
               />
+            )}
+            {pauseError && (
+              <p role="alert" className="-mt-4 mb-6 text-sm text-red-600 dark:text-red-400">{pauseError}</p>
+            )}
+
+            {/* Premolt prediction — tarantula only (registry-gated). The card
+                fetches its own data from the canonical premolt endpoint. */}
+            {taxonHasModule(invert.taxon, 'premolt') && !invert.died_at && (
+              <div className="mb-6">
+                <PremoltPredictionSection tarantulaId={invert.id} />
+              </div>
             )}
 
             {/* Identity */}
@@ -641,10 +815,12 @@ export default function InvertDetailPage() {
             {/* Husbandry */}
             {hasHusbandry(invert) && (
               <Section title="Husbandry">
+                <Fact label="Location" value={invert.location} />
                 <Fact label="Type" value={cap(invert.enclosure_type)} />
                 <Fact label="Size" value={invert.enclosure_size} />
                 <Fact label="Substrate" value={invert.substrate_type} />
                 <Fact label="Substrate depth" value={invert.substrate_depth} />
+                <Fact label="Last substrate change" value={invert.last_substrate_change ? formatLocalDate(invert.last_substrate_change) : null} />
                 {(invert.target_temp_min || invert.target_temp_max) && (
                   <Fact label="Temperature" value={`${invert.target_temp_min ?? '?'}–${invert.target_temp_max ?? '?'} °F`} />
                 )}
@@ -652,6 +828,14 @@ export default function InvertDetailPage() {
                   <Fact label="Humidity" value={`${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%`} />
                 )}
                 <Fact label="Water dish" value={invert.water_dish ? 'Yes' : 'No'} />
+                <Fact label="Misting" value={invert.misting_schedule} />
+                <Fact label="Last enclosure cleaning" value={invert.last_enclosure_cleaning ? formatLocalDate(invert.last_enclosure_cleaning) : null} />
+                {invert.enclosure_notes && (
+                  <div className="py-1.5">
+                    <span className="block text-sm text-theme-tertiary">Enclosure notes</span>
+                    <p className="mt-0.5 text-sm text-theme-primary whitespace-pre-line">{invert.enclosure_notes}</p>
+                  </div>
+                )}
               </Section>
             )}
 
@@ -672,6 +856,15 @@ export default function InvertDetailPage() {
                 onDelete: canChange(x) ? () => deleteLog(`feedings/${x.id}`, 'feeding') : undefined,
               }))}
             />
+            {/* Tarantula feeding analytics: streak, longest gap, refusals and
+                prey mix. Its own status banner is hidden — the verdict at the
+                top of the page already says when she was fed and whether
+                she's due or paused, and two banners could disagree. */}
+            {invert.taxon === 'tarantula' && tarantulaStats && tarantulaStats.total_feedings > 0 && (
+              <div className="mb-4">
+                <FeedingStatsCard data={tarantulaStats} hideStatus />
+              </div>
+            )}
             <LogSection
               title="Molts"
               cta={canLog ? 'Log molt' : undefined}
@@ -708,6 +901,41 @@ export default function InvertDetailPage() {
                     <div className="flex justify-between gap-4"><dt className="text-theme-tertiary">Acquired via transfer</dt><dd>{formatLocalDate(invert.provenance.transferred_at)}</dd></div>
                   )}
                 </dl>
+              </Section>
+            )}
+
+            {/* Visibility — owner only. Hidden from co-keepers; the server
+                strips visibility from their writes regardless. */}
+            {isOwner && !invert.transferred_out_at && (
+              <Section title="Visibility">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-theme-primary">{isPublic ? 'Public' : 'Private'}</p>
+                    <p className="text-xs text-theme-tertiary mt-0.5">
+                      Public animals are listed on your keeper profile when your collection is public.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isPublic}
+                    aria-label={isPublic ? 'Make private' : 'Make public'}
+                    onClick={handleVisibilityToggle}
+                    disabled={visibilityBusy}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-60 ${
+                      isPublic ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                        isPublic ? 'translate-x-5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {visibilityError && (
+                  <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">{visibilityError}</p>
+                )}
               </Section>
             )}
 
@@ -938,6 +1166,23 @@ export default function InvertDetailPage() {
         onSaved={fetchAll}
       />
 
+      {/* Feeding pause — PUT /inverts/{id}, so it works for every taxon with
+          a feeding cadence. Current values come from feedingStats, like mobile. */}
+      {invert && canKeep && (
+        <PauseFeedingModal
+          isOpen={pauseOpen}
+          onClose={() => setPauseOpen(false)}
+          onSubmit={handlePauseFeeding}
+          initialReason={feedingStats?.feeding_paused_reason ?? invert.feeding_paused_reason ?? undefined}
+          initialUntil={feedingStats?.feeding_paused_until ?? invert.feeding_paused_until ?? undefined}
+          isPaused={!!feedingStats?.is_feeding_paused}
+        />
+      )}
+
+      <Suspense fallback={null}>
+        <LogDeepLink id={id} canLog={canLog && !invert?.died_at} ready={!!invert && !loading && viewerRole !== null} />
+      </Suspense>
+
       {/* `resource="inverts"` is the whole point — the default tarantula
           routes 404 for every other taxon. */}
       {qrOpen && invert && (
@@ -946,6 +1191,13 @@ export default function InvertDetailPage() {
           tarantulaName={invert.name || invert.common_name || 'Unnamed'}
           scientificName={invert.scientific_name ?? null}
           sex={invert.sex ?? null}
+          // Recent molts on the label, as the legacy tarantula page offered.
+          // leg_span_after is inches for every taxon; the label prints ".
+          molts={molts.map((m) => ({
+            id: m.id,
+            molted_at: m.molted_at,
+            leg_span_after: m.leg_span_after != null && m.leg_span_after !== '' ? Number(m.leg_span_after) : undefined,
+          }))}
           resource="inverts"
           onClose={() => setQrOpen(false)}
           onPhotoAdded={fetchAll}
@@ -1226,7 +1478,8 @@ function cap(s?: string | null): string | null {
 function hasHusbandry(i: Invert): boolean {
   return Boolean(
     i.enclosure_type || i.enclosure_size || i.substrate_type || i.substrate_depth ||
-    i.target_temp_min || i.target_temp_max || i.target_humidity_min || i.target_humidity_max,
+    i.target_temp_min || i.target_temp_max || i.target_humidity_min || i.target_humidity_max ||
+    i.location || i.last_substrate_change || i.misting_schedule || i.last_enclosure_cleaning || i.enclosure_notes,
   )
 }
 

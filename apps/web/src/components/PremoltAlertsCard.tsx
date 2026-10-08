@@ -132,7 +132,7 @@ export default function PremoltAlertsCard() {
         {likelyPredictions.map(prediction => (
           <button
             key={prediction.tarantula_id}
-            onClick={() => router.push(`/dashboard/tarantulas/${prediction.tarantula_id}`)}
+            onClick={() => router.push(`/dashboard/inverts/${prediction.tarantula_id}`)}
             className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-gray-800 hover:shadow-md transition border border-amber-100 dark:border-amber-900 text-left group"
           >
             <div className="flex-1">

@@ -48,6 +48,16 @@ export interface FeedingVerdict {
   detail: string
 }
 
+// The canonical reasons PauseFeedingModal stores, as prose. Anything else (an
+// older free-text reason) is shown as written.
+const PAUSE_REASON_LABELS: Record<string, string> = {
+  premolt: 'In premolt',
+  post_rehouse: 'Settling after a rehouse',
+  recovering: 'Recovering',
+  mating_season: 'Mating-season pause',
+  other: 'Paused',
+}
+
 function fmtDate(v: string): string {
   // Date-only strings are parsed as UTC midnight by `new Date`, which rewinds
   // a day in western timezones. Split rather than parse.
@@ -70,14 +80,17 @@ export function feedingVerdict(s: InvertFeedingStats | null): FeedingVerdict | n
   const iv = s.interval_days
 
   if (s.is_feeding_paused) {
+    const reason = s.feeding_paused_reason
+      ? PAUSE_REASON_LABELS[s.feeding_paused_reason] ?? s.feeding_paused_reason
+      : null
     return {
       tone: 'muted',
       headline: 'Feeding paused',
-      detail: s.feeding_paused_reason
+      detail: reason
         ? s.feeding_paused_until
-          ? `${s.feeding_paused_reason} · until ${fmtDate(s.feeding_paused_until)}`
-          : s.feeding_paused_reason
-        : 'Resume from the actions above when she starts taking food again.',
+          ? `${reason} · until ${fmtDate(s.feeding_paused_until)}`
+          : reason
+        : 'No overdue alerts until you resume.',
     }
   }
 
@@ -147,10 +160,13 @@ const TONE_CLS: Record<FeedingVerdict['tone'], string> = {
 export default function InvertFeedingStatus({
   stats,
   onSetCadence,
+  actions,
 }: {
   stats: InvertFeedingStats | null
   /** ADR-017 — an offer, not a setting. Omit it and the prompt never renders. */
   onSetCadence?: () => void
+  /** Extra controls under the verdict (pause / resume). Omit to render none. */
+  actions?: React.ReactNode
 }) {
   const v = feedingVerdict(stats)
   if (!v) return null
@@ -177,6 +193,7 @@ export default function InvertFeedingStatus({
           </button>
         )}
       </div>
+      {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
     </div>
   )
 }

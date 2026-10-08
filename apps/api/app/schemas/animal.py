@@ -9,7 +9,7 @@ reptile_species in anh_20260514). The catalog *route* stays
 `/api/v1/reptile-species/` because appalachiantarantulas.com reads it
 — only the table + this FK field were renamed.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Any, Optional
 from datetime import date, datetime
 from decimal import Decimal
@@ -52,6 +52,16 @@ class AnimalBase(BaseModel):
     # true/false explicitly overrides for this animal. Clients resolve
     # the effective value as `override ?? species.feeds_on_cgd`.
     feeds_on_cgd_override: Optional[bool] = None
+
+    # Room / rack / shelf. Trimmed and whitespace-collapsed here; the router
+    # then snaps it to the keeper's existing spelling (utils/locations).
+    location: Optional[str] = Field(None, max_length=120)
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _normalise_location(cls, v):
+        from app.utils.locations import normalize_location
+        return normalize_location(v) if isinstance(v, str) else v
 
     # Media
     photo_url: Optional[str] = Field(None, max_length=500)
@@ -99,6 +109,7 @@ class AnimalFeedingStatusItem(BaseModel):
     scientific_name: Optional[str] = None
     taxon: str
     photo_url: Optional[str] = None
+    location: Optional[str] = None
     last_feeding_date: Optional[datetime] = None
     days_since_last_feeding: Optional[int] = None
     is_feeding_paused: bool = False

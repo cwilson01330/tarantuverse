@@ -4,6 +4,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+# Lockstep with services/share_card.py::CARD_KINDS and card_links_kind_check.
+KIND_PATTERN = "^(molt|profile|colony|shed|weight)$"
+
 
 class PhotoFocus(BaseModel):
     """Where the keeper wants the photo framed: the point of the photo (0-1
@@ -16,9 +19,13 @@ class PhotoFocus(BaseModel):
 
 class ShareCardCreate(BaseModel):
     app: str = Field(..., pattern="^(tarantuverse|herpetoverse)$")
+    # The card's subject: an animal, or — for kind "colony" — a colony's id.
     animal_id: UUID
-    kind: str = Field(..., pattern="^(molt|profile)$")
+    kind: str = Field(..., pattern=KIND_PATTERN)
     molt_id: Optional[UUID] = None
+    # kind "shed" (HV): which shed log. kind "weight" (HV): which weigh-in.
+    shed_id: Optional[UUID] = None
+    weight_log_id: Optional[UUID] = None
     fields: Optional[List[str]] = Field(None, max_length=20)
     shape: str = Field("story", pattern="^(story|post|square|wide)$")
     frame: str = Field("specimen", pattern="^(specimen|notes|herbarium)$")

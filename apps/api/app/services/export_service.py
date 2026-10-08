@@ -128,7 +128,7 @@ INVERT_FIELDS = [
     "id", "user_id", "taxon", "name", "common_name", "scientific_name",
     "species_id", "sex", "date_acquired", "source", "price_paid",
     "photo_url", "notes", "is_public", "visibility", "enclosure_id",
-    "colony_id",
+    "colony_id", "location",
     # Growth / stage — instar and length carry the taxa that don't use
     # sling/juvenile/adult.
     "life_stage", "current_instar", "current_length_mm",
@@ -192,6 +192,7 @@ COLONY_FIELDS = [
     "last_substrate_change", "target_temp_min", "target_temp_max",
     "target_humidity_min", "target_humidity_max", "water_dish",
     "notes", "photo_url", "visibility", "is_active", "transferred_out_at",
+    "ended_at", "end_reason", "end_notes", "location",
     "created_at", "updated_at",
 ]
 
@@ -224,7 +225,8 @@ ANIMAL_FIELDS = [
     "current_length_in", "feeding_schedule", "last_fed_at", "last_shed_at",
     "brumation_active", "brumation_started_at", "feeding_paused_reason",
     "feeding_paused_until", "feeds_on_cgd_override", "photo_url", "is_public",
-    "visibility", "notes", "created_at", "updated_at",
+    "visibility", "notes", "location", "died_at", "death_cause", "death_notes",
+    "transferred_out_at", "created_at", "updated_at",
 ]
 
 SHED_FIELDS = [
@@ -638,6 +640,22 @@ class ExportService:
         data = ExportService._gather(db, user)
         return await build_full_zip(data, user.username, fetch_photo)
 
+    @staticmethod
+    async def export_full_zip_file(db: Session, user: User):
+        """Same backup, written to a spooled temp file (in memory up to 16 MB,
+        then disk) so a large collection's photos never sit in RAM all at
+        once on the 512 MB instance. The caller streams it and closes it."""
+        import tempfile
+        data = ExportService._gather(db, user)
+        spool = tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024)
+        try:
+            await build_full_zip(data, user.username, out=spool)
+        except Exception:
+            spool.close()
+            raise
+        spool.seek(0)
+        return spool
+
 
 TAXON_FOLDERS = {
     "tarantula": "tarantulas", "scorpion": "scorpions", "centipede": "centipedes",
@@ -672,18 +690,36 @@ def _photo_ext(url: str) -> str:
     return ext if ext in {"jpg", "jpeg", "png", "gif", "webp"} else "jpg"
 
 
-async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None) -> bytes:
+# A stored photo is at most a 2560 px re-encode; anything far larger isn't ours.
+MAX_EXPORT_PHOTO_BYTES = 25 * 1024 * 1024
+
+
+def _is_our_photo_url(url: str, base: str) -> bool:
+    """Only fetch from our own storage bucket. `photos.url` is written by the
+    server, but the export must never become a way to make the API fetch an
+    arbitrary address (SSRF)."""
+    base = (base or "").rstrip("/")
+    return bool(base) and base.startswith("https://") and url.startswith(base + "/")
+
+
+async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, out=None) -> Optional[bytes]:
     """The full backup, from already-gathered export data (pure but for
-    `fetch_photo`, so it can be tested without a database or network)."""
+    `fetch_photo`, so it can be tested without a database or network).
+    Writes to `out` (a binary file object) when given and returns None;
+    otherwise returns the ZIP bytes."""
     client: Optional[httpx.AsyncClient] = None
     if fetch_photo is None:
+        from app.config import settings
+        storage_base = settings.R2_PUBLIC_URL
         client = httpx.AsyncClient(timeout=15.0, follow_redirects=False)
 
         async def fetch_photo(url: str) -> Optional[bytes]:
-            if not url.startswith(("https://", "http://")):
+            if not _is_our_photo_url(url, storage_base):
                 return None
             resp = await client.get(url)
-            return resp.content if resp.status_code == 200 else None
+            if resp.status_code != 200 or len(resp.content) > MAX_EXPORT_PHOTO_BYTES:
+                return None
+            return resp.content
 
     async def add_photos(zf: zipfile.ZipFile, folder: str, photos: List[Dict]) -> None:
         for photo in photos:
@@ -717,7 +753,7 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None) 
     genos_by_a = _group(data["genotypes"], "animal_id")
     a_photos = _group(data["animal_photos"], "animal_id")
 
-    buf = io.BytesIO()
+    buf = out if out is not None else io.BytesIO()
     try:
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("metadata.json", json.dumps({
@@ -809,7 +845,7 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None) 
         if client is not None:
             await client.aclose()
 
-    return buf.getvalue()
+    return None if out is not None else buf.getvalue()
 
 
 # ---------------------------------------------------------------------------

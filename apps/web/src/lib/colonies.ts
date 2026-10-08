@@ -53,6 +53,39 @@ export type ColonyEventType =
 /** Per-life-stage headcount buckets, e.g. {"adults":10,"nymphs":100}. */
 export type StageCounts = Record<string, number>
 
+/**
+ * Why a colony ended. A population doesn't die like one animal does; it
+ * crashes, is sold on, is folded into another colony, or ends for some other
+ * reason. Mirrors COLONY_END_REASONS in the API and the mobile lib.
+ */
+export type ColonyEndReason = 'crashed' | 'sold' | 'merged' | 'other'
+
+export const COLONY_END_REASON_ORDER: ColonyEndReason[] = ['crashed', 'sold', 'merged', 'other']
+
+export const COLONY_END_REASON_LABELS: Record<ColonyEndReason, string> = {
+  crashed: 'Crashed or died out',
+  sold: 'Sold or rehomed',
+  merged: 'Merged into another colony',
+  other: 'Other',
+}
+
+/** Label for a stored reason; null for a missing or unknown value. */
+export function colonyEndReasonLabel(reason: string | null | undefined): string | null {
+  if (!reason) return null
+  return COLONY_END_REASON_LABELS[reason as ColonyEndReason] ?? null
+}
+
+/** "Oct 7, 2026" for a YYYY-MM-DD ended_at, parsed locally to avoid TZ drift. */
+export function formatEndedDate(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map((p) => Number.parseInt(p, 10))
+  if (![y, m, d].every((n) => Number.isFinite(n))) return iso
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export interface ColonyListItem {
   id: string
   taxon: ColonyTaxon
@@ -67,6 +100,9 @@ export interface ColonyListItem {
   species_missing: boolean
   /** Room / rack / shelf (see lib/locations). */
   location?: string | null
+  /** YYYY-MM-DD, set once the colony has ended; absent/null while running. */
+  ended_at?: string | null
+  end_reason?: ColonyEndReason | null
 }
 
 export interface ColonyResponse {
@@ -99,6 +135,10 @@ export interface ColonyResponse {
   photo_url: string | null
   visibility: ColonyVisibility | null
   is_active: boolean
+  /** Set once the colony has ended (see endColony); null while it is running. */
+  ended_at?: string | null
+  end_reason?: ColonyEndReason | null
+  end_notes?: string | null
   created_at: string
   updated_at: string | null
   total_count: number | null
@@ -133,8 +173,10 @@ export interface ColonyCreate {
   visibility?: ColonyVisibility | null
 }
 
-// Update is a partial — send only changed fields.
-export type ColonyUpdate = Partial<ColonyCreate>
+// Update is a partial — send only changed fields. `is_active` is update-only:
+// false archives the colony (hidden from the collection and the free-plan
+// count, history kept), true brings it back.
+export type ColonyUpdate = Partial<ColonyCreate> & { is_active?: boolean }
 
 export interface ColonyEventResponse {
   /** Set when a co-keeper logged it; absent/null means the owner. */
@@ -195,6 +237,74 @@ export async function listColonies(
   })
   if (!res.ok) throw new Error('Failed to load colonies')
   return (await res.json()) as ColonyListItem[]
+}
+
+/**
+ * Colonies that have left the working collection: archived ones AND ended
+ * ones. The default list hides both, so this asks for `status=past`. Used for
+ * the "Past colonies" / "Archived colonies" entry on the collection page —
+ * never merged into the main list or its counts. Rows with `ended_at` are the
+ * ended ones; the rest are archived.
+ *
+ * `include_inactive=true` rides along so an API that predates `status` still
+ * returns the archived rows (it just won't have any ended ones to return).
+ */
+export async function listPastColonies(token: string): Promise<ColonyListItem[]> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/?status=past&include_inactive=true`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load colonies')
+  const rows = (await res.json()) as ColonyListItem[]
+  return rows.filter((c) => c.is_active === false || !!c.ended_at)
+}
+
+export interface EndColonyPayload {
+  /** YYYY-MM-DD. Omit for today. Future dates are rejected server-side. */
+  ended_at?: string | null
+  reason: ColonyEndReason
+  notes?: string | null
+}
+
+/**
+ * Record that a colony has ended. A terminal state, never a delete: the record
+ * and every event, feeding and photo stay. The colony leaves the collection
+ * list and the free-plan count. Its own endpoint rather than a field on the
+ * update route, so it can't happen as a side effect of an incidental edit.
+ */
+export async function endColony(
+  token: string,
+  id: string,
+  payload: EndColonyPayload,
+): Promise<ColonyResponse> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${id}/end`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const d = body?.detail
+    throw new Error(typeof d === 'string' ? d : 'Could not save. Nothing has changed.')
+  }
+  return (await res.json()) as ColonyResponse
+}
+
+/**
+ * Undo an end. A correction, so it is deliberately not blocked by the free-plan
+ * cap (the colony starts counting again).
+ */
+export async function reopenColony(token: string, id: string): Promise<ColonyResponse> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${id}/reopen`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: '{}',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const d = body?.detail
+    throw new Error(typeof d === 'string' ? d : 'Could not reopen the colony.')
+  }
+  return (await res.json()) as ColonyResponse
 }
 
 export async function getColony(token: string, id: string): Promise<ColonyResponse> {
@@ -307,6 +417,69 @@ export async function deleteColony(token: string, id: string): Promise<void> {
     headers: authHeaders(token),
   })
   if (!res.ok && res.status !== 204) throw new Error('Failed to delete colony')
+}
+
+// ── Colony photos ─────────────────────────────────────────────────────────────
+//
+// Uncapped by design (the free 5-photo cap is for tarantula/invert photos).
+// Set-hero and delete use the shared, parent-agnostic /photos/{id} routes.
+
+export interface ColonyPhoto {
+  id: string
+  url: string
+  thumbnail_url: string | null
+  caption: string | null
+  taken_at: string | null
+  created_at: string
+}
+
+export async function listColonyPhotos(token: string, colonyId: string): Promise<ColonyPhoto[]> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/photos`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load photos')
+  return (await res.json()) as ColonyPhoto[]
+}
+
+export async function uploadColonyPhoto(
+  token: string,
+  colonyId: string,
+  file: File,
+  caption?: string,
+): Promise<ColonyPhoto> {
+  const form = new FormData()
+  form.append('file', file)
+  if (caption && caption.trim()) form.append('caption', caption.trim())
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/photos`, {
+    method: 'POST',
+    headers: authHeaders(token), // no Content-Type — the browser sets the multipart boundary
+    body: form,
+  })
+  if (!res.ok) {
+    // 400 = unreadable / oversize image. The server's message is actionable.
+    const body = await res.json().catch(() => null)
+    const d = body?.detail
+    const msg = typeof d === 'string' ? d : typeof d?.message === 'string' ? d.message : null
+    throw new Error(msg ?? 'Could not upload photo. Please try again.')
+  }
+  return (await res.json()) as ColonyPhoto
+}
+
+/** Promote a photo to the colony's hero (keeper action; updates colony.photo_url). */
+export async function setColonyMainPhoto(token: string, photoId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/photos/${photoId}/set-main`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Could not set hero photo.')
+}
+
+export async function deleteColonyPhoto(token: string, photoId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/photos/${photoId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!res.ok && res.status !== 204) throw new Error('Could not delete photo.')
 }
 
 // ── Colony feedings ───────────────────────────────────────────────────────────

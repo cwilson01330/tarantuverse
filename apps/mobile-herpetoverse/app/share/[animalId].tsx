@@ -18,7 +18,7 @@ import { PhotoStrip } from '../../src/components/share/PhotoStrip';
 import { PhotoAdjuster } from '../../src/components/share/PhotoAdjuster';
 import { AppHeader } from '../../src/components/AppHeader';
 import {
-  CardFrame, CardShape, FIELDS, FIELD_LABELS, FRAMES, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
+  CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, KIND_TITLE, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
   createShareCard, getShareDefaults, listSharePhotos, previewImageUrl, shareImageUrl,
 } from '../../src/lib/share-cards';
 
@@ -34,7 +34,11 @@ interface MadeLink { key: string; cardLink: string }
 
 export default function ShareCardScreen() {
   const router = useRouter();
-  const { animalId } = useLocalSearchParams<{ animalId: string }>();
+  // kind=shed needs shedId; kind=weight needs weightId. No kind = the animal's profile card.
+  const { animalId, kind: kindParam, shedId, weightId } =
+    useLocalSearchParams<{ animalId: string; kind?: string; shedId?: string; weightId?: string }>();
+  const kind: CardKind = kindParam === 'shed' && shedId ? 'shed' : kindParam === 'weight' && weightId ? 'weight' : 'profile';
+  const eventIds = kind === 'shed' ? { shed_id: shedId } : kind === 'weight' ? { weight_log_id: weightId } : {};
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
@@ -69,10 +73,10 @@ export default function ShareCardScreen() {
   const noFields = fields !== null && fields.length === 0;
 
   useEffect(() => {
-    getShareDefaults()
+    getShareDefaults(kind)
       .then((d) => { setFields(d.fields); setFrame(d.frame); })
-      .catch(() => setFields(FIELDS));
-  }, []);
+      .catch(() => setFields(FIELDS[kind]));
+  }, [kind]);
 
   useEffect(() => {
     if (!animalId) return;
@@ -84,7 +88,7 @@ export default function ShareCardScreen() {
     return hit && Date.now() - hit.at < PREVIEW_TTL_MS ? hit.uri : null;
   };
   const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null, fo: PhotoFocus | null) => {
-    const r = await createShareCard({ animal_id: animalId, fields: f, shape: s, frame: fr, photo_id: ph, focus: fo, link: false, preview: true });
+    const r = await createShareCard({ animal_id: animalId, kind, ...eventIds, fields: f, shape: s, frame: fr, photo_id: ph, focus: fo, link: false, preview: true });
     return previewImageUrl(r.image_url);
   };
 
@@ -171,7 +175,7 @@ export default function ShareCardScreen() {
   const produce = async (): Promise<{ file: string; cardLink: string | null }> => {
     const key = linkKey(fields!, shape, frame, photoId, focus);
     const reuse = link && madeLink.current?.key === key ? madeLink.current : null;
-    const r = await createShareCard({ animal_id: animalId!, fields: fields!, shape, frame, photo_id: photoId, focus, link: link && !reuse });
+    const r = await createShareCard({ animal_id: animalId!, kind, ...eventIds, fields: fields!, shape, frame, photo_id: photoId, focus, link: link && !reuse });
     if (link && r.card_link) madeLink.current = { key, cardLink: r.card_link };
     // Full-size JPEG: ~10x smaller than the PNG, indistinguishable on a feed.
     const file = `${FileSystem.cacheDirectory}share-card-${Date.now()}.jpg`;
@@ -211,7 +215,7 @@ export default function ShareCardScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title="Share card"
+      <AppHeader title={KIND_TITLE[kind]}
         leftAction={<TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close"><MaterialCommunityIcons name="close" size={26} color={iconColor} /></TouchableOpacity>} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.previewWrap, { borderRadius: layout.radius.md }]}>
@@ -263,7 +267,7 @@ export default function ShareCardScreen() {
         </View>
         <Text style={[TYPE.caption, styles.section]}>On this card</Text>
         <View style={[styles.group, { borderRadius: layout.radius.md }]}>
-          {FIELDS.map((f) => (
+          {FIELDS[kind].map((f) => (
             <View key={f} style={styles.row}>
               <Text style={[TYPE.body, { color: colors.textPrimary }]}>{FIELD_LABELS[f]}</Text>
               <Switch value={!!fields?.includes(f)} onValueChange={() => toggle(f)} accessibilityLabel={FIELD_LABELS[f]} />

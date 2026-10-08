@@ -14,7 +14,7 @@ from uuid import UUID
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -26,6 +26,7 @@ from app.models.feeding_log import FeedingLog
 from app.schemas.colony import (
     ColonyCreate,
     ColonyUpdate,
+    ColonyEndRequest,
     ColonyResponse,
     ColonyListItem,
     ColonyEventCreate,
@@ -147,6 +148,19 @@ def _reverse_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -
 @policy("viewer")
 async def list_colonies(
     include_inactive: bool = Query(False),
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        pattern="^(active|ended|past)$",
+        description=(
+            "Which colonies to list. Default ('active') is the working "
+            "collection: ended colonies are excluded, and so are archived ones "
+            "unless include_inactive is set. 'ended' = only colonies that have "
+            "ended (history view, like inverts' status=deceased). 'past' = "
+            "everything that has left the working collection, archived or "
+            "ended."
+        ),
+    ),
     collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -156,8 +170,17 @@ async def list_colonies(
         Colony.user_id == access.owner.id,
         Colony.transferred_out_at.is_(None),
     )
-    if not include_inactive:
-        q = q.filter(Colony.is_active.is_(True))
+    view = status_filter or "active"
+    if view == "ended":
+        q = q.filter(Colony.ended_at.isnot(None))
+    elif view == "past":
+        q = q.filter(or_(Colony.is_active.is_(False), Colony.ended_at.isnot(None)))
+    else:
+        # An ended colony never appears in the working collection, archived
+        # or not -- same rule that keeps a deceased animal out of /inverts/.
+        q = q.filter(Colony.ended_at.is_(None))
+        if not include_inactive:
+            q = q.filter(Colony.is_active.is_(True))
     colonies = q.order_by(Colony.created_at.desc()).all()
 
     # Last ACCEPTED feeding per colony, in ONE grouped query rather than one
@@ -279,8 +302,86 @@ async def update_colony(
     if "location" in data:
         data["location"] = canonical_location(db, access.owner.id, data["location"])
 
+    # Unarchiving puts the colony back in the free-tier count, so it has to
+    # clear the same cap a brand-new colony does -- otherwise archive -> add ->
+    # unarchive walks a free keeper past it. Archiving (true -> false) is never
+    # blocked. An ended or handed-off colony doesn't count toward the cap
+    # whatever its is_active says, so flipping the flag on one is no change to
+    # the count and is not checked. The cap is the OWNER's, not the caller's.
+    if (
+        data.get("is_active") is True
+        and not colony.is_active
+        and colony.ended_at is None
+        and colony.transferred_out_at is None
+    ):
+        enforce_collection_limit(db, access.owner)
+
     for k, v in data.items():
         setattr(colony, k, v)
+
+    db.commit()
+    db.refresh(colony)
+    return ColonyResponse(**_build_response(colony, db))
+
+
+# ---------- end / reopen ----------
+#
+# The colony counterpart of mark-died / revive (ADR-015). A population doesn't
+# die, it ENDS, with a reason. Dedicated endpoints rather than fields on the
+# generic update so ended_at can't be flipped by an incidental PUT that echoes
+# back an object the client fetched.
+
+@router.post("/{colony_id}/end", response_model=ColonyResponse)
+@policy("keeper")
+async def end_colony(
+    colony_id: UUID,
+    payload: ColonyEndRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Record that a colony has ended. Keeps the record and every event intact.
+
+    The colony drops out of the collection list and the free-tier count, but
+    nothing is deleted and it stays readable under `?status=ended`.
+    """
+    colony, _access = load_colony(db, current_user, colony_id, "keeper")
+    if colony.ended_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This colony has already ended.",
+        )
+
+    colony.ended_at = payload.ended_at or date.today()
+    colony.end_reason = payload.reason
+    colony.end_notes = payload.notes
+
+    db.commit()
+    db.refresh(colony)
+    return ColonyResponse(**_build_response(colony, db))
+
+
+@router.post("/{colony_id}/reopen", response_model=ColonyResponse)
+@policy("keeper")
+async def reopen_colony(
+    colony_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Undo an end. A correction for a mis-tap, so -- like reviving an animal --
+    it deliberately does NOT check the free-tier cap: refusing to fix a mistake
+    because of a billing limit would be indefensible. Clears the reason and
+    notes too; a lingering reason with no date would be an orphan nobody sees.
+    """
+    colony, _access = load_colony(db, current_user, colony_id, "keeper")
+    if colony.ended_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This colony hasn't ended.",
+        )
+
+    colony.ended_at = None
+    colony.end_reason = None
+    colony.end_notes = None
 
     db.commit()
     db.refresh(colony)

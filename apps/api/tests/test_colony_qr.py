@@ -95,7 +95,7 @@ def make_colony(owner, **kw):
     defaults = dict(
         id=uuid.uuid4(), user_id=owner.id, taxon="isopod", name="Dwarf whites", species_id=None,
         species=None, photo_url=None, stage_counts={"adults": 10, "juveniles": 20, "mixed": 0},
-        count_is_estimated=True, transferred_out_at=None,
+        count_is_estimated=True, transferred_out_at=None, ended_at=None,
         enclosure_type="terrestrial", enclosure_size="12x12", substrate_type="coco", substrate_depth="3 in",
         last_substrate_change=None, target_temp_min=None, target_temp_max=None,
         target_humidity_min=None, target_humidity_max=None, water_dish=True,
@@ -125,8 +125,10 @@ def test_migration_chains_from_the_current_head_and_is_the_only_head():
     root = pathlib.Path(__file__).resolve().parents[1]
     cfg = Config(str(root / "alembic.ini"))
     cfg.set_main_option("script_location", str(root / "alembic"))
-    heads = ScriptDirectory.from_config(cfg).get_heads()
-    assert heads == ["cqr_20261006_colony_qr_sessions"]
+    script = ScriptDirectory.from_config(cfg)
+    assert len(script.get_heads()) == 1
+    # Still in the chain (later migrations are free to build on it).
+    assert "cqr_20261006_colony_qr_sessions" in {r.revision for r in script.walk_revisions()}
     assert _load_migration().down_revision == "pin_20260930_premium_intro"
 
 

@@ -16,6 +16,7 @@ import { ROLE_LABEL, can, useCollectionRole, type CollectionRole } from '@/lib/c
 import DashboardLayout from '@/components/DashboardLayout'
 import ColonyPopulationChart from '@/components/ColonyPopulationChart'
 const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
+const ShareCardModal = dynamic(() => import('@/components/ShareCardModal'), { ssr: false })
 import EditPanel, { type EditField, type EditValues } from './EditPanel'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
@@ -41,6 +42,17 @@ import {
   deleteColonySubstrateChange,
   colonySubstrateReasons,
   listColonyCareLogs,
+  listColonyPhotos,
+  setColonyMainPhoto,
+  deleteColonyPhoto,
+  updateColony,
+  endColony,
+  reopenColony,
+  COLONY_END_REASON_ORDER,
+  COLONY_END_REASON_LABELS,
+  colonyEndReasonLabel,
+  type ColonyEndReason,
+  type ColonyPhoto,
   createColonyCareLog,
   deleteColonyCareLog,
   CARE_LOG_LABELS,
@@ -127,8 +139,13 @@ export default function ColonyDetailPage() {
   const isMine = !!colony?.user_id && !!user?.id && colony.user_id === user.id
   const viewerRole: CollectionRole | null = isMine ? 'owner' : shared.role
   const isOwner = viewerRole === 'owner'
-  const canKeep = can(viewerRole, 'keeper')
-  const canLog = can(viewerRole, 'logger')
+  // An ended colony is a historical record: like a died animal's page, every
+  // logging and editing control goes away. Only Reopen (below) survives, and it
+  // needs the raw role, not the gated one.
+  const isEnded = !!colony?.ended_at
+  const canKeepRole = can(viewerRole, 'keeper')
+  const canKeep = canKeepRole && !isEnded
+  const canLog = can(viewerRole, 'logger') && !isEnded
   const canChange = (x: { logged_by_user_id?: string | null }) =>
     canKeep || (canLog && !!user?.id && x.logged_by_user_id === user.id)
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
@@ -157,6 +174,23 @@ export default function ColonyDetailPage() {
   const [careNote, setCareNote] = useState('')
   const [careBusy, setCareBusy] = useState(false)
   const [careError, setCareError] = useState('')
+  // Photos. Tracked separately so a failed photo fetch says so — an empty
+  // strip would read as "no photos yet" when the truth is "couldn't load".
+  const [photos, setPhotos] = useState<ColonyPhoto[]>([])
+  const [photosError, setPhotosError] = useState('')
+  const [photoActionError, setPhotoActionError] = useState('')
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
+  // End colony. Its own dialog rather than a field on edit, so it can't happen
+  // by accident. The dialog is the confirm; the date is already defaulted.
+  const [endOpen, setEndOpen] = useState(false)
+  const [endDate, setEndDate] = useState('')
+  const [endReason, setEndReason] = useState<ColonyEndReason | ''>('')
+  const [endNotes, setEndNotes] = useState('')
+  const [endBusy, setEndBusy] = useState(false)
+  const [endError, setEndError] = useState('')
+  const [reopenBusy, setReopenBusy] = useState(false)
+  const [reopenError, setReopenError] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -192,12 +226,14 @@ export default function ColonyDetailPage() {
   // Delete colony
   const [deleting, setDeleting] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
+  // Share card (spec 2026-09-29): changes nothing about the colony or who can see it.
+  const [shareOpen, setShareOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const fetchAll = useCallback(async () => {
     if (!token || !colonyId) return
     try {
-      const [c, evs, feeds, mlts, subs, care, hist] = await Promise.all([
+      const [c, evs, feeds, mlts, subs, care, hist, pics] = await Promise.all([
         getColony(token, colonyId),
         listColonyEvents(token, colonyId).catch(() => [] as ColonyEventResponse[]),
         // Non-fatal: a colony with no feedings is the normal state and must
@@ -211,6 +247,12 @@ export default function ColonyDetailPage() {
         // Non-fatal like the rest: a chart that can't load must not take the
         // whole colony page with it.
         getColonyPopulationHistory(token, colonyId).catch(() => null),
+        // Non-fatal, but a failure is shown in the Photos section rather than
+        // swallowed into an empty list.
+        listColonyPhotos(token, colonyId).then(
+          (data) => ({ data, failed: false }),
+          () => ({ data: [] as ColonyPhoto[], failed: true }),
+        ),
       ])
       setColony(c)
       setEvents(evs)
@@ -219,6 +261,8 @@ export default function ColonyDetailPage() {
       setSubstrates(subs)
       setCareLogs(care)
       setHistory(hist)
+      setPhotos(pics.data)
+      setPhotosError(pics.failed ? 'Couldn’t load photos. Check your connection and refresh.' : '')
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -340,6 +384,107 @@ export default function ColonyDetailPage() {
       await fetchAll()
     } catch (e) {
       setMoltError(e instanceof Error ? e.message : 'Failed to delete')
+    }
+  }
+
+  const makeHeroPhoto = async (photoId: string) => {
+    if (!token) return
+    setPhotoActionError('')
+    try {
+      await setColonyMainPhoto(token, photoId)
+      // Refetch so colony.photo_url (the header image + "★ Hero" badge) updates.
+      await fetchAll()
+    } catch (e) {
+      setPhotoActionError(e instanceof Error ? e.message : 'Could not set hero photo.')
+    }
+  }
+
+  const removePhoto = async (photoId: string) => {
+    if (!token) return
+    if (!confirm('Delete this photo? This cannot be undone.')) return
+    setPhotoActionError('')
+    try {
+      await deleteColonyPhoto(token, photoId)
+      await fetchAll()
+    } catch (e) {
+      setPhotoActionError(e instanceof Error ? e.message : 'Could not delete photo.')
+    }
+  }
+
+  const toggleArchive = async () => {
+    if (!token || !colony || archiveBusy) return
+    const archiving = colony.is_active
+    if (
+      archiving &&
+      !confirm(
+        'Archive this colony? It will be hidden from your collection and the free-plan count, and you can unarchive it any time.',
+      )
+    ) {
+      return
+    }
+    setArchiveBusy(true)
+    setArchiveError('')
+    try {
+      await updateColony(token, colony.id, { is_active: !archiving })
+      await fetchAll()
+    } catch (e) {
+      setArchiveError(e instanceof Error ? e.message : 'Could not update the colony.')
+    } finally {
+      setArchiveBusy(false)
+    }
+  }
+
+  const openEnd = () => {
+    // Today by default but editable: most people log an ending after the fact.
+    setEndDate(todayIso())
+    setEndReason('')
+    setEndNotes('')
+    setEndError('')
+    setEndOpen(true)
+  }
+
+  const submitEnd = async () => {
+    if (!token || !colony || endBusy) return
+    if (!endReason) {
+      setEndError('Pick a reason.')
+      return
+    }
+    setEndBusy(true)
+    setEndError('')
+    try {
+      await endColony(token, colony.id, {
+        ended_at: endDate || null,
+        reason: endReason,
+        notes: endNotes.trim() || null,
+      })
+      setEndOpen(false)
+      await fetchAll()
+    } catch (e) {
+      // Stay open. Closing on failure would look like it worked.
+      setEndError(e instanceof Error ? e.message : 'Could not save. Nothing has changed.')
+    } finally {
+      setEndBusy(false)
+    }
+  }
+
+  const handleReopen = async () => {
+    if (!token || !colony || reopenBusy) return
+    if (
+      !confirm(
+        'Reopen this colony? It will return to your collection, count toward your plan again, and logging will be open.',
+      )
+    ) {
+      return
+    }
+    setReopenBusy(true)
+    setReopenError('')
+    try {
+      await reopenColony(token, colony.id)
+      await fetchAll()
+    } catch (e) {
+      setReopenError(e instanceof Error ? e.message : 'Could not reopen the colony.')
+    } finally {
+      setReopenBusy(false)
     }
   }
 
@@ -799,7 +944,7 @@ export default function ColonyDetailPage() {
               >
                 {taxonGlyph(colony.taxon)} {taxonLabel(colony.taxon)} · {speciesLabel}
               </p>
-              {!colony.is_active && (
+              {!colony.is_active && !isEnded && (
                 <span
                   className="inline-block mt-2 text-xs font-semibold px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
                   aria-label="Archived colony"
@@ -816,6 +961,31 @@ export default function ColonyDetailPage() {
             >
               Edit
             </Link>}
+            {canKeep && <button
+              type="button"
+              onClick={toggleArchive}
+              disabled={archiveBusy}
+              className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition disabled:opacity-50"
+            >
+              {archiveBusy ? 'Saving…' : colony.is_active ? 'Archive' : 'Unarchive'}
+            </button>}
+            {/* Neutral, not red: ending a colony destroys nothing. */}
+            {canKeep && <button
+              type="button"
+              onClick={openEnd}
+              className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition"
+            >
+              End colony
+            </button>}
+            {/* Keeper-level, like sharing an animal. An ended colony can't
+                get a new card (the API says 409), so the button goes too. */}
+            {canKeep && <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition"
+            >
+              Share card
+            </button>}
             {isOwner && <button
               onClick={() => setQrOpen(true)}
               className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition"
@@ -830,6 +1000,61 @@ export default function ColonyDetailPage() {
             </button>}
           </div>
         </div>
+
+        {archiveError && (
+          <div
+            role="alert"
+            className="mb-4 p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+          >
+            {archiveError}
+          </div>
+        )}
+
+        {/* Status card for an ended colony. A filled slate dot, the same quiet
+            full stop the died-animal card uses: never red, nothing was
+            destroyed, and no success colour either. */}
+        {isEnded && colony.ended_at && (
+          <section
+            aria-labelledby="ended-heading"
+            className="mb-6 p-4 rounded-2xl border border-theme bg-surface"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-500" aria-hidden="true" />
+              <h2 id="ended-heading" className="font-semibold text-theme-primary">
+                {[`Ended ${formatEventDate(colony.ended_at)}`, colonyEndReasonLabel(colony.end_reason)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </h2>
+            </div>
+            <p className="mt-2 text-sm text-theme-secondary">
+              This is a historical record. Everything below is kept. The colony is out of your
+              collection and your animal count.
+            </p>
+            {colony.end_notes && (
+              <p className="mt-2 text-sm italic text-theme-tertiary whitespace-pre-wrap">{colony.end_notes}</p>
+            )}
+            <p className="mt-3 text-xs text-theme-tertiary">
+              Logging is closed. Records stay readable and exportable.
+            </p>
+            {canKeepRole && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={handleReopen}
+                  disabled={reopenBusy}
+                  className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary text-sm font-semibold hover:bg-surface-elevated transition disabled:opacity-50"
+                >
+                  {reopenBusy ? 'Saving…' : 'Reopen colony'}
+                </button>
+                {reopenError && (
+                  <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    {reopenError}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Population card */}
         <section
@@ -870,7 +1095,9 @@ export default function ColonyDetailPage() {
             </div>
           ) : (
             <p className="text-sm text-theme-tertiary">
-              No stage counts yet. Use “Log event” below to record births, additions, etc.
+              {isEnded
+                ? 'No stage counts were recorded.'
+                : 'No stage counts yet. Use “Log event” below to record births, additions, etc.'}
             </p>
           )}
 
@@ -1611,6 +1838,95 @@ export default function ColonyDetailPage() {
           </div>
         </section>
 
+        {/* Photos. Same strip as the animal detail page: hero badge, and
+            keepers get Set hero / Delete on hover. Uncapped for colonies. */}
+        <section aria-labelledby="photos-heading" className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2
+              id="photos-heading"
+              className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide"
+            >
+              Photos
+            </h2>
+            {canLog && (
+              <Link
+                href={`/dashboard/colonies/${colony.id}/add-photo`}
+                className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                + Add photo
+              </Link>
+            )}
+          </div>
+          {photosError && (
+            <div
+              role="alert"
+              className="mb-3 p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+            >
+              {photosError}
+            </div>
+          )}
+          {photoActionError && (
+            <div
+              role="alert"
+              className="mb-3 p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+            >
+              {photoActionError}
+            </div>
+          )}
+          {photos.length === 0 ? (
+            !photosError && (
+              <div className="p-6 rounded-2xl border border-theme bg-surface text-center text-theme-secondary">
+                No photos yet.
+              </div>
+            )
+          ) : (
+            <div className="p-4 rounded-2xl border border-theme bg-surface">
+              <div className="flex gap-3 overflow-x-auto">
+                {photos.map((p) => {
+                  const isHero = colony.photo_url === p.url
+                  return (
+                    <div key={p.id} className="group relative flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getImageUrl(p.thumbnail_url || p.url)}
+                        alt={p.caption || ''}
+                        className="w-24 h-24 rounded-lg object-cover"
+                      />
+                      {isHero && (
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/65 text-white text-[10px] font-semibold">
+                          ★ Hero
+                        </span>
+                      )}
+                      {canKeep && (
+                        <div className="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-black/55 rounded-b-lg py-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
+                          {!isHero && (
+                            <button
+                              type="button"
+                              onClick={() => makeHeroPhoto(p.id)}
+                              className="text-[10px] font-semibold text-white hover:underline"
+                              aria-label="Set as hero photo"
+                            >
+                              Set hero
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(p.id)}
+                            className="text-[10px] font-semibold text-red-300 hover:underline"
+                            aria-label="Delete photo"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* Add event — loggers and up */}
         {canLog && <section aria-labelledby="addevent-heading" className="mb-6">
           <h2
@@ -1799,7 +2115,7 @@ export default function ColonyDetailPage() {
           {renderEditor('event')}
           {events.length === 0 ? (
             <div className="p-6 rounded-2xl border border-theme bg-surface text-center text-theme-secondary">
-              No events yet. Use Log event above to record your first one.
+              {isEnded ? 'No events were logged.' : 'No events yet. Use Log event above to record your first one.'}
             </div>
           ) : (
             <ul className="divide-y divide-theme rounded-2xl border border-theme bg-surface overflow-hidden">
@@ -1876,6 +2192,101 @@ export default function ColonyDetailPage() {
           )}
         </section>
 
+        {/* End colony. The dialog IS the confirm: the date is defaulted, so the
+            flow completes in one pick and one click. Neutral ink, never the
+            accent and never red -- nothing is destroyed. */}
+        {endOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="end-dialog-heading"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            onClick={() => !endBusy && setEndOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl border border-theme bg-surface p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 id="end-dialog-heading" className="text-xl font-bold text-theme-primary">
+                End {colony.name}
+              </h3>
+              <p className="text-sm text-theme-secondary">
+                Nothing is deleted. Every event, feeding and photo stays in your records, and the
+                colony stops counting toward your plan. You can reopen it later.
+              </p>
+
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Date it ended
+                </span>
+                <input
+                  type="date"
+                  value={endDate}
+                  max={todayIso()}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+
+              <fieldset>
+                <legend className="block text-sm font-medium text-theme-secondary mb-1">
+                  Reason
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {COLONY_END_REASON_ORDER.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setEndReason(endReason === r ? '' : r)}
+                      aria-pressed={endReason === r}
+                      className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+                        endReason === r
+                          ? 'bg-theme-primary border-theme-primary text-surface'
+                          : 'border-theme bg-surface text-theme-primary hover:border-primary-400'
+                      }`}
+                    >
+                      {COLONY_END_REASON_LABELS[r]}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Note <span className="text-theme-tertiary font-normal">Optional</span>
+                </span>
+                <textarea
+                  value={endNotes}
+                  onChange={(e) => setEndNotes(e.target.value.slice(0, 2000))}
+                  rows={3}
+                  className={inputCls}
+                />
+              </label>
+
+              {endError && (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-400">{endError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={submitEnd}
+                disabled={endBusy || !endReason}
+                className="w-full py-3 rounded-xl bg-theme-primary text-surface font-semibold disabled:opacity-60"
+              >
+                {endBusy ? 'Saving…' : 'End colony'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEndOpen(false)}
+                disabled={endBusy}
+                className="w-full text-sm text-theme-tertiary hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Delete confirm modal */}
         {confirmDelete && (
           <div
@@ -1934,6 +2345,16 @@ export default function ColonyDetailPage() {
             populationIsEstimated={colony.count_is_estimated}
             onClose={() => setQrOpen(false)}
             onPhotoAdded={fetchAll}
+          />
+        )}
+        {token && colony && (
+          <ShareCardModal
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            app="tarantuverse"
+            animalId={colony.id}
+            kind="colony"
+            token={token}
           />
         )}
       </div>

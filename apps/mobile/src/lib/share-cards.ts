@@ -1,6 +1,7 @@
 import { apiClient } from '../services/api';
 
-export type CardKind = 'molt' | 'profile';
+/** 'colony' cards take the colony's id where an animal id would go. */
+export type CardKind = 'molt' | 'profile' | 'colony';
 export type CardShape = 'story' | 'post' | 'square';
 export type CardFrame = 'specimen' | 'notes' | 'herbarium';
 
@@ -38,15 +39,24 @@ export interface ShareDefaults { fields: string[]; frame: CardFrame }
 export const FIELD_LABELS: Record<string, string> = {
   photo: 'Photo', name: 'Name', species: 'Species', sex: 'Sex', in_care: 'Time in care',
   molts: 'Molt count', size: 'Size', size_change: 'Size change', days_in_care: 'Days in care',
+  population: 'Population', stages: 'Life stages', founded: 'Colony since',
 };
 export const FIELDS: Record<CardKind, string[]> = {
   molt: ['photo', 'name', 'species', 'size_change', 'days_in_care'],
   profile: ['photo', 'name', 'species', 'sex', 'in_care', 'molts', 'size'],
+  colony: ['photo', 'name', 'species', 'population', 'stages', 'founded'],
 };
+export const KIND_TITLE: Record<CardKind, string> = { molt: 'Share molt', profile: 'Share card', colony: 'Colony card' };
+
+/** How the "Shared cards" list names a link's kind. Any kind, either app:
+ *  the API lists links from both, and a newer server may add more. */
+export function cardKindLabel(kind: string): string {
+  return ({ molt: 'molt', profile: 'profile', colony: 'colony', shed: 'shed', weight: 'weigh-in' } as Record<string, string>)[kind] ?? 'card';
+}
 
 export interface ShareCardCreated { image_url: string; card_link: string | null; code: string | null; fields: string[] }
 /** Mirrors apps/api/app/schemas/share_card.py::CardLinkItem. */
-export interface CardLinkItem { code: string; app: string; kind: CardKind; name: string | null; url: string; created_at: string; revoked_at: string | null }
+export interface CardLinkItem { code: string; app: string; kind: string; name: string | null; url: string; created_at: string; revoked_at: string | null }
 
 export async function getShareDefaults(kind: CardKind): Promise<ShareDefaults> {
   const { data } = await apiClient.get<{ fields: string[]; frame?: CardFrame }>(`/share-cards/defaults`, { params: { app: 'tarantuverse', kind } });
@@ -63,7 +73,9 @@ export async function listCardLinks(): Promise<CardLinkItem[]> {
 export async function revokeCardLink(code: string): Promise<void> {
   await apiClient.delete(`/card-links/${encodeURIComponent(code)}`);
 }
-export async function listSharePhotos(animalId: string): Promise<SharePhoto[]> {
-  const { data } = await apiClient.get<SharePhoto[]>(`/share-cards/photos`, { params: { app: 'tarantuverse', animal_id: animalId } });
+export async function listSharePhotos(animalId: string, kind?: CardKind): Promise<SharePhoto[]> {
+  // Only a colony needs the kind: its photos hang off the colony, not an animal.
+  const params = { app: 'tarantuverse', animal_id: animalId, ...(kind === 'colony' ? { kind } : {}) };
+  const { data } = await apiClient.get<SharePhoto[]>(`/share-cards/photos`, { params });
   return data;
 }

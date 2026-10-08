@@ -15,6 +15,13 @@ Rules (pinned by tests/test_locations.py):
   * cap at MAX_LOCATION_LEN characters (a location is a label, not a note)
   * snap to the keeper's EXISTING spelling when one matches case-insensitively:
     the first spelling a keeper uses wins, everything after it conforms
+
+SCOPES. A keeper's location vocabulary is per keeper AND per product: Tarantuverse
+and Herpetoverse are separate apps over one account, so "Rack 1" in the spider
+room and "Rack 1" in the reptile room are different places. Every DB-touching
+helper takes `scope` ("tarantuverse" by default, or "herpetoverse") which picks
+the tables it looks at — the text rules above are shared, only the row set
+differs. Tarantuverse = inverts + colonies; Herpetoverse = animals.
 """
 from __future__ import annotations
 
@@ -50,20 +57,34 @@ def location_key(value: Optional[str]) -> Optional[str]:
     return norm.lower() if norm else None
 
 
-def _location_models():
+SCOPE_TARANTUVERSE = "tarantuverse"
+SCOPE_HERPETOVERSE = "herpetoverse"
+
+
+def _location_models(scope: str = SCOPE_TARANTUVERSE):
+    """The tables whose `location` column makes up this scope's vocabulary."""
     # Imported lazily: utils must not import models at module load (circular
     # import through app.models.__init__).
+    if scope == SCOPE_HERPETOVERSE:
+        from app.models.animal import Animal
+
+        return (Animal,)
+    if scope != SCOPE_TARANTUVERSE:
+        raise ValueError(f"unknown location scope: {scope!r}")
     from app.models.invert import Invert
     from app.models.colony import Colony
 
     return (Invert, Colony)
 
 
-def existing_locations(db: Session, user_id: UUID | str) -> List[str]:
-    """Every distinct location spelling this keeper has on file, across
-    animals and colonies, in the spelling actually stored."""
+def existing_locations(
+    db: Session, user_id: UUID | str, scope: str = SCOPE_TARANTUVERSE
+) -> List[str]:
+    """Every distinct location spelling this keeper has on file in this scope
+    (animals and colonies for TV, animals for HV), in the spelling actually
+    stored."""
     seen: dict[str, str] = {}
-    for model in _location_models():
+    for model in _location_models(scope):
         rows = (
             db.query(model.location)
             .filter(model.user_id == user_id, model.location.isnot(None))
@@ -90,43 +111,40 @@ def snap_to_existing(value: Optional[str], existing: Iterable[str]) -> Optional[
     return norm
 
 
-def canonical_location(db: Session, user_id: UUID | str, raw: Optional[str]) -> Optional[str]:
+def canonical_location(
+    db: Session, user_id: UUID | str, raw: Optional[str], scope: str = SCOPE_TARANTUVERSE
+) -> Optional[str]:
     """The value to STORE for this keeper: normalised, then snapped to their
-    existing spelling if they already have this place on file."""
+    existing spelling (in this scope) if they already have this place on file."""
     norm = normalize_location(raw)
     if norm is None:
         return None
-    return snap_to_existing(norm, existing_locations(db, user_id))
+    return snap_to_existing(norm, existing_locations(db, user_id, scope))
 
 
-def list_locations(db: Session, user_id: UUID | str) -> List[dict]:
-    """[{name, count}] across animals + colonies, alphabetical. Deceased and
-    transferred-out animals are excluded from the counts — they no longer live
-    anywhere — but an inactive colony's location still counts so a keeper can
-    see the label is in use before renaming it."""
-    from app.models.invert import Invert
-    from app.models.colony import Colony
-
+def list_locations(
+    db: Session, user_id: UUID | str, scope: str = SCOPE_TARANTUVERSE
+) -> List[dict]:
+    """[{name, count}] alphabetical. Deceased and transferred-out animals are
+    excluded from the counts — they no longer live anywhere — but an inactive
+    colony's location still counts so a keeper can see the label is in use
+    before renaming it. Tarantuverse = animals + colonies; Herpetoverse =
+    animals."""
     counts: dict[str, dict] = {}
 
-    invert_rows = (
-        db.query(Invert.location, func.count(Invert.id))
-        .filter(
-            Invert.user_id == user_id,
-            Invert.location.isnot(None),
-            Invert.transferred_out_at.is_(None),
-            Invert.died_at.is_(None),
+    rows: list = []
+    for model in _location_models(scope):
+        query = db.query(model.location, func.count(model.id)).filter(
+            model.user_id == user_id, model.location.isnot(None)
         )
-        .group_by(Invert.location)
-        .all()
-    )
-    colony_rows = (
-        db.query(Colony.location, func.count(Colony.id))
-        .filter(Colony.user_id == user_id, Colony.location.isnot(None))
-        .group_by(Colony.location)
-        .all()
-    )
-    for value, n in list(invert_rows) + list(colony_rows):
+        if hasattr(model, "died_at"):
+            # Animal rows (inverts / animals) carry the lifecycle columns;
+            # colonies don't, and keep counting.
+            query = query.filter(
+                model.transferred_out_at.is_(None), model.died_at.is_(None)
+            )
+        rows.extend(query.group_by(model.location).all())
+    for value, n in rows:
         key = location_key(value)
         if not key:
             continue
@@ -135,8 +153,11 @@ def list_locations(db: Session, user_id: UUID | str) -> List[dict]:
     return sorted(counts.values(), key=lambda e: e["name"].lower())
 
 
-def rename_location(db: Session, user_id: UUID | str, old: str, new: str) -> int:
-    """Rename every animal + colony at `old` to `new` for this keeper.
+def rename_location(
+    db: Session, user_id: UUID | str, old: str, new: str, scope: str = SCOPE_TARANTUVERSE
+) -> int:
+    """Rename every animal (+ colony, on Tarantuverse) at `old` to `new` for
+    this keeper, within one scope.
 
     Renaming onto a name that already exists is a MERGE: the target's existing
     spelling wins and both groups end up under it. Returns rows changed.
@@ -145,11 +166,11 @@ def rename_location(db: Session, user_id: UUID | str, old: str, new: str) -> int
     old_key = location_key(old)
     if old_key is None:
         return 0
-    target = canonical_location(db, user_id, new)
+    target = canonical_location(db, user_id, new, scope)
     if target is None:
         return 0
     moved = 0
-    for model in _location_models():
+    for model in _location_models(scope):
         moved += (
             db.query(model)
             .filter(model.user_id == user_id, func.lower(model.location) == old_key)

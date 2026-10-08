@@ -162,7 +162,7 @@ export default function AnalyticsPage() {
                 No tarantulas in your collection yet!
               </p>
               <button
-                onClick={() => router.push("/dashboard/tarantulas/new")}
+                onClick={() => router.push("/dashboard/tarantulas/add")}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Add Your First Tarantula
@@ -416,7 +416,7 @@ export default function AnalyticsPage() {
                 <div
                   key={index}
                   className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
-                  onClick={() => router.push(`/dashboard/tarantulas/${activity.tarantula_id}`)}
+                  onClick={() => router.push(`/dashboard/inverts/${activity.tarantula_id}`)}
                 >
                   <span className="text-2xl">{getActivityIcon(activity.type)}</span>
                   <div className="flex-1">

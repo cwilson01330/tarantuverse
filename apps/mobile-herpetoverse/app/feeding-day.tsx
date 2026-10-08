@@ -15,7 +15,7 @@
  * colors/layout — this app is dark-first; #0B0B0B is the on-primary text
  * color used everywhere (matches the collection FAB + empty-state CTA).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -45,6 +46,16 @@ import {
   resumeFeeding,
   type AnimalFeedingStatus,
 } from '../src/lib/animals';
+import { LocationSheet } from '../src/components/LocationPicker';
+import {
+  UNASSIGNED_KEY,
+  bulkSetLocation,
+  groupByLocation,
+  useLocations,
+} from '../src/lib/locations';
+
+/** Persisted "By location" toggle for this screen. */
+const GROUP_BY_LOCATION_KEY = 'hv_feeding_day_group_by_location';
 
 type FilterKey = 'all' | 'overdue' | 'never';
 
@@ -81,6 +92,24 @@ function FeedingDayScreen() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Walk the shelves: group the list by location so the screen matches the
+  // order the keeper walks the house. Only offered once at least one animal
+  // HAS a location; a keeper who never set one sees none of this.
+  const { locations, refresh: refreshLocations } = useLocations();
+  const [groupByLoc, setGroupByLoc] = useState(false);
+  const [locSheetOpen, setLocSheetOpen] = useState(false);
+  const [locBusy, setLocBusy] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(GROUP_BY_LOCATION_KEY)
+      .then((v) => setGroupByLoc(v === '1'))
+      .catch(() => {});
+  }, []);
+  const toggleGroupByLoc = () => {
+    const next = !groupByLoc;
+    setGroupByLoc(next);
+    AsyncStorage.setItem(GROUP_BY_LOCATION_KEY, next ? '1' : '0').catch(() => {});
+  };
+
   // Batch sheet
   const [sheetOpen, setSheetOpen] = useState(false);
   const [outcome, setOutcome] = useState<'fed' | 'refused'>('fed');
@@ -94,6 +123,7 @@ function FeedingDayScreen() {
       const rows = await listAnimalFeedingStatus(tz);
       setItems(rows ?? []);
       setLoadError('');
+      refreshLocations();
     } catch (e: any) {
       // 401 → interceptor already handles logout; stay quiet.
       if (e?.response?.status === 401) return;
@@ -104,7 +134,7 @@ function FeedingDayScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [refreshLocations]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,6 +157,11 @@ function FeedingDayScreen() {
       return items.filter((i) => i.days_since_last_feeding === null);
     return items;
   }, [items, filter]);
+
+  const hasLocations = useMemo(
+    () => locations.length > 0 || items.some((i) => !!i.location),
+    [locations, items],
+  );
 
   const shownIds = useMemo(() => shown.map((i) => i.id), [shown]);
   const allShownSelected =
@@ -192,6 +227,30 @@ function FeedingDayScreen() {
     );
   };
 
+  /** Tag every selected animal with one location (or clear it). This is the
+   *  path that makes locations usable on a big collection: one pass with
+   *  multi-select instead of sixty edit forms. */
+  const applyLocation = async (location: string | null) => {
+    if (selected.size === 0) return;
+    setLocBusy(true);
+    try {
+      const res = await bulkSetLocation(location, Array.from(selected));
+      setSelected(new Set());
+      setResumedNote(
+        res.location
+          ? `${res.updated} moved to ${res.location}.`
+          : `Location cleared on ${res.updated}.`,
+      );
+      // First location ever set — turn grouping on so the tag is visible.
+      if (res.location && !groupByLoc && !hasLocations) toggleGroupByLoc();
+      await fetchStatus();
+    } catch (e: any) {
+      setLoadError(e?.response?.data?.detail || e?.message || 'Could not set location');
+    } finally {
+      setLocBusy(false);
+    }
+  };
+
   const submit = async () => {
     if (selected.size === 0) return;
     setSubmitting(true);
@@ -244,6 +303,93 @@ function FeedingDayScreen() {
     };
   };
 
+  const renderAnimal = (a: AnimalFeedingStatus) => {
+    const isSel = selected.has(a.id);
+    const pill = statusPill(a);
+    return (
+      <TouchableOpacity
+        key={a.id}
+        onPress={() => toggle(a.id)}
+        activeOpacity={0.7}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: isSel }}
+        accessibilityLabel={`${displayName(a)}, ${pill.label}`}
+        style={[
+          styles.row,
+          {
+            backgroundColor: colors.surface,
+            borderColor: isSel ? colors.primary : colors.border,
+            borderRadius: layout.radius.md,
+          },
+        ]}
+      >
+        <MaterialCommunityIcons
+          name={isSel ? 'checkbox-marked' : 'checkbox-blank-outline'}
+          size={24}
+          color={isSel ? colors.primary : colors.textTertiary}
+        />
+        {a.photo_url ? (
+          <Image source={{ uri: a.photo_url }} style={styles.thumb} />
+        ) : (
+          <View
+            style={[
+              styles.thumbPlaceholder,
+              { backgroundColor: colors.surfaceRaised },
+            ]}
+          >
+            <Text style={styles.thumbEmoji}>{taxonGlyph(a.taxon)}</Text>
+          </View>
+        )}
+        <View style={styles.rowText}>
+          <Text
+            style={[styles.rowName, { color: colors.textPrimary }]}
+            numberOfLines={1}
+          >
+            {displayName(a)}
+          </Text>
+          {a.scientific_name ? (
+            <Text
+              style={[styles.rowSci, { color: colors.textTertiary }]}
+              numberOfLines={1}
+            >
+              {a.scientific_name}
+            </Text>
+          ) : null}
+          {a.interval_days ? (
+            <Text
+              style={[styles.rowMeta, { color: colors.textTertiary }]}
+              numberOfLines={1}
+            >
+              every ~{a.interval_days}d
+            </Text>
+          ) : null}
+        </View>
+        {/* Tappable when paused — see confirmResume. */}
+        {a.is_feeding_paused ? (
+          <TouchableOpacity
+            onPress={() => confirmResume(a)}
+            disabled={resumingId === a.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName(a)} is paused. Tap to resume feeding.`}
+            style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
+          >
+            <Text style={[styles.pillText, { color: pill.color }]}>
+              {resumingId === a.id ? 'Resuming…' : 'Paused ✕'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
+          >
+            <Text style={[styles.pillText, { color: pill.color }]}>
+              {pill.label}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'all', label: `All (${counts.all})` },
     { key: 'overdue', label: `Overdue (${counts.overdue})` },
@@ -293,6 +439,34 @@ function FeedingDayScreen() {
             </TouchableOpacity>
           );
         })}
+        {/* A view option, not a filter — grouping, not hiding. Only once a
+            location exists. */}
+        {hasLocations && (
+          <TouchableOpacity
+            onPress={toggleGroupByLoc}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: groupByLoc }}
+            accessibilityLabel="Group by location"
+            style={[
+              styles.chip,
+              styles.chipIcon,
+              {
+                backgroundColor: groupByLoc ? colors.primary : colors.surface,
+                borderColor: groupByLoc ? colors.primary : colors.border,
+                borderRadius: layout.radius.lg,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="map-marker-outline"
+              size={15}
+              color={groupByLoc ? '#0B0B0B' : colors.textSecondary}
+            />
+            <Text style={[styles.chipText, { color: groupByLoc ? '#0B0B0B' : colors.textSecondary }]}>
+              By location
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Select all shown */}
@@ -392,93 +566,26 @@ function FeedingDayScreen() {
           </View>
         )}
 
+        {!loading && !groupByLoc && shown.map(renderAnimal)}
+
         {!loading &&
-          shown.map((a) => {
-            const isSel = selected.has(a.id);
-            const pill = statusPill(a);
-            return (
-              <TouchableOpacity
-                key={a.id}
-                onPress={() => toggle(a.id)}
-                activeOpacity={0.7}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isSel }}
-                accessibilityLabel={`${displayName(a)}, ${pill.label}`}
-                style={[
-                  styles.row,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: isSel ? colors.primary : colors.border,
-                    borderRadius: layout.radius.md,
-                  },
-                ]}
-              >
+          groupByLoc &&
+          groupByLocation<AnimalFeedingStatus>(shown, (a) => a.location).map((g) => (
+            <View key={g.key}>
+              <View style={styles.groupHeader}>
                 <MaterialCommunityIcons
-                  name={isSel ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={24}
-                  color={isSel ? colors.primary : colors.textTertiary}
+                  name={g.key === UNASSIGNED_KEY ? 'map-marker-off-outline' : 'map-marker-outline'}
+                  size={16}
+                  color={colors.textTertiary}
                 />
-                {a.photo_url ? (
-                  <Image source={{ uri: a.photo_url }} style={styles.thumb} />
-                ) : (
-                  <View
-                    style={[
-                      styles.thumbPlaceholder,
-                      { backgroundColor: colors.surfaceRaised },
-                    ]}
-                  >
-                    <Text style={styles.thumbEmoji}>{taxonGlyph(a.taxon)}</Text>
-                  </View>
-                )}
-                <View style={styles.rowText}>
-                  <Text
-                    style={[styles.rowName, { color: colors.textPrimary }]}
-                    numberOfLines={1}
-                  >
-                    {displayName(a)}
-                  </Text>
-                  {a.scientific_name ? (
-                    <Text
-                      style={[styles.rowSci, { color: colors.textTertiary }]}
-                      numberOfLines={1}
-                    >
-                      {a.scientific_name}
-                    </Text>
-                  ) : null}
-                  {a.interval_days ? (
-                    <Text
-                      style={[styles.rowMeta, { color: colors.textTertiary }]}
-                      numberOfLines={1}
-                    >
-                      every ~{a.interval_days}d
-                    </Text>
-                  ) : null}
-                </View>
-                {/* Tappable when paused — see confirmResume. */}
-                {a.is_feeding_paused ? (
-                  <TouchableOpacity
-                    onPress={() => confirmResume(a)}
-                    disabled={resumingId === a.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${displayName(a)} is paused. Tap to resume feeding.`}
-                    style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
-                  >
-                    <Text style={[styles.pillText, { color: pill.color }]}>
-                      {resumingId === a.id ? 'Resuming…' : 'Paused ✕'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View
-                    style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
-                  >
-                    <Text style={[styles.pillText, { color: pill.color }]}>
-                      {pill.label}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+                <Text style={[styles.groupTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {g.label}
+                </Text>
+                <Text style={[styles.groupCount, { color: colors.textTertiary }]}>{g.rows.length}</Text>
+              </View>
+              {g.rows.map(renderAnimal)}
+            </View>
+          ))}
 
         <View style={styles.scrollTail} />
       </ScrollView>
@@ -496,6 +603,22 @@ function FeedingDayScreen() {
           ]}
         >
           <TouchableOpacity
+            onPress={() => setLocSheetOpen(true)}
+            disabled={locBusy}
+            accessibilityRole="button"
+            accessibilityLabel={`Set location for ${selected.size} selected`}
+            style={[
+              styles.locBtn,
+              { borderColor: colors.border, backgroundColor: colors.background, borderRadius: layout.radius.lg },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="map-marker-plus-outline"
+              size={22}
+              color={locBusy ? colors.textTertiary : colors.textPrimary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => setSheetOpen(true)}
             style={[
               styles.actionBtn,
@@ -510,6 +633,15 @@ function FeedingDayScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <LocationSheet
+        visible={locSheetOpen}
+        title={`Set location for ${selected.size}`}
+        locations={locations}
+        confirmLabel="Apply"
+        onClose={() => setLocSheetOpen(false)}
+        onPick={applyLocation}
+      />
 
       {/* Batch sheet */}
       <Modal
@@ -696,6 +828,11 @@ const styles = StyleSheet.create({
   chipsInner: { paddingHorizontal: 16, gap: 8 },
   chip: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
   chipText: { fontSize: 13, fontWeight: '600' },
+  chipIcon: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 6 },
+  groupTitle: { flex: 1, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupCount: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  locBtn: { width: 52, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginRight: 8 },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',

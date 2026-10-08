@@ -18,7 +18,7 @@ import { PhotoStrip } from '../../src/components/share/PhotoStrip';
 import { PhotoAdjuster } from '../../src/components/share/PhotoAdjuster';
 import { AppHeader } from '../../src/components/AppHeader';
 import {
-  CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
+  CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, KIND_TITLE, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
   createShareCard, getShareDefaults, listSharePhotos, previewImageUrl, shareImageUrl,
 } from '../../src/lib/share-cards';
 
@@ -35,7 +35,8 @@ interface MadeLink { key: string; cardLink: string }
 export default function ShareCardScreen() {
   const router = useRouter();
   const { animalId, kind: kindParam, moltId } = useLocalSearchParams<{ animalId: string; kind?: string; moltId?: string }>();
-  const kind: CardKind = kindParam === 'molt' ? 'molt' : 'profile';
+  // kind=colony: animalId is the colony's id.
+  const kind: CardKind = kindParam === 'molt' || kindParam === 'colony' ? kindParam : 'profile';
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
@@ -77,8 +78,8 @@ export default function ShareCardScreen() {
 
   useEffect(() => {
     if (!animalId) return;
-    listSharePhotos(animalId).then(setPhotos).catch(() => setPhotos([]));
-  }, [animalId]);
+    listSharePhotos(animalId, kind).then(setPhotos).catch(() => setPhotos([]));
+  }, [animalId, kind]);
 
   const cached = (k: string) => {
     const hit = cache.current.get(k);
@@ -212,7 +213,7 @@ export default function ShareCardScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title={kind === 'molt' ? 'Share molt' : 'Share card'}
+      <AppHeader title={KIND_TITLE[kind]}
         leftAction={<TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close"><MaterialCommunityIcons name="close" size={26} color={iconColor} /></TouchableOpacity>} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.previewWrap, { borderRadius: layout.radius.md }]}>

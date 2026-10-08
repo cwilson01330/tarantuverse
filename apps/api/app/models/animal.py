@@ -135,6 +135,11 @@ class Animal(Base):
     # of day 7). See cgd_20260522 migration.
     feeds_on_cgd_override = Column(Boolean, nullable=True)
 
+    # Where the animal physically lives (room / rack / shelf). Free text,
+    # canonicalised per keeper by utils/locations (herpetoverse scope) so one
+    # place can't split into "Reptile room" and "reptile room".
+    location = Column(String(40), nullable=True)
+
     # Media
     photo_url = Column(String(500))
 

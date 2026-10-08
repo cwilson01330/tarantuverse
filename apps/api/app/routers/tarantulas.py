@@ -38,7 +38,7 @@ from app.services.inverts_dualwrite import (
     mirror_tarantula_delete,
     mirror_tarantula_update,
 )
-from app.utils.access import policy
+from app.utils.access import load_invert, policy
 from app.utils.photo_cleanup import collect_for_animal, delete_files
 from app.utils.legacy_logs import tarantula_logs
 
@@ -493,7 +493,7 @@ def _calendar_day_diff(later: datetime, earlier: datetime, tz_offset_minutes: Op
 
 
 @router.get("/{tarantula_id}/feeding-stats", response_model=FeedingStats)
-@policy("owner_only")
+@policy("viewer")
 async def get_feeding_stats(
     tarantula_id: UUID,
     tz_offset_minutes: Optional[int] = Query(
@@ -514,11 +514,14 @@ async def get_feeding_stats(
 
     Returns feeding patterns, acceptance rates, prey distribution,
     and predictions for next feeding.
+
+    Viewer level (2026-10-07): the shared web detail page shows this card to
+    co-keepers too, the same as /inverts/{id}/feeding-stats. Access resolves
+    through the `inverts` twin (same primary key); the pause columns are still
+    read off the legacy row, which the invert update path mirrors.
     """
-    tarantula = db.query(Tarantula).filter(
-        Tarantula.id == tarantula_id,
-        Tarantula.user_id == current_user.id
-    ).first()
+    load_invert(db, current_user, tarantula_id, "viewer", not_found="Tarantula not found")
+    tarantula = db.query(Tarantula).filter(Tarantula.id == tarantula_id).first()
 
     if not tarantula:
         raise HTTPException(

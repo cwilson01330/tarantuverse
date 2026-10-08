@@ -517,7 +517,7 @@ export default function EditColonyScreen() {
           <View style={styles.switchRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={styles.switchLabel}>Active colony</Text>
-              <Text style={styles.hint}>Turn off to archive. Archived colonies are hidden from the main list but history is preserved.</Text>
+              <Text style={styles.hint}>Turn off to archive. An archived colony is hidden from your collection and the free-plan count, and its history is kept. Find it under “Archived colonies” in Collection.</Text>
             </View>
             <Switch value={isActive} onValueChange={setIsActive} trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#fff" accessibilityLabel="Toggle colony active" />
           </View>

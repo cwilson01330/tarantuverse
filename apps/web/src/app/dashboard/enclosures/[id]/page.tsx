@@ -640,7 +640,7 @@ export default function EnclosureDetailPage() {
                 {inhabitants.map((t) => (
                   <Link
                     key={t.id}
-                    href={`/dashboard/tarantulas/${t.id}`}
+                    href={`/dashboard/inverts/${t.id}`}
                     className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                   >
                     <div className="w-12 h-12 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center overflow-hidden shrink-0">

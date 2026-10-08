@@ -39,6 +39,7 @@ import {
   extractErrorMessage,
 } from '../../src/components/forms/FormPrimitives';
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
+import { LocationPicker } from '../../src/components/LocationPicker';
 import { ReptileSpeciesAutocomplete } from '../../src/components/forms/ReptileSpeciesAutocomplete';
 import {
   AddGenesField,
@@ -146,6 +147,7 @@ function AddReptileScreen() {
     typeof params.species_id === 'string' ? params.species_id : null,
   );
   const [enclosureId, setEnclosureId] = useState<string | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
   const [commonName, setCommonName] = useState(
     typeof params.common_name === 'string' ? params.common_name : '',
   );
@@ -223,6 +225,7 @@ function AddReptileScreen() {
       common_name: trimmedCommon || null,
       herp_species_id: speciesId,
       enclosure_id: enclosureId,
+      location,
       sex,
       hatch_date: hatchIso,
       source: source === 'unset' ? null : source,
@@ -415,6 +418,13 @@ function AddReptileScreen() {
           >
             <EnclosurePicker value={enclosureId} onChange={setEnclosureId} />
           </Field>}
+
+          <Field
+            label="Location"
+            hint="Optional. A room, rack or shelf — pick one you've used, or name a new place."
+          >
+            <LocationPicker value={location} onChange={setLocation} collection={collection} />
+          </Field>
 
           <Field
             label="Current weight (g)"

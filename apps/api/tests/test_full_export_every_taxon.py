@@ -118,3 +118,37 @@ def test_preview_counts_every_taxon_once():
     # The duplicate "animals" key that hid the all-taxa count is gone.
     assert src.count('"animals":') == 1
     assert "total_records" in src
+
+
+def test_exports_carry_location_and_lifecycle():
+    """A keeper's export must hold everything they recorded (2026-10-07)."""
+    from app.models.animal import Animal
+    from app.models.colony import Colony
+    from app.models.invert import Invert
+    for fields, model in (
+        (export_service.INVERT_FIELDS, Invert),
+        (export_service.COLONY_FIELDS, Colony),
+        (export_service.ANIMAL_FIELDS, Animal),
+    ):
+        assert "location" in fields
+        cols = set(model.__table__.columns.keys())
+        assert set(fields) <= cols, set(fields) - cols   # no typo'd field names
+    for f in ("died_at", "death_cause", "death_notes"):
+        assert f in export_service.ANIMAL_FIELDS
+
+
+def test_export_only_fetches_our_own_storage():
+    from app.services.export_service import _is_our_photo_url
+    base = "https://pub-abc.r2.dev"
+    assert _is_our_photo_url("https://pub-abc.r2.dev/photos/x.jpg", base)
+    assert not _is_our_photo_url("https://pub-abc.r2.dev.evil.com/x.jpg", base)
+    assert not _is_our_photo_url("http://169.254.169.254/latest/meta-data", base)
+    assert not _is_our_photo_url("https://pub-abc.r2.dev/x.jpg", "")   # unset base: fetch nothing
+
+
+def test_full_zip_can_stream_to_a_file():
+    import tempfile
+    with tempfile.SpooledTemporaryFile() as f:
+        assert asyncio.run(build_full_zip(_data(), "k", fetch_photo=_fetch, out=f)) is None
+        f.seek(0)
+        assert "all_animals.csv" in zipfile.ZipFile(f).namelist()

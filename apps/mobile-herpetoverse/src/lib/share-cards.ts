@@ -34,21 +34,40 @@ export const previewImageUrl = (u: string) => withParams(u, 'size=preview&fmt=jp
 export const shareImageUrl = (u: string) => withParams(u, 'fmt=jpg');
 export interface ShareDefaults { fields: string[]; frame: CardFrame }
 
+/** HV card kinds: the animal, one shed log, one weigh-in. */
+export type CardKind = 'profile' | 'shed' | 'weight';
+
 export const FIELD_LABELS: Record<string, string> = {
   photo: 'Photo', name: 'Name', species: 'Species', sex: 'Sex', in_care: 'Time in care',
   weight: 'Weight', length: 'Length', sheds: 'Shed count',
+  shed_number: 'Shed number', shed_date: 'Shed date', completeness: 'Shed quality',
+  days_since_previous: 'Days since last shed', change: 'Change since last', weigh_date: 'Date weighed',
 };
-export const FIELDS: string[] = ['photo', 'name', 'species', 'sex', 'in_care', 'weight', 'length', 'sheds'];
+/** Mirrors FIELD_ALLOW in apps/api/app/services/share_card.py. */
+export const FIELDS: Record<CardKind, string[]> = {
+  profile: ['photo', 'name', 'species', 'sex', 'in_care', 'weight', 'length', 'sheds'],
+  shed: ['photo', 'name', 'species', 'shed_number', 'shed_date', 'completeness', 'days_since_previous', 'in_care'],
+  weight: ['photo', 'name', 'species', 'weight', 'change', 'weigh_date', 'in_care'],
+};
+export const KIND_TITLE: Record<CardKind, string> = { profile: 'Share card', shed: 'Shed card', weight: 'Weigh-in card' };
+
+/** How the "Shared cards" list names a link's kind. */
+export function cardKindLabel(kind: string): string {
+  return ({ molt: 'molt', profile: 'profile', colony: 'colony', shed: 'shed', weight: 'weigh-in' } as Record<string, string>)[kind] ?? 'card';
+}
 
 export interface ShareCardCreated { image_url: string; card_link: string | null; code: string | null; fields: string[] }
 /** Mirrors apps/api/app/schemas/share_card.py::CardLinkItem. */
-export interface CardLinkItem { code: string; app: string; kind: 'molt' | 'profile'; name: string | null; url: string; created_at: string; revoked_at: string | null }
+export interface CardLinkItem { code: string; app: string; kind: string; name: string | null; url: string; created_at: string; revoked_at: string | null }
 
-export async function getShareDefaults(): Promise<ShareDefaults> {
-  const { data } = await apiClient.get<{ fields: string[]; frame?: CardFrame }>(`/share-cards/defaults`, { params: { app: 'herpetoverse', kind: 'profile' } });
+export async function getShareDefaults(kind: CardKind = 'profile'): Promise<ShareDefaults> {
+  const { data } = await apiClient.get<{ fields: string[]; frame?: CardFrame }>(`/share-cards/defaults`, { params: { app: 'herpetoverse', kind } });
   return { fields: data.fields, frame: data.frame ?? 'specimen' };
 }
-export async function createShareCard(body: { animal_id: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; focus?: PhotoFocus | null; link: boolean; preview?: boolean }): Promise<ShareCardCreated> {
+export async function createShareCard(body: {
+  animal_id: string; kind?: CardKind; shed_id?: string; weight_log_id?: string;
+  fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; focus?: PhotoFocus | null; link: boolean; preview?: boolean;
+}): Promise<ShareCardCreated> {
   const { data } = await apiClient.post<ShareCardCreated>(`/share-cards/`, { app: 'herpetoverse', kind: 'profile', ...body });
   return data;
 }

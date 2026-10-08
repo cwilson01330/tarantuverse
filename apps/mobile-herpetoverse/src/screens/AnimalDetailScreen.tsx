@@ -252,6 +252,16 @@ export function AnimalDetailScreen() {
 
         <View style={styles.belowHero}>
 
+        {/* Room / rack / shelf — only when the keeper has set one. */}
+        {animal.location ? (
+          <View style={styles.locationRow} accessible accessibilityLabel={`Location: ${animal.location}`}>
+            <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.textTertiary} />
+            <Text style={[TYPE.body, { color: colors.textSecondary, flex: 1 }]} numberOfLines={1}>
+              {animal.location}
+            </Text>
+          </View>
+        ) : null}
+
         {isOwner && !dead && (
           <TouchableOpacity
             onPress={() => setShareOpen(true)}
@@ -358,6 +368,16 @@ export function AnimalDetailScreen() {
             weights={weights}
             sheds={sheds}
             canChange={mayChange}
+            onShare={
+              canKeep && !dead
+                ? (kind, entryId) =>
+                    router.push(
+                      (kind === 'shed'
+                        ? `/share/${animal.id}?kind=shed&shedId=${entryId}`
+                        : `/share/${animal.id}?kind=weight&weightId=${entryId}`) as never,
+                    )
+                : undefined
+            }
             onOpen={(kind, entryId) => {
               const route =
                 kind === 'feeding'
@@ -567,6 +587,7 @@ const styles = StyleSheet.create({
   /** Everything after the hero gets the normal 16pt gutter. */
   belowHero: { paddingHorizontal: 16, gap: 16 },
   linkRow: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // Pinned log bar
   logBar: {

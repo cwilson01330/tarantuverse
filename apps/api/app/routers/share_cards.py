@@ -18,10 +18,12 @@ from app.config import settings
 from app.database import get_db
 from app.models.card_link import CardLink
 from app.models.user import User
-from app.schemas.share_card import CardLinkItem, ShareCardCreate, ShareCardCreated, SharePhotoItem
+from app.schemas.share_card import KIND_PATTERN, CardLinkItem, ShareCardCreate, ShareCardCreated, SharePhotoItem
 from app.services.share_card import (
     CardSubject,
     MoltFacts,
+    ShedFacts,
+    WeightFacts,
     _LEG_SPAN_TAXA,
     clean_fields,
     clean_frame,
@@ -43,6 +45,11 @@ PUBLIC_FIELDS = {
     "tarantuverse": ["photo", "name", "species", "sex", "in_care", "molts", "size"],
     "herpetoverse": ["photo", "name", "species", "sex", "in_care", "weight", "sheds"],
 }
+# ...and of already-public colonies: exactly what /col/{id} already shows
+# anyone (population and per-stage counts; never the acquisition date).
+PUBLIC_COLONY_FIELDS = ["photo", "name", "species", "population", "stages"]
+
+COLONY_CLOSED = "This colony has ended or been handed off, so it can't be shared."
 
 
 # ── DB access (monkeypatched in tests) ──────────────────────────────────────
@@ -124,6 +131,115 @@ def _load_molt(db: Session, animal_id: UUID, molt_id: UUID) -> MoltFacts:
     )
 
 
+def _colony_subject(db: Session, col) -> CardSubject:
+    """A colony as a card subject. Reads only what a card can show: never its
+    location, notes, sitter note, source or enclosure."""
+    sci = common = None
+    if col.species_id:
+        from app.models.invert_species import InvertSpecies
+        sp = db.query(InvertSpecies).filter(InvertSpecies.id == col.species_id).first()
+        if sp is not None:
+            sci = sp.scientific_name
+            common = sp.common_names[0] if sp.common_names else None
+    return CardSubject(
+        app="tarantuverse", taxon=col.taxon, name=col.name, scientific_name=sci, common_name=common,
+        sex=None, date_acquired=col.date_acquired, photo_url=col.photo_url,
+        founded_date=col.founded_date, stage_counts=dict(col.stage_counts or {}),
+        count_is_estimated=bool(col.count_is_estimated),
+    )
+
+
+def _colony_closed(col) -> bool:
+    return col.ended_at is not None or col.transferred_out_at is not None
+
+
+def _load_colony_subject(db: Session, user, colony_id: UUID, need: str):
+    """(colony_row, owner_user, CardSubject). 404 when the caller has no
+    access to the colony's collection — the colony routes' own rule."""
+    from app.utils.access import load_colony
+
+    col, access = load_colony(db, user, colony_id, need, not_found="Colony not found")
+    return col, access.owner, _colony_subject(db, col)
+
+
+def _load_colony_subject_unchecked(db: Session, colony_id: UUID):
+    """Token-authorised read (the role check happened when the token was
+    issued)."""
+    from app.models.colony import Colony
+
+    col = db.query(Colony).filter(Colony.id == colony_id).first()
+    if col is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    return col, None, _colony_subject(db, col)
+
+
+def _colony_live(db: Session, colony_id) -> bool:
+    """A colony card link stays up only while the colony exists and is still
+    running — ended or handed off reads as 'no longer shared'."""
+    from app.models.colony import Colony
+
+    col = db.query(Colony).filter(Colony.id == colony_id).first()
+    return col is not None and not _colony_closed(col)
+
+
+def _load_shed(db: Session, animal_id: UUID, shed_id: UUID) -> ShedFacts:
+    """One of THIS animal's sheds; another animal's shed id is a 404."""
+    from app.models.shed_log import ShedLog
+
+    shed = db.query(ShedLog).filter(ShedLog.id == shed_id, ShedLog.animal_id == animal_id).first()
+    if shed is None:
+        raise HTTPException(status_code=404, detail="Shed not found")
+    # Strictly earlier sheds, tie-broken by id like molt numbering, so two
+    # sheds logged at the same moment still get distinct numbers.
+    earlier = or_(ShedLog.shed_at < shed.shed_at, and_(ShedLog.shed_at == shed.shed_at, ShedLog.id < shed.id))
+    before = db.query(ShedLog).filter(ShedLog.animal_id == animal_id, earlier).count()
+    prev = (
+        db.query(ShedLog.shed_at)
+        .filter(ShedLog.animal_id == animal_id, earlier)
+        .order_by(ShedLog.shed_at.desc(), ShedLog.id.desc())
+        .first()
+    )
+    return ShedFacts(
+        number=before + 1,
+        shed_on=shed.shed_at.date(),
+        is_complete=shed.is_complete_shed,
+        has_retained=bool(shed.has_retained_shed),
+        previous_on=prev[0].date() if prev and prev[0] is not None else None,
+    )
+
+
+def _load_weight(db: Session, animal_id: UUID, weight_log_id: UUID) -> WeightFacts:
+    """One of THIS animal's weigh-ins, and the one before it."""
+    from app.models.weight_log import WeightLog
+
+    row = db.query(WeightLog).filter(WeightLog.id == weight_log_id, WeightLog.animal_id == animal_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Weigh-in not found")
+    earlier = or_(WeightLog.weighed_at < row.weighed_at, and_(WeightLog.weighed_at == row.weighed_at, WeightLog.id < row.id))
+    prev = (
+        db.query(WeightLog.weight_g)
+        .filter(WeightLog.animal_id == animal_id, earlier)
+        .order_by(WeightLog.weighed_at.desc(), WeightLog.id.desc())
+        .first()
+    )
+    return WeightFacts(
+        weight_g=float(row.weight_g),
+        weighed_on=row.weighed_at.date(),
+        previous_g=float(prev[0]) if prev and prev[0] is not None else None,
+    )
+
+
+def _event_facts(db: Session, kind: str, animal_id: UUID, molt_id=None, shed_id=None, weight_log_id=None) -> dict:
+    """The per-event facts compose_card needs for this kind, as kwargs."""
+    if kind == "molt":
+        return {"molt": _load_molt(db, animal_id, molt_id)}
+    if kind == "shed":
+        return {"shed": _load_shed(db, animal_id, shed_id)}
+    if kind == "weight":
+        return {"weight": _load_weight(db, animal_id, weight_log_id)}
+    return {}
+
+
 def _focus_claim(focus) -> Optional[dict]:
     """Rounded so equivalent framings share a cache key and tokens stay short."""
     if focus is None:
@@ -144,30 +260,33 @@ def _clean_focus(raw) -> Optional[dict]:
         return None
 
 
-def _photo_parent_column(app: str):
+def _photo_parent_column(app: str, kind: Optional[str] = None):
     from app.models.photo import Photo
+    if kind == "colony":
+        return Photo.colony_id
     return Photo.invert_id if app == "tarantuverse" else Photo.animal_id
 
 
-def _load_photo_url(db: Session, app: str, animal_id, photo_id) -> Optional[str]:
-    """The URL of one of THIS animal's photos, or None. A photo id that
-    belongs to another animal is treated exactly like one that doesn't exist."""
+def _load_photo_url(db: Session, app: str, animal_id, photo_id, kind: Optional[str] = None) -> Optional[str]:
+    """The URL of one of THIS animal's (or colony's) photos, or None. A photo
+    id that belongs to anything else is treated exactly like one that doesn't
+    exist."""
     from app.models.photo import Photo
 
     row = (
         db.query(Photo.url)
-        .filter(Photo.id == photo_id, _photo_parent_column(app) == animal_id)
+        .filter(Photo.id == photo_id, _photo_parent_column(app, kind) == animal_id)
         .first()
     )
     return row[0] if row else None
 
 
-def _list_photos(db: Session, app: str, animal_id) -> list:
+def _list_photos(db: Session, app: str, animal_id, kind: Optional[str] = None) -> list:
     from app.models.photo import Photo
 
     return (
         db.query(Photo)
-        .filter(_photo_parent_column(app) == animal_id)
+        .filter(_photo_parent_column(app, kind) == animal_id)
         .order_by(Photo.created_at.desc())
         .limit(60)
         .all()
@@ -200,23 +319,41 @@ async def create_share_card(
         raise HTTPException(status_code=422, detail=str(e))
     if body.kind == "molt" and body.molt_id is None:
         raise HTTPException(status_code=422, detail="A molt card needs molt_id")
+    if body.kind == "shed" and body.shed_id is None:
+        raise HTTPException(status_code=422, detail="A shed card needs shed_id")
+    if body.kind == "weight" and body.weight_log_id is None:
+        raise HTTPException(status_code=422, detail="A weigh-in card needs weight_log_id")
 
     # Keeper role or owner (spec §4.1). 404 for anyone else.
-    _animal, owner, subject = _load_subject(db, current_user, body.app, body.animal_id, "keeper")
-    molt = _load_molt(db, body.animal_id, body.molt_id) if body.kind == "molt" else None
+    if body.kind == "colony":
+        colony, owner, subject = _load_colony_subject(db, current_user, body.animal_id, "keeper")
+        # An ended or handed-off colony can't get a NEW card (its existing
+        # links read as no longer shared, see get_card_link).
+        if _colony_closed(colony):
+            raise HTTPException(status_code=409, detail=COLONY_CLOSED)
+    else:
+        _animal, owner, subject = _load_subject(db, current_user, body.app, body.animal_id, "keeper")
+    # Event ids are only read for their own kind, and only ever looked up
+    # under THIS animal (another animal's id is a 404).
+    event = _event_facts(db, body.kind, body.animal_id, body.molt_id, body.shed_id, body.weight_log_id)
     if body.photo_id is not None:
-        chosen = _load_photo_url(db, body.app, body.animal_id, body.photo_id)
+        chosen = _load_photo_url(db, body.app, body.animal_id, body.photo_id, kind=body.kind)
         if chosen is None:
             raise HTTPException(status_code=404, detail="Photo not found")
         subject.photo_url = chosen
 
-    token = sign_render_token({
+    claims = {
         "app": body.app, "kind": body.kind, "animal_id": str(body.animal_id),
-        "molt_id": str(body.molt_id) if body.molt_id else None,
+        "molt_id": str(body.molt_id) if body.molt_id and body.kind == "molt" else None,
         "fields": fields, "shape": body.shape, "frame": body.frame,
         "photo_id": str(body.photo_id) if body.photo_id else None,
         "focus": _focus_claim(body.focus),
-    })
+    }
+    if body.kind == "shed":
+        claims["shed_id"] = str(body.shed_id)
+    if body.kind == "weight":
+        claims["weight_log_id"] = str(body.weight_log_id)
+    token = sign_render_token(claims)
     image_url = f"{settings.CARD_RENDERER_ORIGIN.rstrip('/')}/api/card/{token}"
 
     card_link = code = None
@@ -224,7 +361,9 @@ async def create_share_card(
         code = secrets.token_urlsafe(16)
         # The frame is frozen with the text: a shared link always shows the
         # card as it looked when it was shared.
-        payload = dict(compose_card(body.kind, subject, fields, molt=molt), frame=body.frame,
+        # (A colony link is told apart from an animal one by kind == "colony":
+        # card_links.animal_id then holds the colony id.)
+        payload = dict(compose_card(body.kind, subject, fields, **event), frame=body.frame,
                        photo_focus=_focus_claim(body.focus))
         db.add(CardLink(
             id=uuid.uuid4(), code=code, app=body.app, animal_id=body.animal_id, kind=body.kind,
@@ -243,7 +382,7 @@ async def create_share_card(
 @router.get("/share-cards/defaults")
 async def get_share_defaults(
     app: str = Query(..., pattern="^(tarantuverse|herpetoverse)$"),
-    kind: str = Query(..., pattern="^(molt|profile)$"),
+    kind: str = Query(..., pattern=KIND_PATTERN),
     current_user: User = Depends(get_current_user),
 ):
     saved_fields, frame = read_defaults((current_user.share_defaults or {}).get(f"{app}:{kind}"))
@@ -257,15 +396,25 @@ async def get_share_defaults(
 async def list_share_photos(
     app: str = Query(..., pattern="^(tarantuverse|herpetoverse)$"),
     animal_id: UUID = Query(...),
+    # "colony" lists a colony's photos (animal_id is then the colony id). Any
+    # other kind, or none (older clients), lists the animal's.
+    kind: Optional[str] = Query(None, pattern=KIND_PATTERN),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """The animal's photos for the composer's photo picker. Same role rule as
     sharing itself (keeper or owner; 404 for anyone else)."""
-    _animal, _owner, subject = _load_subject(db, current_user, app, animal_id, "keeper")
+    if kind == "colony":
+        if app != "tarantuverse":
+            raise HTTPException(status_code=404, detail="Colony not found")
+        _col, _owner, subject = _load_colony_subject(db, current_user, animal_id, "keeper")
+        rows = _list_photos(db, app, animal_id, kind="colony")
+    else:
+        _animal, _owner, subject = _load_subject(db, current_user, app, animal_id, "keeper")
+        rows = _list_photos(db, app, animal_id)
     return [
         SharePhotoItem(id=p.id, url=p.url, thumbnail_url=p.thumbnail_url, is_main=p.url == subject.photo_url)
-        for p in _list_photos(db, app, animal_id)
+        for p in rows
     ]
 
 
@@ -278,15 +427,22 @@ async def share_card_data(token: str, response: Response, db: Session = Depends(
     if not claims:
         raise HTTPException(status_code=404, detail="Card not found")
     # No login here: the token proved the sharer's right when it was issued.
-    app, animal_id = claims["app"], UUID(claims["animal_id"])
-    _animal, _owner, subject = _load_subject_unchecked(db, app, animal_id)
+    app, animal_id, kind = claims["app"], UUID(claims["animal_id"]), claims["kind"]
+    if kind == "colony":
+        _col, _owner, subject = _load_colony_subject_unchecked(db, animal_id)
+    else:
+        _animal, _owner, subject = _load_subject_unchecked(db, app, animal_id)
     if claims.get("photo_id"):
         # Deleted since the token was minted: fall back to the main photo.
-        chosen = _load_photo_url(db, app, animal_id, UUID(claims["photo_id"]))
+        chosen = _load_photo_url(db, app, animal_id, UUID(claims["photo_id"]), kind=kind)
         if chosen:
             subject.photo_url = chosen
-    molt = _load_molt(db, animal_id, UUID(claims["molt_id"])) if claims.get("molt_id") else None
-    card = compose_card(claims["kind"], subject, claims["fields"], molt=molt)
+    def claim_id(k: str) -> Optional[UUID]:
+        return UUID(claims[k]) if claims.get(k) else None
+
+    # A deleted molt/shed/weigh-in makes its token a 404 (no stale card).
+    event = _event_facts(db, kind, animal_id, claim_id("molt_id"), claim_id("shed_id"), claim_id("weight_log_id"))
+    card = compose_card(kind, subject, claims["fields"], **event)
     card["shape"] = claims["shape"]
     # Tokens minted before frames existed have no frame claim.
     card["frame"] = clean_frame(claims.get("frame"))
@@ -317,7 +473,10 @@ async def get_card_link(code: str, response: Response, db: Session = Depends(get
     link = _find_link(db, code)
     if link is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    if link.revoked_at is not None or not _animal_exists(db, link.app, link.animal_id):
+    # A colony link (kind "colony": animal_id holds the colony id) also goes
+    # once the colony has ended or been handed off.
+    alive = _colony_live(db, link.animal_id) if link.kind == "colony" else _animal_exists(db, link.app, link.animal_id)
+    if link.revoked_at is not None or not alive:
         raise HTTPException(status_code=410, detail="This card is no longer shared")
     # Links shared before frames existed have no frame in their snapshot.
     return dict(link.payload, shape="wide", frame=clean_frame((link.payload or {}).get("frame")))
@@ -352,6 +511,23 @@ async def revoke_card_link(code: str, db: Session = Depends(get_db), current_use
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/public-card/tarantuverse/colonies/{colony_id}")
+async def public_colony_card(colony_id: UUID, db: Session = Depends(get_db)):
+    """Link-preview payload for a colony that is ALREADY public under the
+    /col/{id} rule: owner's collection public AND the colony's own visibility
+    'public' AND not ended or handed off. Changes nothing; 404 otherwise."""
+    from app.models.colony import Colony
+
+    col = db.query(Colony).filter(Colony.id == colony_id).first()
+    if col is None or _colony_closed(col) or getattr(col, "visibility", None) != "public":
+        raise HTTPException(status_code=404, detail="Not found")
+    owner = db.query(User).filter(User.id == col.user_id).first()
+    if owner is None or owner.collection_visibility != "public":
+        raise HTTPException(status_code=404, detail="Not found")
+    subject = _colony_subject(db, col)
+    return dict(compose_card("colony", subject, PUBLIC_COLONY_FIELDS), shape="wide", frame="specimen")
+
+
 @router.get("/public-card/{app}/{animal_id}")
 async def public_card(app: str, animal_id: UUID, db: Session = Depends(get_db)):
     """Link-preview payload for an animal that is ALREADY public under the
@@ -368,6 +544,11 @@ async def public_card(app: str, animal_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Not found")
     owner = db.query(User).filter(User.id == row.user_id).first()
     if owner is None or owner.collection_visibility != "public":
+        raise HTTPException(status_code=404, detail="Not found")
+    # TV animals carry a per-animal choice that wins over a public collection,
+    # matching /t and /i. (HV has no per-animal toggle yet, so its stored
+    # default isn't treated as a choice.)
+    if app == "tarantuverse" and getattr(row, "visibility", None) == "private":
         raise HTTPException(status_code=404, detail="Not found")
     _a, _o, subject = _load_subject(db, owner, app, animal_id, "viewer")
     return dict(compose_card("profile", subject, PUBLIC_FIELDS[app]), shape="wide", frame="specimen")

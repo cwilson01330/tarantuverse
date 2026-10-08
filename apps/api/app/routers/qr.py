@@ -781,6 +781,12 @@ async def get_public_tarantula_profile(
             status_code=403,
             detail="This collection is private",
         )
+    # The keeper's per-animal choice (the visibility toggle on the animal
+    # page, 2026-10-07) wins over a public collection. The tarantula's
+    # visibility lives on its `inverts` twin (same primary key).
+    t_mirror = db.query(Invert).filter(Invert.id == t_uuid).first()
+    if not is_owner and t_mirror is not None and t_mirror.visibility == "private":
+        raise HTTPException(status_code=403, detail="This animal is private")
 
     # Species care sheet info
     species_data = None
@@ -939,6 +945,9 @@ async def get_public_invert_profile(
     collection_public = owner and owner.collection_visibility == "public"
     if not is_owner and not collection_public:
         raise HTTPException(status_code=403, detail="This collection is private")
+    # The keeper's per-animal choice wins over a public collection (2026-10-07).
+    if not is_owner and invert.visibility == "private":
+        raise HTTPException(status_code=403, detail="This animal is private")
 
     species_data = None
     if invert.species_id:
@@ -1101,6 +1110,10 @@ async def get_public_colony_profile(
     if not is_owner and colony.visibility != "public":
         raise HTTPException(status_code=403, detail="This colony is private")
     if not is_owner and colony.transferred_out_at is not None:
+        raise HTTPException(status_code=404, detail="Colony not found")
+    # An ended colony is the same story: the owner still sees their own record,
+    # a printed QR label scanned by anyone else gets a 404.
+    if not is_owner and colony.ended_at is not None:
         raise HTTPException(status_code=404, detail="Colony not found")
 
     species_data = None

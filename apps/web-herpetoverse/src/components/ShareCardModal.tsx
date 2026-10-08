@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import {
-  CardApp, CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
+  CardApp, CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, KIND_TITLE, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
   createShareCard, getShareDefaults, listSharePhotos, previewImageUrl, shareImageUrl,
 } from '@/lib/shareCards'
 import PhotoAdjustPanel from '@/components/PhotoAdjustPanel'
@@ -46,10 +46,14 @@ function FrameThumb({ frame }: { frame: CardFrame }) {
 }
 
 export default function ShareCardModal({
-  open, onClose, app, animalId, kind, moltId, token,
+  open, onClose, app, animalId, kind, moltId, shedId, weightLogId, token,
 }: {
-  open: boolean; onClose: () => void; app: CardApp; animalId: string; kind: CardKind; moltId?: string; token: string
+  /** shedId / weightLogId go with kinds 'shed' / 'weight'. */
+  open: boolean; onClose: () => void; app: CardApp; animalId: string; kind: CardKind; moltId?: string
+  shedId?: string; weightLogId?: string; token: string
 }) {
+  const eventIds = { molt_id: moltId, shed_id: shedId, weight_log_id: weightLogId }
+  const eventKey = `${moltId ?? ''}|${shedId ?? ''}|${weightLogId ?? ''}`
   const [shape, setShape] = useState<CardShape>('post')
   const [frame, setFrame] = useState<CardFrame>('specimen')
   const [fields, setFields] = useState<string[] | null>(null)
@@ -96,7 +100,7 @@ export default function ShareCardModal({
     setCardLink(null)
     setCopied(false)
     setError(null)
-  }, [open, moltId])
+  }, [open, eventKey])
 
   // Invalidate any in-flight preview when the modal closes.
   useEffect(() => {
@@ -109,11 +113,11 @@ export default function ShareCardModal({
     getShareDefaults(token, app, kind)
       .then((d) => { if (!cancelled) { setFields(d.fields); setFrame(d.frame) } })
       .catch(() => { if (!cancelled) setFields(FIELDS[`${app}:${kind}`]) })
-    listSharePhotos(token, app, animalId)
+    listSharePhotos(token, app, animalId, kind)
       .then((ps) => { if (!cancelled) setPhotos(ps) })
       .catch(() => { if (!cancelled) setPhotos([]) })
     return () => { cancelled = true }
-  }, [open, token, app, kind, moltId, animalId])
+  }, [open, token, app, kind, eventKey, animalId])
 
   // A link belongs to one frame+fields+shape+photo combination; changing any clears it.
   useEffect(() => {
@@ -125,7 +129,7 @@ export default function ShareCardModal({
     return hit && Date.now() - hit.at < PREVIEW_TTL_MS ? hit.url : null
   }
   const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null, fo: PhotoFocus | null) => {
-    const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields: f, shape: s, frame: fr, photo_id: ph, focus: fo, link: false, preview: true })
+    const r = await createShareCard(token, { app, animal_id: animalId, kind, ...eventIds, fields: f, shape: s, frame: fr, photo_id: ph, focus: fo, link: false, preview: true })
     return previewImageUrl(r.image_url)
   }
 
@@ -166,7 +170,7 @@ export default function ShareCardModal({
     }, 350)
     return () => { if (timer.current) clearTimeout(timer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, fields, shape, frame, photoId, focus, token, app, animalId, kind, moltId])
+  }, [open, fields, shape, frame, photoId, focus, token, app, animalId, kind, eventKey])
 
   /** Once the current preview shows, quietly draw the other two frames so
    *  switching frame is instant. Once per fields/shape/photo combination. */
@@ -241,7 +245,7 @@ export default function ShareCardModal({
     setError(null)
     try {
       const reuse = link && !!shownLink
-      const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, photo_id: photoId, focus, link: reuse ? false : link })
+      const r = await createShareCard(token, { app, animal_id: animalId, kind, ...eventIds, fields, shape, frame, photo_id: photoId, focus, link: reuse ? false : link })
       const url = reuse ? shownLink : r.card_link
       if (!reuse && r.card_link) setCardLink({ url: r.card_link, key })
       // Full-size JPEG: ~10x smaller than the PNG, indistinguishable on a feed.
@@ -271,7 +275,7 @@ export default function ShareCardModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      role="dialog" aria-modal="true" aria-label={kind === 'molt' ? 'Share molt' : 'Share card'}
+      role="dialog" aria-modal="true" aria-label={KIND_TITLE[kind]}
       onClick={onClose}
     >
       <div
@@ -311,7 +315,7 @@ export default function ShareCardModal({
               )}
         </div>
         <div className="flex flex-col gap-4">
-          <h2 className="text-sm font-semibold text-white tracking-wide">{kind === 'molt' ? 'Share molt' : 'Share card'}</h2>
+          <h2 className="text-sm font-semibold text-white tracking-wide">{KIND_TITLE[kind]}</h2>
           <div className="flex gap-3" role="group" aria-label="Frame">
             {FRAMES.map((f) => (
               <button key={f.key} onClick={() => setFrame(f.key)} aria-pressed={frame === f.key} className="flex flex-col items-center gap-1">

@@ -436,7 +436,7 @@ def photos(monkeypatch):
     mine = uuid.uuid4()
     store = {"deleted": False}
 
-    def load_photo_url(db, app, animal_id, photo_id):
+    def load_photo_url(db, app, animal_id, photo_id, kind=None):
         if store["deleted"] or animal_id != ANIMAL_ID or photo_id != mine:
             return None
         return OTHER_PHOTO
@@ -490,7 +490,7 @@ def test_photo_left_off_ignores_the_choice(photos):
 def test_list_photos_flags_the_main_one(monkeypatch):
     rows = [NS(id=uuid.uuid4(), url=OTHER_PHOTO, thumbnail_url=None),
             NS(id=uuid.uuid4(), url="https://pub.example.r2.dev/photos/x.jpg", thumbnail_url="t")]
-    monkeypatch.setattr(sc, "_list_photos", lambda db, app, animal_id: rows)
+    monkeypatch.setattr(sc, "_list_photos", lambda db, app, animal_id, kind=None: rows)
     out = run(sc.list_share_photos(app="tarantuverse", animal_id=ANIMAL_ID, db=FakeDB(), current_user=OWNER))
     assert [p.is_main for p in out] == [False, True]
 

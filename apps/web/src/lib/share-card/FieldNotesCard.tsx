@@ -29,6 +29,16 @@ const TYPE: Record<Shape, { headline: number; facts: number }> = {
 const PHOTO_H: Record<'story' | 'post' | 'square', number> = { story: 1254, post: 786, square: 600 }
 
 const upper = (s: string) => s.toUpperCase()
+/** A handwritten fact this long may wrap on its own line. */
+const LONG_FACT = 26
+
+/** Long headlines (a colony called "Dubia bin number two of the rack") step
+ *  down a size, like long names on the Herbarium frame, so they don't push
+ *  the facts into the wordmark. */
+function headlineSize(p: CardPayload, shape: Shape): number {
+  const t = TYPE[shape].headline
+  return (p.notes.headline?.length ?? 0) > 18 ? Math.round(t * 0.72) : t
+}
 
 function Photo({ url, taxon, w, h }: { url: string | null; taxon: string; w: number; h: number }) {
   if (url) {
@@ -54,6 +64,17 @@ function FactsLine({ facts, size, stacked }: { facts: string[]; size: number; st
       </div>
     )
   }
+  if (facts.some((f) => f.length > LONG_FACT) && !facts.some((f) => f.includes(' → '))) {
+    // A fact long enough to wrap on its own (a colony's stage split) would
+    // leave its dot stranded at the far edge as a separate box; one run of
+    // text wraps mid-line like handwriting instead. (Reenie's no-break space
+    // has no width, so plain spaces it is.)
+    return (
+      <div style={{ ...common, display: 'flex', marginTop: 12, marginLeft: 18, lineHeight: 1.15 }}>
+        {facts.join(' · ')}
+      </div>
+    )
+  }
   return (
     <div style={{ ...common, display: 'flex', flexWrap: 'wrap', alignItems: 'center', marginTop: 12, marginLeft: 18, lineHeight: 1.15 }}>
       {facts.map((f, i) => (
@@ -74,7 +95,9 @@ function Text({ p, shape }: { p: CardPayload; shape: Shape }) {
   const facts = p.notes.facts
   // At the side-column shapes two facts read best one per line, like a note;
   // longer lists stay on one wrapping line so they still fit the column.
-  const stacked = side && facts.length <= 2
+  // A fact that would wrap on its own (a long stage split) also reads best
+  // on its own line there.
+  const stacked = side && (facts.length <= 2 || facts.some((f) => f.length > LONG_FACT))
   const printed: CSSProperties = { display: 'flex', fontSize: side ? 21 : 27, letterSpacing: side ? 4 : 6, color: PRINT }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
@@ -82,7 +105,7 @@ function Text({ p, shape }: { p: CardPayload; shape: Shape }) {
       {p.notes.headline ? (
         <div
           style={{
-            display: 'flex', fontFamily: 'Reenie', fontSize: t.headline, lineHeight: 0.95, color: HAND,
+            display: 'flex', fontFamily: 'Reenie', fontSize: headlineSize(p, shape), lineHeight: 0.95, color: HAND,
             marginTop: 24, transform: 'rotate(-1.5deg)', transformOrigin: '0% 50%',
           }}
         >
@@ -101,7 +124,8 @@ function estimateTextHeight(p: CardPayload, shape: Shape, textW: number): number
   const t = TYPE[shape]
   const lines = (text: string, size: number, w: number) => Math.max(1, Math.ceil((text.length * size * 0.4) / w))
   let h = 27 * 1.25 * 2 + 60 // species line + wordmark + breathing room
-  if (p.notes.headline) h += 24 + t.headline * 0.95 * lines(p.notes.headline, t.headline, textW)
+  const hs = headlineSize(p, shape)
+  if (p.notes.headline) h += 24 + hs * 0.95 * lines(p.notes.headline, hs, textW)
   if (p.notes.facts.length > 0) h += 12 + t.facts * 1.15 * lines(p.notes.facts.join(' · '), t.facts, textW - 18)
   return Math.ceil(h)
 }

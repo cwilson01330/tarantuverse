@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 
 /**
- * Pause-feeding modal for tarantulas.
+ * Pause-feeding modal, for any animal with a feeding cadence.
  *
  * Mirror of the Herpetoverse `PauseFeedingSheet` for the web. Lets a
  * keeper flag a feeding pause with a canonical reason (premolt /
@@ -21,33 +21,35 @@ interface PauseFeedingModalProps {
   onSubmit: (reason: string, until: string | null) => Promise<void>
   initialReason?: string | null
   initialUntil?: string | null
+  /** Already paused: the dialog edits the pause rather than starting one. */
+  isPaused?: boolean
 }
 
 const REASON_OPTIONS: { value: string; label: string; help: string }[] = [
   {
     value: 'premolt',
     label: 'Premolt',
-    help: "She's in premolt and won't eat — common for slings and mature females.",
+    help: 'Not eating ahead of a molt. Common, and can last weeks or months.',
   },
   {
     value: 'post_rehouse',
     label: 'Post-rehouse',
-    help: 'Settling into a new enclosure. Most spiders skip a feeding or two.',
+    help: 'Settling into a new enclosure. Many skip a feeding or two.',
   },
   {
     value: 'recovering',
     label: 'Recovering',
-    help: 'After a fall, leg loss, or other stress. Wait until she steadies.',
+    help: 'After a fall, a lost limb, or other stress.',
   },
   {
     value: 'mating_season',
     label: 'Mating season',
-    help: 'Mature male wandering, or breeding pause for a female.',
+    help: 'A wandering mature male, or a female paused for breeding.',
   },
   {
     value: 'other',
     label: 'Other',
-    help: 'Add a note in the husbandry section if you want to remember why.',
+    help: 'Add a note on the animal if you want to remember why.',
   },
 ]
 
@@ -57,6 +59,7 @@ export default function PauseFeedingModal({
   onSubmit,
   initialReason,
   initialUntil,
+  isPaused = false,
 }: PauseFeedingModalProps) {
   const [reason, setReason] = useState<string>(initialReason || 'premolt')
   const [until, setUntil] = useState<string>(initialUntil || '')
@@ -96,10 +99,10 @@ export default function PauseFeedingModal({
           <div className="flex justify-between items-start mb-4">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Pause feedings
+                {isPaused ? 'Change pause' : 'Pause feedings'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Suppress overdue alerts while she's not eating.
+                No overdue alerts while they&apos;re not eating.
               </p>
             </div>
             <button
@@ -186,7 +189,7 @@ export default function PauseFeedingModal({
                 disabled={submitting}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
               >
-                {submitting ? 'Saving…' : 'Pause feedings'}
+                {submitting ? 'Saving…' : isPaused ? 'Save' : 'Pause feedings'}
               </button>
             </div>
           </form>

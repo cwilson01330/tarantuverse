@@ -10,9 +10,10 @@
  * whatever loaded; the partial-failure state is surfaced via a banner
  * but the list remains usable.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +48,18 @@ import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
 import { DEFAULT_CGD_FOOD_TYPE, feedingPillColor } from '../../src/lib/cgd';
+import { LocationRenameSheet } from '../../src/components/LocationPicker';
+import {
+  UNASSIGNED_KEY,
+  groupByLocation,
+  locationKey,
+  renameLocation,
+  useLocations,
+} from '../../src/lib/locations';
+
+/** Persisted "By location" toggle. Off by default; only offered once the
+ *  keeper has at least one location. */
+const GROUP_BY_LOCATION_KEY = 'hv_collection_group_by_location';
 
 // ---------------------------------------------------------------------------
 // Types — minimum subset of the Animal schema needed for the card.
@@ -76,11 +89,19 @@ interface ReptileBase {
   current_weight_g: string | null;
   /** Secondary fact — "shed 6d ago". */
   last_shed_at: string | null;
+  /** Room / rack / shelf (see lib/locations). */
+  location: string | null;
 }
 
 interface ReptileRow extends ReptileBase {
   taxon: Taxon;
 }
+
+/** One entry in the collection FlatList: a card, or (when grouped by
+ *  location) a place header. */
+type ListItem =
+  | { kind: 'row'; row: ReptileRow }
+  | { kind: 'header'; key: string; label: string; count: number };
 
 function reptileTitle(r: ReptileBase): string {
   return (
@@ -120,6 +141,23 @@ function CollectionScreen() {
   // its own flag. Best-effort fetch: a failure just leaves the chip off.
   const [deceased, setDeceased] = useState<Animal[]>([]);
   const [showDied, setShowDied] = useState(false);
+  // Group by keeper-defined location (room / rack / shelf). The chip only
+  // renders once a location exists somewhere, so a keeper who never set one
+  // sees exactly the screen they had before.
+  const { locations: keeperLocations, refresh: refreshLocations } = useLocations();
+  const [groupByLoc, setGroupByLoc] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem(GROUP_BY_LOCATION_KEY)
+      .then((v) => setGroupByLoc(v === '1'))
+      .catch(() => {});
+  }, []);
+  const toggleGroupByLoc = () => {
+    const next = !groupByLoc;
+    setGroupByLoc(next);
+    AsyncStorage.setItem(GROUP_BY_LOCATION_KEY, next ? '1' : '0').catch(() => {});
+  };
+
   // Long-press quick-actions sheet. `actionTarget` holds the animal
   // whose sheet is open (null = closed); `actionBusy` gates the rows
   // while a write is in flight, and `actionBusyKey` says which row
@@ -217,6 +255,7 @@ function CollectionScreen() {
     listDeceasedAnimals()
       .then(setDeceased)
       .catch(() => {});
+    refreshLocations();
 
     // ADR-003: one unified animals endpoint — every taxon in a single
     // call. The `taxon` discriminator rides on each row.
@@ -235,6 +274,7 @@ function CollectionScreen() {
         taxon: a.taxon,
         current_weight_g: a.current_weight_g,
         last_shed_at: a.last_shed_at,
+        location: a.location ?? null,
       }));
       // Newest first.
       merged.sort(
@@ -250,7 +290,7 @@ function CollectionScreen() {
         "Couldn't load your collection. Pull down to retry.",
       );
     }
-  }, []);
+  }, [refreshLocations]);
 
   // useFocusEffect re-fetches when the keeper returns from another screen
   // (e.g. add-reptile in Bundle 4). For now it covers tab re-focus too.
@@ -413,8 +453,12 @@ function CollectionScreen() {
     setShowDied(false);
   }
 
+  const hasAnyLocation =
+    keeperLocations.length > 0 || (rows ?? []).some((r) => !!r.location);
+  const grouped = groupByLoc && hasAnyLocation;
+
   const filterBar =
-    ownedTaxa.length > 1 || deceased.length > 0 ? (
+    ownedTaxa.length > 1 || deceased.length > 0 || hasAnyLocation ? (
       <TaxonFilterBar
         ownedTaxa={ownedTaxa}
         active={showDied ? undefined : taxonFilter}
@@ -422,8 +466,57 @@ function CollectionScreen() {
         diedCount={deceased.length}
         diedActive={showDied}
         onDied={() => setShowDied(true)}
+        showLocationToggle={hasAnyLocation}
+        locationActive={groupByLoc}
+        onToggleLocation={toggleGroupByLoc}
       />
     ) : null;
+
+  // The grouped list is flattened into one homogeneous FlatList: a header
+  // item per place, then its cards. (A nested list per group would fight the
+  // pull-to-refresh and the FAB's scroll area.)
+  const listItems = useMemo<ListItem[]>(() => {
+    const flat = visibleRows ?? [];
+    if (!grouped) return flat.map((row) => ({ kind: 'row' as const, row }));
+    return groupByLocation(flat, (r) => r.location).flatMap((g) => [
+      { kind: 'header' as const, key: g.key, label: g.label, count: g.rows.length },
+      ...g.rows.map((row) => ({ kind: 'row' as const, row })),
+    ]);
+  }, [visibleRows, grouped]);
+
+  /** Rename (or merge) a location from its group header. Merging is
+   *  confirmed with the count, because it's the one action here that can't
+   *  be undone with a single tap. */
+  const submitRename = async (oldName: string, newName: string) => {
+    const targetKey = locationKey(newName);
+    if (!targetKey || targetKey === locationKey(oldName)) {
+      setRenameTarget(null);
+      return;
+    }
+    const existing = keeperLocations.find((l) => locationKey(l.name) === targetKey);
+    const run = async () => {
+      try {
+        await renameLocation(oldName, newName);
+        setRenameTarget(null);
+        await fetchAll();
+      } catch (e: any) {
+        Alert.alert('Could not rename', e?.response?.data?.detail || e?.message || 'Something went wrong.');
+      }
+    };
+    if (existing) {
+      const moving = keeperLocations.find((l) => locationKey(l.name) === locationKey(oldName))?.count ?? 0;
+      Alert.alert(
+        `Merge into ${existing.name}?`,
+        `${moving} ${moving === 1 ? 'animal' : 'animals'} from “${oldName}” will move to “${existing.name}”.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Merge', onPress: run },
+        ],
+      );
+      return;
+    }
+    await run();
+  };
 
   // ---------- Died archive ----------
   if (showDied) {
@@ -521,8 +614,8 @@ function CollectionScreen() {
     >
       {collectionHeader}
       <FlatList
-        data={visibleRows ?? []}
-        keyExtractor={(r) => `${r.taxon}:${r.id}`}
+        data={listItems}
+        keyExtractor={(it) => (it.kind === 'header' ? `group-${it.key}` : `${it.row.taxon}:${it.row.id}`)}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
@@ -543,18 +636,47 @@ function CollectionScreen() {
             {filterBar}
           </View>
         }
-        renderItem={({ item }) => (
-          <ReptileCard
-            row={item}
-            onPress={() => {
-              // ADR-003: one taxon-agnostic /reptile/ detail route.
-              router.push(`/reptile/${item.id}` as never);
-            }}
-            onLongPress={() => setActionTarget(item)}
-            onFed={() => handleQuickFeed(item)}
-            fedBusy={quickFedId === item.id}
-          />
-        )}
+        renderItem={({ item: it }) => {
+          if (it.kind === 'header') {
+            const isUnassigned = it.key === UNASSIGNED_KEY;
+            return (
+              <View style={styles.groupHeader}>
+                <MaterialCommunityIcons
+                  name={isUnassigned ? 'map-marker-off-outline' : 'map-marker-outline'}
+                  size={16}
+                  color={colors.textTertiary}
+                />
+                <Text style={[styles.groupTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {it.label}
+                </Text>
+                <Text style={[styles.groupCount, { color: colors.textTertiary }]}>{it.count}</Text>
+                {!isUnassigned && (
+                  <TouchableOpacity
+                    onPress={() => setRenameTarget(it.label)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rename ${it.label}`}
+                  >
+                    <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          }
+          const item = it.row;
+          return (
+            <ReptileCard
+              row={item}
+              onPress={() => {
+                // ADR-003: one taxon-agnostic /reptile/ detail route.
+                router.push(`/reptile/${item.id}` as never);
+              }}
+              onLongPress={() => setActionTarget(item)}
+              onFed={() => handleQuickFeed(item)}
+              fedBusy={quickFedId === item.id}
+            />
+          );
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -562,6 +684,12 @@ function CollectionScreen() {
             tintColor={colors.primary}
           />
         }
+      />
+      <LocationRenameSheet
+        visible={renameTarget !== null}
+        current={renameTarget ?? ''}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={(next) => submitRename(renameTarget ?? '', next)}
       />
       {/* FAB — same destination as the empty-state CTA. Bundle 4 wires
           /reptile/add (a single form that lets the keeper pick taxon). */}
@@ -617,6 +745,9 @@ function TaxonFilterBar({
   diedCount,
   diedActive,
   onDied,
+  showLocationToggle,
+  locationActive,
+  onToggleLocation,
 }: {
   ownedTaxa: AnimalTaxon[];
   /** undefined = no taxon chip selected (the Died view is showing). */
@@ -625,6 +756,10 @@ function TaxonFilterBar({
   diedCount: number;
   diedActive: boolean;
   onDied: () => void;
+  /** Only true once the keeper has a location somewhere. */
+  showLocationToggle: boolean;
+  locationActive: boolean;
+  onToggleLocation: () => void;
 }) {
   const { colors, layout } = useTheme();
 
@@ -668,6 +803,34 @@ function TaxonFilterBar({
           </TouchableOpacity>
         );
       })}
+      {/* A view option, not a filter — grouping, not hiding. Only once a
+          location exists. */}
+      {showLocationToggle && (
+        <TouchableOpacity
+          onPress={onToggleLocation}
+          style={[
+            styles.filterChip,
+            styles.diedChip,
+            {
+              backgroundColor: locationActive ? colors.primary : colors.surface,
+              borderColor: locationActive ? colors.primary : colors.border,
+              borderRadius: layout.radius.sm,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: locationActive }}
+          accessibilityLabel="Group by location"
+        >
+          <MaterialCommunityIcons
+            name="map-marker-outline"
+            size={14}
+            color={locationActive ? '#0B0B0B' : colors.textSecondary}
+          />
+          <Text style={[styles.filterChipText, { color: locationActive ? '#0B0B0B' : colors.textSecondary }]}>
+            By location
+          </Text>
+        </TouchableOpacity>
+      )}
       {/* Last: a status, not a kind of animal. A neutral dot (§14.4). */}
       {diedCount > 0 && (
         <TouchableOpacity
@@ -971,6 +1134,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   diedChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 12, paddingBottom: 8, paddingHorizontal: 4 },
+  groupTitle: { flex: 1, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupCount: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
   diedDot: { width: 7, height: 7, borderRadius: 3.5 },
   archiveLink: { marginTop: 16, minHeight: 44, justifyContent: 'center' },
   filterChipText: {

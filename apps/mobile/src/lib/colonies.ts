@@ -37,6 +37,28 @@ export type ColonyEventType =
   | 'observation'
   | 'count_correction';
 
+/**
+ * Why a colony ended. A population doesn't die like one animal does: it
+ * crashes, is sold on, is folded into another colony, or ends for some other
+ * reason. Mirrors COLONY_END_REASONS in the API and the web lib.
+ */
+export type ColonyEndReason = 'crashed' | 'sold' | 'merged' | 'other';
+
+export const COLONY_END_REASON_ORDER: ColonyEndReason[] = ['crashed', 'sold', 'merged', 'other'];
+
+export const COLONY_END_REASON_LABELS: Record<ColonyEndReason, string> = {
+  crashed: 'Crashed or died out',
+  sold: 'Sold or rehomed',
+  merged: 'Merged into another colony',
+  other: 'Other',
+};
+
+/** Label for a stored reason; null for a missing or unknown value. */
+export function colonyEndReasonLabel(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  return COLONY_END_REASON_LABELS[reason as ColonyEndReason] ?? null;
+}
+
 export interface ColonyListItem {
   id: string;
   taxon: InvertTaxon;
@@ -51,6 +73,9 @@ export interface ColonyListItem {
   species_missing: boolean;
   /** Room / rack / shelf (see lib/locations). */
   location?: string | null;
+  /** YYYY-MM-DD, set once the colony has ended; absent/null while running. */
+  ended_at?: string | null;
+  end_reason?: ColonyEndReason | null;
   /** Last ACCEPTED feeding. Lets the collection card read "Fed 4d ago" like
    *  every other card. */
   last_feeding_date?: string | null;
@@ -97,6 +122,10 @@ export interface Colony {
   photo_url: string | null;
   visibility: Visibility | null;
   is_active: boolean;
+  /** Set once the colony has ended (see endColony); null while running. */
+  ended_at?: string | null;
+  end_reason?: ColonyEndReason | null;
+  end_notes?: string | null;
   created_at: string;
   updated_at: string | null;
   total_count: number;
@@ -175,6 +204,42 @@ export async function listColonies(includeInactive = false): Promise<ColonyListI
   const { data } = await apiClient.get<ColonyListItem[]>('/colonies/', {
     params: { include_inactive: includeInactive },
   });
+  return data;
+}
+
+/**
+ * Colonies that have left the working collection: archived ones AND ended
+ * ones. The default list hides both, so this asks for `status=past`. Rows with
+ * `ended_at` are the ended ones; the rest are archived. include_inactive rides
+ * along so an API that predates `status` still returns the archived rows.
+ */
+export async function listPastColonies(): Promise<ColonyListItem[]> {
+  const { data } = await apiClient.get<ColonyListItem[]>('/colonies/', {
+    params: { status: 'past', include_inactive: true },
+  });
+  return data.filter((c) => c.is_active === false || !!c.ended_at);
+}
+
+export interface EndColonyPayload {
+  /** YYYY-MM-DD. Omit for today. Future dates are rejected server-side. */
+  ended_at?: string | null;
+  reason: ColonyEndReason;
+  notes?: string | null;
+}
+
+/**
+ * Record that a colony has ended. A terminal state, never a delete: the record
+ * and every event, feeding and photo stay. Its own endpoint rather than a field
+ * on the update route, so it can't happen as a side effect of an edit.
+ */
+export async function endColony(id: string, payload: EndColonyPayload): Promise<Colony> {
+  const { data } = await apiClient.post<Colony>(`/colonies/${id}/end`, payload);
+  return data;
+}
+
+/** Undo an end. A correction, so it is deliberately not blocked by the plan cap. */
+export async function reopenColony(id: string): Promise<Colony> {
+  const { data } = await apiClient.post<Colony>(`/colonies/${id}/reopen`, {});
   return data;
 }
 

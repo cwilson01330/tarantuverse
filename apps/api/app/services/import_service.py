@@ -485,6 +485,7 @@ ANIMAL_IMPORT_FIELDS: List[Dict[str, str]] = [
     {"field": "current_weight_g", "label": "Weight (g)", "type": "decimal"},
     {"field": "current_length_in", "label": "Length (in)", "type": "decimal"},
     {"field": "feeding_schedule", "label": "Feeding schedule", "type": "str"},
+    {"field": "location", "label": "Location (room / rack / shelf)", "type": "str"},
     {"field": "notes", "label": "Notes", "type": "str"},
 ]
 ANIMAL_FIELD_TYPE = {f["field"]: f["type"] for f in ANIMAL_IMPORT_FIELDS}
@@ -510,6 +511,8 @@ ANIMAL_HEADER_SYNONYMS: Dict[str, str] = {
     "feeding schedule": "feeding_schedule", "feeding": "feeding_schedule",
     "feed schedule": "feeding_schedule", "diet": "feeding_schedule",
     "feeding frequency": "feeding_schedule", "schedule": "feeding_schedule",
+    "location": "location", "room": "location", "rack": "location", "shelf": "location",
+    "where": "location", "area": "location", "spot": "location",
     "notes": "notes", "comments": "notes", "remarks": "notes", "description": "notes",
 }
 

@@ -430,7 +430,7 @@ export default function TarantulaPublicClient() {
           {profile.is_owner && (
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => router.push(`/dashboard/tarantulas/${profile.id}`)}
+                onClick={() => router.push(`/dashboard/inverts/${profile.id}`)}
                 className="flex flex-col items-center gap-1 p-3 bg-purple-600 text-white rounded-xl text-xs font-semibold"
               >
                 <span className="text-xl">📋</span>
@@ -444,7 +444,7 @@ export default function TarantulaPublicClient() {
                 Log Feeding
               </button>
               <button
-                onClick={() => router.push(`/dashboard/tarantulas/${profile.id}?log=molt`)}
+                onClick={() => router.push(`/dashboard/inverts/${profile.id}?log=molt`)}
                 className="flex flex-col items-center gap-1 p-3 bg-blue-600 text-white rounded-xl text-xs font-semibold"
               >
                 <span className="text-xl">🔄</span>
@@ -759,7 +759,7 @@ export default function TarantulaPublicClient() {
                   {feedSaving ? 'Saving…' : 'Log feeding'}
                 </button>
                 <button
-                  onClick={() => router.push(`/dashboard/tarantulas/${profile.id}?log=feeding`)}
+                  onClick={() => router.push(`/dashboard/inverts/${profile.id}?log=feeding`)}
                   className="w-full mt-2 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-purple-600 transition-colors"
                 >
                   Add more detail (size, notes) →

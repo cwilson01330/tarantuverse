@@ -137,6 +137,9 @@ export interface Animal {
 
   photo_url: string | null;
 
+  /** Room / rack / shelf (see lib/locations). Canonicalised server-side. */
+  location?: string | null;
+
   notes: string | null;
 
   last_fed_at: string | null;
@@ -330,6 +333,9 @@ export interface CreateAnimalPayload {
   current_length_in?: string | number | null;
   /** Per-animal CGD override. null inherits the species default. */
   feeds_on_cgd_override?: boolean | null;
+  /** Room / rack / shelf. null or "" clears it; the server snaps it to the
+   *  keeper's existing spelling. */
+  location?: string | null;
   notes?: string | null;
 }
 
@@ -626,6 +632,8 @@ export interface AnimalFeedingStatus {
   scientific_name: string | null;
   taxon: AnimalTaxon;
   photo_url: string | null;
+  /** Room / rack / shelf — drives Feeding Day's "By location" grouping. */
+  location?: string | null;
   last_feeding_date: string | null;
   days_since_last_feeding: number | null;
   is_feeding_paused: boolean;

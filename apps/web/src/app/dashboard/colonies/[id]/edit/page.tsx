@@ -87,6 +87,7 @@ export default function EditColonyPage() {
   const [waterDish, setWaterDish] = useState(true)
   const [notes, setNotes] = useState('')
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
+  const [isActive, setIsActive] = useState(true)
 
   const load = useCallback(async () => {
     if (!token || !colonyId) return
@@ -118,6 +119,7 @@ export default function EditColonyPage() {
       setWaterDish(c.water_dish ?? true)
       setNotes(c.notes ?? '')
       setVisibility((c.visibility as 'private' | 'public') ?? 'private')
+      setIsActive(c.is_active)
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -220,6 +222,7 @@ export default function EditColonyPage() {
         water_dish: waterDish,
         notes: notes.trim() || null,
         visibility,
+        is_active: isActive,
       })
       router.replace(`/dashboard/colonies/${colony.id}`)
     } catch (err) {
@@ -556,6 +559,35 @@ export default function EditColonyPage() {
               ))}
             </div>
           </Field>
+
+          <div className="flex items-start justify-between gap-4 p-4 rounded-2xl border border-theme bg-surface">
+            <div className="min-w-0">
+              <div id="colony-active-label" className="text-sm font-semibold text-theme-primary">
+                Active colony
+              </div>
+              <p className="mt-0.5 text-xs text-theme-tertiary">
+                Turn off to archive. An archived colony is hidden from your collection and the
+                free-plan count, and its history is kept. Find it under “Archived colonies” on
+                the collection page.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isActive}
+              aria-labelledby="colony-active-label"
+              onClick={() => setIsActive((v) => !v)}
+              className={`relative flex-shrink-0 mt-0.5 w-11 h-6 rounded-full transition focus:outline-none focus:ring-2 focus:ring-electric-blue-500 ${
+                isActive ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  isActive ? 'translate-x-5' : ''
+                }`}
+              />
+            </button>
+          </div>
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <Link

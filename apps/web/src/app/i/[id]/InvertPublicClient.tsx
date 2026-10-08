@@ -304,11 +304,7 @@ export default function InvertPublicClient() {
             the screen where they can actually do something. */}
         {animal.is_owner && (
           <Link
-            href={
-              animal.taxon === 'tarantula'
-                ? `/dashboard/tarantulas/${animal.id}`
-                : `/dashboard/inverts/${animal.id}`
-            }
+            href={`/dashboard/inverts/${animal.id}`}
             className="mt-5 block w-full text-center px-4 py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 transition"
           >
             Open in my collection

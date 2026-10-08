@@ -261,7 +261,7 @@ export default function CollectionValuePage() {
                     <tr
                       key={tarantula.id}
                       className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
-                      onClick={() => router.push("/dashboard/tarantulas/" + tarantula.id)}
+                      onClick={() => router.push("/dashboard/inverts/" + tarantula.id)}
                     >
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{tarantula.name}</td>
                       <td className="px-6 py-4 text-sm italic text-gray-600 dark:text-gray-400">{tarantula.scientific_name}</td>

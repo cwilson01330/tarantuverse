@@ -165,12 +165,12 @@ export default function FeaturesPage() {
             </div>
             <h2 className="text-3xl font-bold mb-4">Photo Gallery</h2>
             <p className="text-gray-600 mb-6">
-              Upload unlimited photos to document your animals' beauty and growth.
+              Upload photos to document your animals' beauty and growth: 5 per animal on the free plan, unlimited with Premium.
             </p>
             <ul className="space-y-3 text-gray-600">
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Unlimited photo uploads with cloud storage</span>
+                <span>Cloud photo storage, unlimited with Premium</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>

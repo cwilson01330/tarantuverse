@@ -447,6 +447,12 @@
 
 - **Instar auto-count (2026-10-07)**: `inverts.current_instar` is the instar for instar taxa (keepers enter "L6") and the molt count for tarantulas; `utils/instar.py` adds/removes one when the NEWEST molt is logged/deleted (back-filled older molts never move it; an unset count stays unset). Clients: `tracksInstars` / `formatStage` / `stageSummary` / `finalMoltCopy` in both registries (`apps/mobile/src/lib/taxon-modules.ts`, `apps/web/src/lib/inverts.ts` — keep in lockstep). No final-molt flag for centipedes/whip spiders (they molt as adults). `invert_species.typical_instars_to_maturity` means MOLTS from hatching/birth to adult (adult stage = that + 1; larger/female figure), shown as "Molts to adult" and as `adultStageHint` on the Stages card. Fill it only from a stated source (`update_molts_to_adult_20261007.py`); never for whip spiders/centipedes.
 
+- **Per-animal visibility is enforced (2026-10-08)**: a TV animal set `visibility='private'` is hidden from non-owners on `/t`, `/i` and link previews (`public_card`) even when the collection is public. HV has no per-animal toggle yet, so HV's stored default isn't enforced. The web tarantula detail/edit/husbandry pages are redirects to `/dashboard/inverts/[id]` (B5), as on mobile.
+
+- **Colony lifecycle (2026-10-08)**: `is_active=false` = archived (un-archiving enforces the free cap); `ended_at`/`end_reason` (crashed|sold|merged|other) = ended (`POST /colonies/{id}/end`, `/reopen`; reopen, like invert revive, is not capped). Both leave lists and the cap; ended colonies 404 on `/col` for non-owners.
+
+- **Full ZIP export streams from a spooled temp file** and only fetches photo URLs under `R2_PUBLIC_URL` (`_is_our_photo_url`), max 25 MB each — never build it as one in-memory bytes blob on the 512 MB instance.
+
 - **Password & Secret Management**:
   - Password complexity validator (uppercase, lowercase, digit, special char)
   - Dev secret detection — refuses to start in production with default key

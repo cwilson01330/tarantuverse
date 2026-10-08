@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 import ActivityFeed from '@/components/ActivityFeed'
@@ -12,7 +13,13 @@ import { groupByLocation, listLocations, locationKey, renameLocation, UNASSIGNED
 import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
 import { formatLocalDate } from '@/lib/date'
-import { listColonies, type ColonyListItem } from '@/lib/colonies'
+import {
+  listColonies,
+  listPastColonies,
+  colonyEndReasonLabel,
+  formatEndedDate,
+  type ColonyListItem,
+} from '@/lib/colonies'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 
 interface Tarantula {
@@ -78,7 +85,7 @@ const TAXA: {
   addPath: string
   detailPath: (id: string) => string
 }[] = [
-  { key: 'tarantula', label: 'Tarantulas', glyph: '🕷', listEndpoint: '/api/v1/tarantulas/', addPath: '/dashboard/tarantulas/add', detailPath: (id) => `/dashboard/tarantulas/${id}` },
+  { key: 'tarantula', label: 'Tarantulas', glyph: '🕷', listEndpoint: '/api/v1/tarantulas/', addPath: '/dashboard/tarantulas/add', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'scorpion', label: 'Scorpions', glyph: '🦂', listEndpoint: '/api/v1/scorpions/', addPath: '/dashboard/inverts/add?taxon=scorpion', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'centipede', label: 'Centipedes', glyph: '🐛', listEndpoint: '/api/v1/centipedes/', addPath: '/dashboard/inverts/add?taxon=centipede', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'whip_spider', label: 'Whip spiders', glyph: '🕸️', listEndpoint: '/api/v1/whip-spiders/', addPath: '/dashboard/inverts/add?taxon=whip_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
@@ -109,6 +116,11 @@ export default function TarantulasPage() {
   // Colonies (ADR-010) — population-level entries, tracked as ONE entry each.
   // Merged into the collection view alongside individual animals.
   const [colonies, setColonies] = useState<ColonyListItem[]>([])
+  // Archived (is_active=false) and ended (ended_at set) colonies live apart
+  // from `colonies` on purpose: they must never reach the main grid, the
+  // filter chips, or the plan count.
+  const [archivedColonies, setArchivedColonies] = useState<ColonyListItem[]>([])
+  const [showArchived, setShowArchived] = useState(false)
   const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey | 'colony'>('all')
   const [showAddMenu, setShowAddMenu] = useState(false)
   // The dashboard's Add Animal action lands here with ?add=1 to open the picker.
@@ -264,6 +276,12 @@ export default function TarantulasPage() {
         setColonies(await listColonies(token))
       } catch {
         setColonies([])
+      }
+      // Archived colonies — a quiet entry, only shown when there are some.
+      try {
+        setArchivedColonies(await listPastColonies(token))
+      } catch {
+        setArchivedColonies([])
       }
 
       // Fetch subscription limits
@@ -1033,6 +1051,81 @@ export default function TarantulasPage() {
                     </div>
                     {renderColonyGrid(filteredColonies)}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Archived colonies — quiet, and only when there are some. Opens
+                a plain list that links to each colony's page (where it can be
+                unarchived). Not part of the grid, filters, or plan count. */}
+            {archivedColonies.length > 0 && (
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={() => setShowArchived((v) => !v)}
+                  aria-expanded={showArchived}
+                  aria-controls="archived-colonies-list"
+                  className="text-sm text-theme-tertiary hover:text-theme-primary underline underline-offset-2 transition"
+                >
+                  {showArchived ? 'Hide' : 'Show'}{' '}
+                  {archivedColonies.some((c) => c.ended_at) ? 'past' : 'archived'} colonies (
+                  {archivedColonies.length})
+                </button>
+                {showArchived && (
+                  <ul
+                    id="archived-colonies-list"
+                    className="mt-3 divide-y divide-theme rounded-2xl border border-theme bg-surface overflow-hidden"
+                  >
+                    {archivedColonies.map((c) => {
+                      const species = c.species_missing
+                        ? 'Species removed'
+                        : c.species_display_name || c.species_scientific_name || null
+                      const count =
+                        c.total_count == null
+                          ? null
+                          : `${c.count_is_estimated ? '≈' : ''}${c.total_count.toLocaleString()}`
+                      return (
+                        <li key={c.id}>
+                          <Link
+                            href={`/dashboard/colonies/${c.id}`}
+                            className="flex items-center gap-3 p-3 hover:bg-surface-elevated transition"
+                          >
+                            {c.photo_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={getImageUrl(c.photo_url)}
+                                alt=""
+                                className="w-11 h-11 rounded-lg object-cover opacity-70 flex-shrink-0"
+                              />
+                            ) : (
+                              <span
+                                className="w-11 h-11 rounded-lg bg-surface-elevated flex items-center justify-center text-xl flex-shrink-0"
+                                aria-hidden="true"
+                              >
+                                {colonyGlyph(c.taxon)}
+                              </span>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-theme-primary truncate">{c.name}</div>
+                              <div className="text-xs text-theme-secondary truncate">
+                                {[species, count ? `${count} in colony` : null].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 flex-shrink-0">
+                              {c.ended_at
+                                ? [
+                                    `Ended ${formatEndedDate(c.ended_at)}`,
+                                    colonyEndReasonLabel(c.end_reason),
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')
+                                : 'Archived'}
+                            </span>
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
                 )}
               </div>
             )}

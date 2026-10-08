@@ -231,6 +231,7 @@ async def list_users(
                 Colony.user_id.in_(user_ids),
                 Colony.transferred_out_at.is_(None),
                 Colony.is_active.is_(True),
+                Colony.ended_at.is_(None),
             )
             .group_by(Colony.user_id)
             .all()

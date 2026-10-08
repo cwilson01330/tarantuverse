@@ -27,6 +27,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
+import { LocationField } from '@/components/LocationPicker'
 import { useAuth } from '@/lib/auth'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
@@ -50,6 +51,7 @@ interface FormState {
   scientificName: string
   speciesId: string | null
   enclosureId: string | null
+  location: string | null
   sex: Sex
   hatchDate: string
   dateAcquired: string
@@ -69,6 +71,7 @@ const EMPTY: FormState = {
   scientificName: '',
   speciesId: null,
   enclosureId: null,
+  location: null,
   sex: 'unknown',
   hatchDate: '',
   dateAcquired: '',
@@ -97,6 +100,7 @@ function animalToForm(a: Animal): FormState {
     scientificName: a.scientific_name ?? '',
     speciesId: a.herp_species_id,
     enclosureId: a.enclosure_id,
+    location: a.location ?? null,
     sex: (a.sex as Sex | null) ?? 'unknown',
     hatchDate: a.hatch_date ?? '',
     dateAcquired: a.date_acquired ?? '',
@@ -200,6 +204,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
       scientific_name: nullableStr(form.scientificName),
       herp_species_id: form.speciesId,
       enclosure_id: form.enclosureId,
+      location: form.location,
       sex: form.sex,
       hatch_date: nullableStr(form.hatchDate),
       date_acquired: nullableStr(form.dateAcquired),
@@ -358,6 +363,19 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
                 />
               </Field>
             </div>}
+
+            <div className="sm:col-span-2">
+              <Field
+                label="Location"
+                hint="Optional — a room, rack or shelf. Pick one you've used, or name a new place."
+              >
+                <LocationField
+                  value={form.location}
+                  onChange={(next) => update('location', next)}
+                  collection={isOwner ? null : animal?.user_id}
+                />
+              </Field>
+            </div>
           </div>
         </section>
 

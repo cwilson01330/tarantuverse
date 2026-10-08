@@ -17,16 +17,11 @@ export default function Home() {
     }
   }, [status, session, router])
 
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-        <div className="text-center">
-          <TarantuverseLogoTransparent className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-400">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  // No loading branch here on purpose. The server never has a session, so
+  // useSession() is always 'loading' during server rendering — a spinner
+  // returned here was the ENTIRE HTML crawlers and link previews received
+  // ("Loading..." and a logo). The landing content renders for everyone;
+  // signed-in keepers are still sent to /dashboard by the effect above.
 
   return (
     // pb-24 on mobile reserves space for the sticky CTA bar so the footer

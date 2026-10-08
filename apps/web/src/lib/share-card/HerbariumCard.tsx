@@ -9,7 +9,7 @@
  * Spec: design_handoff_share_cards/README.md §3.
  */
 import { CSSProperties } from 'react'
-import { CardPayload, FactValue, SHAPE_SIZE, Shape, taxonGlyph } from './SpecimenCard'
+import { CardPayload, FactValue, SHAPE_SIZE, Shape, WRAP_VALUE, taxonGlyph } from './SpecimenCard'
 
 const GROUND = '#EDE7D6'
 const RULE_LINE = 'rgba(60,50,30,.07)'
@@ -146,15 +146,39 @@ function MountedPhoto({ url, taxon, box }: { url: string | null; taxon: string; 
   )
 }
 
+/** Inner width of the story/post/square determination box. */
+function boxInner(shape: Shape): number {
+  const L = LAYOUT[shape]
+  const pad = shape === 'square' ? 36 : 48
+  return SHAPE_SIZE[shape].width - L.box.left - L.box.right - pad * 2 - 9
+}
+
+/** The facts sit side by side as columns (label over value) when they fit;
+ *  long values — a colony's "~200 juveniles · ~120 adults" — would run into
+ *  each other, so those cards list the facts as label/value rows instead.
+ *  Errs towards rows: Caslon averages ~0.5em per character, the letter-spaced
+ *  capitals of a label ~0.8em. */
+function factsAsRows(p: CardPayload, shape: Shape): boolean {
+  if (LAYOUT[shape].stacked || p.facts.length === 0) return false
+  const t = LAYOUT[shape].type
+  const cols = p.facts.slice(0, 4).map((f) => Math.max(f.label.length * t.label * 0.8, f.value.length * t.value * 0.52))
+  const need = cols.reduce((a, b) => a + b, 0) + (cols.length - 1) * 40
+  return need > boxInner(shape)
+}
+
 /** Rough height of the story/post determination box, for keeping it clear of
  *  the photo. Errs high: Gloock averages ~0.5em per character. */
-function estimateBoxHeight(p: CardPayload, t: Layout['type'], nameSize: number, boxW: number): number {
+function estimateBoxHeight(p: CardPayload, t: Layout['type'], nameSize: number, boxW: number, rows: boolean): number {
   const inner = boxW - 96 - 9
   let h = 42 + 36 + 9 + t.header * 1.25
   if (p.name) h += 24 + nameSize * 1.05 * Math.max(1, Math.ceil((p.name.length * nameSize * 0.5) / inner))
   if (p.scientific_name) h += 9 + t.sci * 1.3
   if (p.common_name) h += 3 + t.common * 1.3
-  if (p.facts.length > 0) h += 36 + 27 + 3 + t.label * 1.3 + 4 + t.value * 1.3
+  if (p.facts.length > 0) {
+    h += rows
+      ? 36 + 27 + 3 + p.facts.length * (t.value * 1.3 + 9)
+      : 36 + 27 + 3 + t.label * 1.3 + 4 + t.value * 1.3
+  }
   return Math.ceil(h)
 }
 
@@ -174,7 +198,7 @@ export function herbariumPhotoBox(p: CardPayload, shape: Shape): Box {
   // photo gives up the difference so the two never overlap.
   let photoH = p.facts.length === 0 && L.photoNoFacts ? L.photoNoFacts : L.photo.height
   if (!L.stacked) {
-    const boxH = estimateBoxHeight(p, L.type, nameSizeFor(p, L), width - L.box.left - L.box.right)
+    const boxH = estimateBoxHeight(p, L.type, nameSizeFor(p, L), width - L.box.left - L.box.right, factsAsRows(p, shape))
     const room = height - L.box.bottom - boxH - 48 - L.photo.top
     photoH = Math.max(360, Math.min(photoH, room))
   }
@@ -186,6 +210,7 @@ export function HerbariumCard({ p, shape }: { p: CardPayload; shape: Shape }) {
   const L = LAYOUT[shape]
   const t = L.type
   const hasFacts = p.facts.length > 0
+  const rows = factsAsRows(p, shape)
   const nameSize = nameSizeFor(p, L)
   const photo = herbariumPhotoBox(p, shape)
   const boxStyle: CSSProperties = {
@@ -224,7 +249,19 @@ export function HerbariumCard({ p, shape }: { p: CardPayload; shape: Shape }) {
           <div style={{ display: 'flex', fontSize: t.common, color: INK_SOFT, marginTop: 3 }}>{p.common_name}</div>
         ) : null}
 
-        {hasFacts && !L.stacked ? (
+        {hasFacts && rows ? (
+          <div style={{ display: 'flex', flexDirection: 'column', marginTop: 36, paddingTop: 27, borderTop: `3px solid ${BORDER}` }}>
+            {p.facts.map((f, i) => (
+              <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: i === 0 ? 0 : 9 }}>
+                <span style={{ fontSize: t.label, letterSpacing: 4.5, color: INK_SOFT, flexShrink: 0, marginRight: 24 }}>{upper(f.label)}</span>
+                <div style={{ ...WRAP_VALUE, fontSize: t.value, color: INK }}>
+                  <FactValue value={f.value} size={t.value} color={INK} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {hasFacts && !L.stacked && !rows ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, paddingTop: 27, borderTop: `3px solid ${BORDER}` }}>
             {p.facts.slice(0, 4).map((f) => (
               <div key={f.label} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -240,8 +277,10 @@ export function HerbariumCard({ p, shape }: { p: CardPayload; shape: Shape }) {
           <div style={{ display: 'flex', flexDirection: 'column', marginTop: 24, paddingTop: 18, borderTop: `3px solid ${BORDER}` }}>
             {p.facts.map((f, i) => (
               <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: t.row, marginTop: i === 0 ? 0 : 9 }}>
-                <span style={{ color: INK_SOFT }}>{f.label}</span>
-                <FactValue value={f.value} size={t.row} color={INK} />
+                <span style={{ color: INK_SOFT, flexShrink: 0, marginRight: 18 }}>{f.label}</span>
+                <div style={WRAP_VALUE}>
+                  <FactValue value={f.value} size={t.row} color={INK} />
+                </div>
               </div>
             ))}
           </div>

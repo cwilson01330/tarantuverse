@@ -1,6 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-export type CardKind = 'molt' | 'profile'
+export type CardKind = 'molt' | 'profile' | 'colony' | 'shed' | 'weight'
 export type CardShape = 'story' | 'post' | 'square'
 export type CardApp = 'tarantuverse' | 'herpetoverse'
 export type CardFrame = 'specimen' | 'notes' | 'herbarium'
@@ -16,12 +16,25 @@ export const FIELD_LABELS: Record<string, string> = {
   photo: 'Photo', name: 'Name', species: 'Species', sex: 'Sex', in_care: 'Time in care',
   molts: 'Molt count', size: 'Size', size_change: 'Size change', days_in_care: 'Days in care',
   weight: 'Weight', length: 'Length', sheds: 'Shed count',
+  // Colony card
+  population: 'Population', stages: 'Life stages', founded: 'Colony since',
+  // Shed and weigh-in cards
+  shed_number: 'Shed number', shed_date: 'Shed date', completeness: 'Shed quality',
+  days_since_previous: 'Days since last shed', change: 'Change since last', weigh_date: 'Date weighed',
 }
 
 export const FIELDS: Record<string, string[]> = {
   'tarantuverse:molt': ['photo', 'name', 'species', 'size_change', 'days_in_care'],
   'tarantuverse:profile': ['photo', 'name', 'species', 'sex', 'in_care', 'molts', 'size'],
+  'tarantuverse:colony': ['photo', 'name', 'species', 'population', 'stages', 'founded'],
   'herpetoverse:profile': ['photo', 'name', 'species', 'sex', 'in_care', 'weight', 'length', 'sheds'],
+  'herpetoverse:shed': ['photo', 'name', 'species', 'shed_number', 'shed_date', 'completeness', 'days_since_previous', 'in_care'],
+  'herpetoverse:weight': ['photo', 'name', 'species', 'weight', 'change', 'weigh_date', 'in_care'],
+}
+
+/** Composer title per kind. */
+export const KIND_TITLE: Record<CardKind, string> = {
+  molt: 'Share molt', profile: 'Share card', colony: 'Colony card', shed: 'Shed card', weight: 'Weigh-in card',
 }
 
 /** The keeper's framing for the photo: point to centre (0-1) and zoom (1-4). */
@@ -67,13 +80,16 @@ export function getShareDefaults(token: string, app: CardApp, kind: CardKind) {
 }
 
 export function createShareCard(token: string, body: {
-  app: CardApp; animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; focus?: PhotoFocus | null; link: boolean; preview?: boolean
+  /** For kind 'colony', animal_id is the colony's id. */
+  app: CardApp; animal_id: string; kind: CardKind; molt_id?: string; shed_id?: string; weight_log_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; focus?: PhotoFocus | null; link: boolean; preview?: boolean
 }) {
   return call<{ image_url: string; card_link: string | null; code: string | null; fields: string[] }>(
     token, '/share-cards/', { method: 'POST', body: JSON.stringify(body) },
   )
 }
 
-export function listSharePhotos(token: string, app: CardApp, animalId: string) {
-  return call<SharePhoto[]>(token, `/share-cards/photos?app=${app}&animal_id=${encodeURIComponent(animalId)}`)
+export function listSharePhotos(token: string, app: CardApp, animalId: string, kind?: CardKind) {
+  // Only a colony needs the kind: its photos hang off the colony, not an animal.
+  const k = kind === 'colony' ? '&kind=colony' : ''
+  return call<SharePhoto[]>(token, `/share-cards/photos?app=${app}&animal_id=${encodeURIComponent(animalId)}${k}`)
 }
