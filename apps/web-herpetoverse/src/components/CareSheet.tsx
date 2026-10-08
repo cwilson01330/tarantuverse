@@ -31,6 +31,7 @@ import {
   trimZeros,
   UVB_LABELS,
 } from '@/lib/reptileSpecies'
+import { LengthRange, TempRange } from '@/components/Measure'
 import {
   CareLevelBadge,
   ChipList,
@@ -161,11 +162,12 @@ function QuickFacts({ species }: { species: ReptileSpecies }) {
   const handleability = species.handleability
     ? HANDLEABILITY_LABELS[species.handleability]
     : null
-  const adultLength = formatRange(
-    species.adult_length_min_in,
-    species.adult_length_max_in,
-    'in',
-  )
+  // Lengths and temperatures render in the viewer's units (Measure.tsx);
+  // whether a row shows still depends only on the stored values.
+  const adultLength =
+    species.adult_length_min_in != null || species.adult_length_max_in != null ? (
+      <LengthRange min={species.adult_length_min_in} max={species.adult_length_max_in} />
+    ) : null
   const adultWeight = formatRange(
     species.adult_weight_min_g,
     species.adult_weight_max_g,
@@ -177,7 +179,7 @@ function QuickFacts({ species }: { species: ReptileSpecies }) {
     ' yrs',
   )
 
-  const facts: Array<[string, string | null]> = [
+  const facts: Array<[string, React.ReactNode | null]> = [
     ['Activity', activity],
     ['Temperament', handleability],
     ['Adult length', adultLength],
@@ -270,35 +272,20 @@ function renderInline(text: string): React.ReactNode {
 // ---------------------------------------------------------------------------
 
 function ClimateGrid({ species }: { species: ReptileSpecies }) {
-  const zones: Array<[string, string | null, string]> = [
-    [
-      'Cool side',
-      formatRange(species.temp_cool_min, species.temp_cool_max, '°F'),
-      'text-herp-teal',
-    ],
-    [
-      'Warm side',
-      formatRange(species.temp_warm_min, species.temp_warm_max, '°F'),
-      'text-amber-300',
-    ],
-    [
-      'Basking spot',
-      formatRange(species.temp_basking_min, species.temp_basking_max, '°F'),
-      'text-orange-300',
-    ],
-    [
-      'Nighttime',
-      formatRange(species.temp_night_min, species.temp_night_max, '°F'),
-      'text-indigo-300',
-    ],
+  // Stored °F; shown in the viewer's units.
+  const zones: Array<[string, string | null, string | null, string]> = [
+    ['Cool side', species.temp_cool_min, species.temp_cool_max, 'text-herp-teal'],
+    ['Warm side', species.temp_warm_min, species.temp_warm_max, 'text-amber-300'],
+    ['Basking spot', species.temp_basking_min, species.temp_basking_max, 'text-orange-300'],
+    ['Nighttime', species.temp_night_min, species.temp_night_max, 'text-indigo-300'],
   ]
 
-  const visible = zones.filter(([, v]) => v != null)
+  const visible = zones.filter(([, lo, hi]) => lo != null || hi != null)
   if (visible.length === 0) return null
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {visible.map(([label, range, tone]) => (
+      {visible.map(([label, lo, hi, tone]) => (
         <div
           key={label}
           className="p-3 rounded-md border border-neutral-800 bg-neutral-900/40"
@@ -306,7 +293,9 @@ function ClimateGrid({ species }: { species: ReptileSpecies }) {
           <div className="text-[11px] uppercase tracking-wider text-neutral-500 mb-1">
             {label}
           </div>
-          <div className={`text-lg font-semibold ${tone}`}>{range}</div>
+          <div className={`text-lg font-semibold ${tone}`}>
+            <TempRange min={lo} max={hi} />
+          </div>
         </div>
       ))}
     </div>
@@ -351,11 +340,10 @@ function HumidityBlock({ species }: { species: ReptileSpecies }) {
 
 function UvbBlock({ species }: { species: ReptileSpecies }) {
   const type = species.uvb_type ? UVB_LABELS[species.uvb_type] : null
-  const distance = formatRange(
-    species.uvb_distance_min_in,
-    species.uvb_distance_max_in,
-    'in',
-  )
+  const distance =
+    species.uvb_distance_min_in != null || species.uvb_distance_max_in != null ? (
+      <LengthRange min={species.uvb_distance_min_in} max={species.uvb_distance_max_in} />
+    ) : null
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -433,11 +421,10 @@ function EnclosureBlock({ species }: { species: ReptileSpecies }) {
 // ---------------------------------------------------------------------------
 
 function SubstrateBlock({ species }: { species: ReptileSpecies }) {
-  const depth = formatRange(
-    species.substrate_depth_min_in,
-    species.substrate_depth_max_in,
-    'in',
-  )
+  const depth =
+    species.substrate_depth_min_in != null || species.substrate_depth_max_in != null ? (
+      <LengthRange min={species.substrate_depth_min_in} max={species.substrate_depth_max_in} />
+    ) : null
 
   return (
     <>
@@ -864,7 +851,7 @@ function ContentFooter({ species }: { species: ReptileSpecies }) {
 // Tiny shared primitives
 // ---------------------------------------------------------------------------
 
-function LabeledStat({ label, value }: { label: string; value: string }) {
+function LabeledStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="p-3 rounded-md border border-neutral-800 bg-neutral-900/40 min-w-0">
       <div className="text-[11px] uppercase tracking-wider text-neutral-500 mb-1">

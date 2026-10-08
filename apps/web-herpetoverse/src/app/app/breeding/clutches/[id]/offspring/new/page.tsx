@@ -15,6 +15,8 @@ import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import UpgradeModal from '@/components/UpgradeModal'
+import { useUnits } from '@/components/UnitsProvider'
+import { lengthUnit, parseLengthInput } from '@/lib/units'
 import {
   type CreateOffspringPayload,
   type OffspringStatus,
@@ -33,6 +35,7 @@ export default function NewOffspringPage({
 }) {
   const { id: clutchId } = use(params)
   const router = useRouter()
+  const { units } = useUnits()
 
   const [morphLabel, setMorphLabel] = useState('')
   const [status, setStatus] = useState<OffspringStatus>('hatched')
@@ -58,7 +61,8 @@ export default function NewOffspringPage({
       status,
       status_date: statusDate || null,
       hatch_weight_g: numOrNull(hatchWeight),
-      hatch_length_in: numOrNull(hatchLength),
+      // Typed in the keeper's units; stored inches.
+      hatch_length_in: parseLengthInput(hatchLength, units),
       notes: notes.trim() || null,
     }
     setSubmitting(true)
@@ -150,14 +154,14 @@ export default function NewOffspringPage({
               className={INPUT_CLS}
             />
           </Field>
-          <Field label="Hatch length (in)">
+          <Field label={`Hatch length (${lengthUnit(units)})`}>
             <input
               type="number"
               min={0}
               step={0.1}
               value={hatchLength}
               onChange={(e) => setHatchLength(e.target.value)}
-              placeholder="e.g. 14"
+              placeholder={units === 'metric' ? 'e.g. 35' : 'e.g. 14'}
               className={INPUT_CLS}
             />
           </Field>

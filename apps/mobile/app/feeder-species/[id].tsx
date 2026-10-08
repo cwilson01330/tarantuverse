@@ -13,6 +13,8 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatLengthMm, tempUnit, tempValue } from '../../src/lib/units';
 import { categoryEmoji } from './index';
 
 interface FeederSpecies {
@@ -45,8 +47,8 @@ function titleCase(s: string | null | undefined): string {
 }
 
 function rangeLabel(
-  min: number | null,
-  max: number | null,
+  min: number | string | null,
+  max: number | string | null,
   unit: string
 ): string | null {
   if (min != null && max != null) return `${min}–${max}${unit}`;
@@ -60,6 +62,8 @@ export default function FeederSpeciesDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const speciesId = params.id;
   const { colors, layout } = useTheme();
+  // Stored °F / mm; shown in the keeper's units.
+  const { units } = useUnits();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [species, setSpecies] = useState<FeederSpecies | null>(null);
@@ -134,7 +138,7 @@ export default function FeederSpeciesDetailScreen() {
     species.common_names && species.common_names.length > 0 ? species.common_names[0] : null;
   const title = common || species.scientific_name;
   const careColor = species.care_level ? CARE_COLORS[species.care_level] : undefined;
-  const tempLabel = rangeLabel(species.temperature_min, species.temperature_max, '°F');
+  const tempLabel = rangeLabel(tempValue(species.temperature_min, units), tempValue(species.temperature_max, units), tempUnit(units));
   const humidityLabel = rangeLabel(species.humidity_min, species.humidity_max, '%');
   const hasClimate = !!(tempLabel || humidityLabel);
   const hasLifeStages =
@@ -151,7 +155,7 @@ export default function FeederSpeciesDetailScreen() {
   if (species.care_level)
     overviewItems.push({ label: 'Care level', value: titleCase(species.care_level) });
   if (species.typical_adult_size_mm != null)
-    overviewItems.push({ label: 'Adult size', value: `${species.typical_adult_size_mm} mm` });
+    overviewItems.push({ label: 'Adult size', value: formatLengthMm(species.typical_adult_size_mm, units) ?? '' });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnitField } from '../../src/hooks/useUnitField';
 
 interface Species {
   id: string;
@@ -49,8 +50,9 @@ export default function AddEnclosureScreen() {
   const [mistingSchedule, setMistingSchedule] = useState('');
 
   // Climate
-  const [tempMin, setTempMin] = useState('');
-  const [tempMax, setTempMax] = useState('');
+  // Stored in °F; typed in the keeper's units.
+  const tempMin = useUnitField('temp');
+  const tempMax = useUnitField('temp');
   const [humidityMin, setHumidityMin] = useState('');
   const [humidityMax, setHumidityMax] = useState('');
 
@@ -113,8 +115,10 @@ export default function AddEnclosureScreen() {
       if (substrateType) data.substrate_type = substrateType;
       if (substrateDepth) data.substrate_depth = substrateDepth;
       if (mistingSchedule) data.misting_schedule = mistingSchedule;
-      if (tempMin) data.target_temp_min = parseFloat(tempMin);
-      if (tempMax) data.target_temp_max = parseFloat(tempMax);
+      const tMin = tempMin.toStorage();
+      const tMax = tempMax.toStorage();
+      if (tMin != null) data.target_temp_min = tMin;
+      if (tMax != null) data.target_temp_max = tMax;
       if (humidityMin) data.target_humidity_min = parseFloat(humidityMin);
       if (humidityMax) data.target_humidity_max = parseFloat(humidityMax);
       if (notes) data.notes = notes;
@@ -481,24 +485,24 @@ export default function AddEnclosureScreen() {
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Temp Min (°F)</Text>
+              <Text style={styles.label}>Temp Min ({tempMin.unit})</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 75"
+                placeholder={tempMin.unit === '°C' ? 'e.g., 24' : 'e.g., 75'}
                 placeholderTextColor={colors.textTertiary}
-                value={tempMin}
-                onChangeText={setTempMin}
+                value={tempMin.value}
+                onChangeText={tempMin.setValue}
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Temp Max (°F)</Text>
+              <Text style={styles.label}>Temp Max ({tempMax.unit})</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 82"
+                placeholder={tempMax.unit === '°C' ? 'e.g., 28' : 'e.g., 82'}
                 placeholderTextColor={colors.textTertiary}
-                value={tempMax}
-                onChangeText={setTempMax}
+                value={tempMax.value}
+                onChangeText={tempMax.setValue}
                 keyboardType="decimal-pad"
               />
             </View>

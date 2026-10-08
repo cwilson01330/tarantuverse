@@ -69,7 +69,7 @@ type SubStatus = {
 
 function YouScreen() {
   const router = useRouter();
-  const { user, logout, token, refreshUser } = useAuth();
+  const { user, logout, token, refreshUser, units, setMeasurementUnits } = useAuth();
   const { colors, layout } = useTheme();
   const { isUpdatePending } = Updates.useUpdates();
 
@@ -321,6 +321,31 @@ function YouScreen() {
           {isIAPAvailable() ? (
             <MenuRow icon="restore" label="Restore purchases" busy={restoring} onPress={handleRestore} />
           ) : null}
+        </MenuSection>
+
+        {/* Same row as Tarantuverse's You tab (one setting per keeper, shared
+            by both apps and both websites). Display only: lengths and
+            temperatures. Weights stay in grams and nothing stored changes. */}
+        <MenuSection title="Appearance">
+          <MenuRow
+            icon="ruler"
+            label="Units"
+            detail={units === 'metric' ? 'Metric (cm, °C)' : 'Imperial (in, °F)'}
+            accessibilityHint="Choose inches and °F, or centimetres and °C"
+            onPress={() => {
+              const choose = (u: 'imperial' | 'metric') => {
+                if (u === units) return;
+                setMeasurementUnits(u).then((ok) => {
+                  if (!ok) Alert.alert('Could not save', 'Check your connection and try again.');
+                });
+              };
+              Alert.alert('Units', 'Lengths and temperatures. Weights stay in grams.', [
+                { text: 'Imperial (in, °F)', onPress: () => choose('imperial') },
+                { text: 'Metric (cm, °C)', onPress: () => choose('metric') },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+          />
         </MenuSection>
 
         <MenuSection title="Help & legal">

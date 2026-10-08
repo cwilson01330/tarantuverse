@@ -43,6 +43,8 @@ import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import { FeedingCadenceDialog } from '@/components/FeedingCadenceDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
 import ShareCardModal from '@/components/ShareCardModal'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatLength } from '@/lib/units'
 import {
   type Animal,
   type CreateFeedingPayload,
@@ -629,6 +631,7 @@ function ProvenanceBlock({
 }: {
   provenance: NonNullable<Animal['provenance']>
 }) {
+  const { units } = useUnits()
   const rows: { label: string; value: string }[] = []
   if (provenance.origin_keeper_name)
     rows.push({ label: 'Origin keeper', value: provenance.origin_keeper_name })
@@ -641,8 +644,11 @@ function ProvenanceBlock({
     })
   const weight = fmtGrams(provenance.weight_g)
   if (weight) rows.push({ label: 'Weight at transfer', value: weight })
-  const length = fmtDecimal(provenance.length_in, 1)
-  if (length) rows.push({ label: 'Length at transfer', value: `${length} in` })
+  // Stored inches; imperial reads exactly as before, metric in cm.
+  const inches = fmtDecimal(provenance.length_in, 1)
+  const length =
+    units === 'metric' ? formatLength(provenance.length_in, units) : inches ? `${inches} in` : null
+  if (length) rows.push({ label: 'Length at transfer', value: length })
   if (provenance.last_shed_at)
     rows.push({
       label: 'Last shed at transfer',

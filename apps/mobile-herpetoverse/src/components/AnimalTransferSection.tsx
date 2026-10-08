@@ -43,6 +43,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useUnits } from '../hooks/useUnits';
+import { formatLength } from '../lib/units';
 import { Section } from './reptile-detail/ReptileDetailShared';
 import {
   type Animal,
@@ -93,6 +95,7 @@ export function AnimalTransferSection({
   /** Called after a claim link is generated so the parent can refetch. */
   onTransferred?: () => void | Promise<void>;
 }) {
+  const { units } = useUnits();
   const { colors, layout } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -210,7 +213,12 @@ export function AnimalTransferSection({
             {prov.length_in != null ? (
               <ProvRow
                 label="Length at hand-off"
-                value={`${prov.length_in} in`}
+                value={
+                  // Stored inches; shown in the keeper's units.
+                  units === 'metric'
+                    ? formatLength(prov.length_in, units) ?? '—'
+                    : `${prov.length_in} in`
+                }
               />
             ) : null}
             {prov.last_shed_at ? (

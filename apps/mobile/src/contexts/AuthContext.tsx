@@ -1,10 +1,11 @@
-import React, { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
 import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
 import { getExpoPushToken } from '../services/notifications';
 import { getErrorMessage } from '../utils/errors';
 import { clearSharedCache } from '../lib/co-keepers';
+import { deviceDefaultUnits, isUnits, type Units } from '../lib/units';
 
 // Re-export for convenience so login screens can import from one place
 export { isGoogleSignInAvailable };
@@ -36,6 +37,9 @@ interface User {
   } | null;
   is_superuser?: boolean;
   is_admin?: boolean;
+  /** Display units. null = never chosen (the device region decides and is
+   *  saved once); undefined = an API too old to know the field. */
+  measurement_units?: Units | null;
 }
 
 interface RegisterResponse {
@@ -62,6 +66,11 @@ interface AuthContextType {
   ) => Promise<RegisterResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** The keeper's display units, resolved: their saved choice, else the
+   *  device region. Display only — storage never changes. */
+  units: Units;
+  /** Save a new choice (optimistic). Resolves false if the save failed. */
+  setMeasurementUnits: (u: Units) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,6 +120,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       cancelled = true;
     };
   }, [token]);
+
+  // A keeper who has never chosen units gets the device region's default,
+  // saved once so it follows them to the web and other devices. Only when the
+  // API returned the field as null (an older API omits it entirely).
+  const unitsSyncedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!token || !user || user.measurement_units !== null) return;
+    if (unitsSyncedFor.current === user.id) return;
+    unitsSyncedFor.current = user.id;
+    const guess = deviceDefaultUnits();
+    (async () => {
+      try {
+        const res = await apiClient.put('/auth/me/profile', { measurement_units: guess });
+        const fresh = res.data;
+        if (fresh && typeof fresh === 'object') {
+          await AsyncStorage.setItem('user', JSON.stringify(fresh));
+          setUser(fresh);
+        }
+      } catch {
+        // Offline: the region default still applies for display.
+      }
+    })();
+  }, [token, user]);
+
+  const units: Units = isUnits(user?.measurement_units) ? user!.measurement_units! : deviceDefaultUnits();
+
+  const setMeasurementUnits = async (u: Units): Promise<boolean> => {
+    const previous = user;
+    if (user) {
+      const next = { ...user, measurement_units: u };
+      setUser(next);
+      AsyncStorage.setItem('user', JSON.stringify(next)).catch(() => {});
+    }
+    if (!token) return true;
+    try {
+      await apiClient.put('/auth/me/profile', { measurement_units: u });
+      return true;
+    } catch {
+      if (previous) setUser(previous);
+      return false;
+    }
+  };
 
   const loadStoredAuth = async () => {
     try {
@@ -268,7 +319,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser, units, setMeasurementUnits }}>
       {children}
     </AuthContext.Provider>
   );

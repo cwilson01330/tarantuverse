@@ -29,10 +29,11 @@ import {
   browseReptileSpecies,
   displayTitle,
   ENCLOSURE_LABELS,
-  formatRange,
   searchReptileSpecies,
   type ReptileSpecies,
 } from '@/lib/reptileSpecies'
+import { formatLengthRangeIn } from '@/components/Measure'
+import { useUnits } from '@/components/UnitsProvider'
 import {
   ANIMAL_TAXA,
   ANIMAL_TAXON_ORDER,
@@ -390,10 +391,11 @@ function SpeciesCard({
   species: ReptileSpecies
   href: string
 }) {
-  const adultSize = formatRange(
+  const { units } = useUnits()
+  const adultSize = formatLengthRangeIn(
     species.adult_length_min_in,
     species.adult_length_max_in,
-    'in',
+    units,
   )
   const activity = species.activity_period
     ? `${ACTIVITY_ICONS[species.activity_period]} ${ACTIVITY_LABELS[species.activity_period]}`

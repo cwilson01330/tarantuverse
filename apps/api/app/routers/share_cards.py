@@ -24,13 +24,14 @@ from app.services.share_card import (
     MoltFacts,
     ShedFacts,
     WeightFacts,
-    _LEG_SPAN_TAXA,
     clean_fields,
     clean_frame,
     compose_card,
     read_defaults,
+    size_text,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.units import UNITS
 from app.utils.share_token import sign_render_token, verify_render_token
 
 router = APIRouter()
@@ -54,16 +55,20 @@ COLONY_CLOSED = "This colony has ended or been handed off, so it can't be shared
 
 # ── DB access (monkeypatched in tests) ──────────────────────────────────────
 
-def _fmt_size(taxon: str, latest_span_in, length_mm) -> Optional[str]:
-    if latest_span_in is not None:
-        n = float(latest_span_in)
-        return f"{n:.2f}".rstrip("0").rstrip(".") + " in"
-    # Only use mm fallback for non-leg-span taxa (e.g., scorpion, centipede).
-    # For leg-span taxa without molt leg-span, return None to omit the row.
-    if taxon in _LEG_SPAN_TAXA:
-        return None
-    if length_mm is not None:
-        return f"{float(length_mm):g} mm"
+def _fmt_size(taxon: str, latest_span_in, length_mm, units: Optional[str] = None) -> Optional[str]:
+    """The size row, in `units` (imperial when unset). Molt span first; the
+    mm body-length fallback only for non-leg-span taxa (e.g. scorpion,
+    centipede) — a leg-span taxon with no molt span omits the row."""
+    return size_text(taxon, latest_span_in, length_mm, units)
+
+
+def _user_units(*users) -> Optional[str]:
+    """The first explicit measurement_units among `users` (None = never
+    chosen; the card then prints imperial, which is what storage is)."""
+    for u in users:
+        v = getattr(u, "measurement_units", None)
+        if v in UNITS:
+            return v
     return None
 
 
@@ -86,7 +91,10 @@ def _load_subject(db: Session, user, app: str, animal_id: UUID, need: str):
             app=app, taxon=inv.taxon, name=inv.name, scientific_name=inv.scientific_name,
             common_name=inv.common_name, sex=inv.sex, date_acquired=inv.date_acquired,
             photo_url=inv.photo_url, molt_count=len(molts),
-            latest_size=_fmt_size(inv.taxon, latest_span, inv.current_length_mm),
+            # Raw stored values; compose_card formats them in the card
+            # author's units.
+            latest_span_in=float(latest_span) if latest_span is not None else None,
+            length_mm=float(inv.current_length_mm) if inv.current_length_mm is not None else None,
         )
         return inv, access.owner, subj
 
@@ -333,6 +341,10 @@ async def create_share_card(
             raise HTTPException(status_code=409, detail=COLONY_CLOSED)
     else:
         _animal, owner, subject = _load_subject(db, current_user, body.app, body.animal_id, "keeper")
+    # Lengths print in the card author's units: the sharer's own setting,
+    # else the owner's (a co-keeper who never chose), else imperial. Carried
+    # in the token and frozen into a link's snapshot like the text itself.
+    units = _user_units(current_user, owner)
     # Event ids are only read for their own kind, and only ever looked up
     # under THIS animal (another animal's id is a 404).
     event = _event_facts(db, body.kind, body.animal_id, body.molt_id, body.shed_id, body.weight_log_id)
@@ -353,6 +365,8 @@ async def create_share_card(
         claims["shed_id"] = str(body.shed_id)
     if body.kind == "weight":
         claims["weight_log_id"] = str(body.weight_log_id)
+    if units:
+        claims["units"] = units
     token = sign_render_token(claims)
     image_url = f"{settings.CARD_RENDERER_ORIGIN.rstrip('/')}/api/card/{token}"
 
@@ -363,7 +377,7 @@ async def create_share_card(
         # card as it looked when it was shared.
         # (A colony link is told apart from an animal one by kind == "colony":
         # card_links.animal_id then holds the colony id.)
-        payload = dict(compose_card(body.kind, subject, fields, **event), frame=body.frame,
+        payload = dict(compose_card(body.kind, subject, fields, units=units, **event), frame=body.frame,
                        photo_focus=_focus_claim(body.focus))
         db.add(CardLink(
             id=uuid.uuid4(), code=code, app=body.app, animal_id=body.animal_id, kind=body.kind,
@@ -429,9 +443,12 @@ async def share_card_data(token: str, response: Response, db: Session = Depends(
     # No login here: the token proved the sharer's right when it was issued.
     app, animal_id, kind = claims["app"], UUID(claims["animal_id"]), claims["kind"]
     if kind == "colony":
-        _col, _owner, subject = _load_colony_subject_unchecked(db, animal_id)
+        _col, owner, subject = _load_colony_subject_unchecked(db, animal_id)
     else:
-        _animal, _owner, subject = _load_subject_unchecked(db, app, animal_id)
+        _animal, owner, subject = _load_subject_unchecked(db, app, animal_id)
+    # The author's units ride in the token; a token minted before units
+    # existed (or by a keeper who never chose) falls back to the owner's.
+    units = claims.get("units") if claims.get("units") in UNITS else _user_units(owner)
     if claims.get("photo_id"):
         # Deleted since the token was minted: fall back to the main photo.
         chosen = _load_photo_url(db, app, animal_id, UUID(claims["photo_id"]), kind=kind)
@@ -442,7 +459,7 @@ async def share_card_data(token: str, response: Response, db: Session = Depends(
 
     # A deleted molt/shed/weigh-in makes its token a 404 (no stale card).
     event = _event_facts(db, kind, animal_id, claim_id("molt_id"), claim_id("shed_id"), claim_id("weight_log_id"))
-    card = compose_card(kind, subject, claims["fields"], **event)
+    card = compose_card(kind, subject, claims["fields"], units=units, **event)
     card["shape"] = claims["shape"]
     # Tokens minted before frames existed have no frame claim.
     card["frame"] = clean_frame(claims.get("frame"))
@@ -551,4 +568,8 @@ async def public_card(app: str, animal_id: UUID, db: Session = Depends(get_db)):
     if app == "tarantuverse" and getattr(row, "visibility", None) == "private":
         raise HTTPException(status_code=404, detail="Not found")
     _a, _o, subject = _load_subject(db, owner, app, animal_id, "viewer")
-    return dict(compose_card("profile", subject, PUBLIC_FIELDS[app]), shape="wide", frame="specimen")
+    # A link preview speaks for the owner, so it prints in the owner's units.
+    return dict(
+        compose_card("profile", subject, PUBLIC_FIELDS[app], units=_user_units(owner)),
+        shape="wide", frame="specimen",
+    )

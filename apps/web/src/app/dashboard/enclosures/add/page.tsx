@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { useUnitField } from '@/hooks/useUnitField'
+import { useUnits } from '@/components/UnitsProvider'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 
@@ -17,6 +19,10 @@ interface Species {
 export default function AddEnclosurePage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
+  // Temps are stored in °F and typed in the keeper's units.
+  const { units } = useUnits()
+  const tempMinField = useUnitField('temp')
+  const tempMaxField = useUnitField('temp')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -105,8 +111,8 @@ export default function AddEnclosurePage() {
         enclosure_size: formData.enclosure_size || null,
         substrate_type: formData.substrate_type || null,
         substrate_depth: formData.substrate_depth || null,
-        target_temp_min: formData.target_temp_min ? parseFloat(formData.target_temp_min) : null,
-        target_temp_max: formData.target_temp_max ? parseFloat(formData.target_temp_max) : null,
+        target_temp_min: tempMinField.toStorage(),
+        target_temp_max: tempMaxField.toStorage(),
         target_humidity_min: formData.target_humidity_min ? parseFloat(formData.target_humidity_min) : null,
         target_humidity_max: formData.target_humidity_max ? parseFloat(formData.target_humidity_max) : null,
         water_dish: formData.water_dish,
@@ -404,30 +410,30 @@ export default function AddEnclosurePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Temperature Min (°F)
+                  Temperature Min ({tempMinField.unit})
                 </label>
                 <input
                   type="number"
                   name="target_temp_min"
-                  value={formData.target_temp_min}
-                  onChange={handleInputChange}
+                  value={tempMinField.value}
+                  onChange={(e) => tempMinField.setValue(e.target.value)}
                   step="0.1"
-                  placeholder="e.g., 75"
+                  placeholder={units === 'metric' ? 'e.g., 24' : 'e.g., 75'}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Temperature Max (°F)
+                  Temperature Max ({tempMaxField.unit})
                 </label>
                 <input
                   type="number"
                   name="target_temp_max"
-                  value={formData.target_temp_max}
-                  onChange={handleInputChange}
+                  value={tempMaxField.value}
+                  onChange={(e) => tempMaxField.setValue(e.target.value)}
                   step="0.1"
-                  placeholder="e.g., 82"
+                  placeholder={units === 'metric' ? 'e.g., 28' : 'e.g., 82'}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>

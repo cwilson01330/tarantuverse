@@ -14,6 +14,8 @@ import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import UpgradeModal from '@/components/UpgradeModal'
+import { useUnits } from '@/components/UnitsProvider'
+import { parseTempInput, tempUnit } from '@/lib/units'
 import {
   type CreateClutchPayload,
   createClutch,
@@ -30,6 +32,7 @@ export default function NewClutchPage({
 }) {
   const { id: pairingId } = use(params)
   const router = useRouter()
+  const { units } = useUnits()
 
   const [laidDate, setLaidDate] = useState<string>(todayISO)
   const [pulledDate, setPulledDate] = useState<string>('')
@@ -67,8 +70,9 @@ export default function NewClutchPage({
       pulled_date: pulledDate || null,
       expected_hatch_date: expectedHatchDate || null,
       hatch_date: hatchDate || null,
-      incubation_temp_min_f: numOrNull(tempMin),
-      incubation_temp_max_f: numOrNull(tempMax),
+      // Typed in the keeper's units; stored °F.
+      incubation_temp_min_f: parseTempInput(tempMin, units),
+      incubation_temp_max_f: parseTempInput(tempMax, units),
       incubation_humidity_min_pct: intOrNull(humMin),
       incubation_humidity_max_pct: intOrNull(humMax),
       expected_count: intOrNull(expectedCount),
@@ -180,27 +184,27 @@ export default function NewClutchPage({
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Temp min (°F)">
+              <Field label={`Temp min (${tempUnit(units)})`}>
                 <input
                   type="number"
-                  min={40}
-                  max={120}
+                  min={units === 'metric' ? 5 : 40}
+                  max={units === 'metric' ? 48 : 120}
                   step={0.1}
                   value={tempMin}
                   onChange={(e) => setTempMin(e.target.value)}
-                  placeholder="e.g. 86"
+                  placeholder={units === 'metric' ? 'e.g. 30' : 'e.g. 86'}
                   className={INPUT_CLS}
                 />
               </Field>
-              <Field label="Temp max (°F)">
+              <Field label={`Temp max (${tempUnit(units)})`}>
                 <input
                   type="number"
-                  min={40}
-                  max={120}
+                  min={units === 'metric' ? 5 : 40}
+                  max={units === 'metric' ? 48 : 120}
                   step={0.1}
                   value={tempMax}
                   onChange={(e) => setTempMax(e.target.value)}
-                  placeholder="e.g. 91"
+                  placeholder={units === 'metric' ? 'e.g. 33' : 'e.g. 91'}
                   className={INPUT_CLS}
                 />
               </Field>
@@ -350,12 +354,6 @@ function todayISO(): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
-}
-
-function numOrNull(s: string): number | null {
-  if (!s.trim()) return null
-  const n = Number(s)
-  return Number.isFinite(n) ? n : null
 }
 
 function intOrNull(s: string): number | null {

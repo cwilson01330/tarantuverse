@@ -21,6 +21,12 @@ import {
 } from '../../src/lib/inverts';
 import { stageCountLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
+import { useUnitField } from '../../src/hooks/useUnitField';
+import { useUnits } from '../../src/hooks/useUnits';
+import { withMmUnit } from '../../src/lib/units';
+
+/** The invert API takes these as decimal strings. */
+const toApi = (n: number | null): string | null => (n == null ? null : String(n));
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'unknown', label: 'Unknown' }, { value: 'female', label: 'Female' }, { value: 'male', label: 'Male' },
@@ -41,15 +47,30 @@ export default function EditInvertScreen() {
   const [form, setForm] = useState<Invert | null>(null);
   const [taxonSheet, setTaxonSheet] = useState(false);
   const [changingTaxon, setChangingTaxon] = useState(false);
+  // Stored in mm / °F, edited in the keeper's units. Untouched fields save
+  // their original value, so opening and saving never drifts them.
+  const { units } = useUnits();
+  const sizeField = useUnitField('lengthMm');
+  const tempMinField = useUnitField('temp');
+  const tempMaxField = useUnitField('temp');
+  const loadSize = sizeField.load;
+  const loadTempMin = tempMinField.load;
+  const loadTempMax = tempMaxField.load;
 
   useEffect(() => {
     if (!id) return;
     (async () => {
-      try { setForm(await getInvert(id)); }
+      try {
+        const loaded = await getInvert(id);
+        setForm(loaded);
+        loadSize(loaded.current_length_mm);
+        loadTempMin(loaded.target_temp_min);
+        loadTempMax(loaded.target_temp_max);
+      }
       catch (err) { Alert.alert('Could not load', err instanceof Error ? err.message : 'Failed to load.', [{ text: 'OK', onPress: () => router.back() }]); }
       finally { setLoading(false); }
     })();
-  }, [id, router]);
+  }, [id, router, loadSize, loadTempMin, loadTempMax]);
 
   const update = <K extends keyof Invert>(key: K, value: Invert[K]) => setForm((p) => (p ? { ...p, [key]: value } : p));
 
@@ -96,10 +117,10 @@ export default function EditInvertScreen() {
       setSaving(true);
       await updateInvert(id, {
         name: form.name, common_name: form.common_name, scientific_name: form.scientific_name,
-        species_id: form.species_id, sex: form.sex, life_stage: form.life_stage, current_instar: form.current_instar, current_length_mm: form.current_length_mm,
+        species_id: form.species_id, sex: form.sex, life_stage: form.life_stage, current_instar: form.current_instar, current_length_mm: toApi(sizeField.toStorage()),
         date_acquired: form.date_acquired, source: form.source, price_paid: form.price_paid,
         enclosure_type: form.enclosure_type, enclosure_size: form.enclosure_size, substrate_type: form.substrate_type, substrate_depth: form.substrate_depth,
-        target_temp_min: form.target_temp_min, target_temp_max: form.target_temp_max, target_humidity_min: form.target_humidity_min, target_humidity_max: form.target_humidity_max,
+        target_temp_min: toApi(tempMinField.toStorage()), target_temp_max: toApi(tempMaxField.toStorage()), target_humidity_min: form.target_humidity_min, target_humidity_max: form.target_humidity_max,
         water_dish: form.water_dish, misting_schedule: form.misting_schedule, last_enclosure_cleaning: form.last_enclosure_cleaning,
         last_substrate_change: form.last_substrate_change, enclosure_notes: form.enclosure_notes, notes: form.notes,
         location: form.location ?? null,
@@ -174,7 +195,7 @@ export default function EditInvertScreen() {
             </View>
           </Field>
           <Field label={stageCountLabel(form.taxon)}><TextInput style={styles.input} value={form.current_instar?.toString() ?? ''} onChangeText={(t) => update('current_instar', t ? Number(t) : null)} keyboardType="number-pad" /></Field>
-          <Field label={meta?.sizeLabel ?? 'Size (mm)'}><TextInput style={styles.input} value={form.current_length_mm ?? ''} onChangeText={(t) => update('current_length_mm', t)} keyboardType="decimal-pad" /></Field>
+          <Field label={withMmUnit(meta?.sizeLabel ?? 'Size', units)}><TextInput style={styles.input} value={sizeField.value} onChangeText={sizeField.setValue} keyboardType="decimal-pad" /></Field>
 
           <SectionHeader title="Acquisition" colors={colors} />
           <Field label="Date acquired"><DateInput value={parseLocalDate(form.date_acquired) ?? new Date()} onChange={(d) => update('date_acquired', toISODateLocal(d))} label="Date acquired" /></Field>
@@ -188,8 +209,8 @@ export default function EditInvertScreen() {
           <Field label="Substrate type"><TextInput style={styles.input} value={form.substrate_type ?? ''} onChangeText={(t) => update('substrate_type', t)} placeholderTextColor={colors.textTertiary} /></Field>
           <Field label="Substrate depth"><TextInput style={styles.input} value={form.substrate_depth ?? ''} onChangeText={(t) => update('substrate_depth', t)} placeholderTextColor={colors.textTertiary} /></Field>
           <View style={styles.row}>
-            <Field label="Temp min (°F)" flex><TextInput style={styles.input} value={form.target_temp_min ?? ''} onChangeText={(t) => update('target_temp_min', t)} keyboardType="decimal-pad" /></Field>
-            <Field label="Temp max (°F)" flex><TextInput style={styles.input} value={form.target_temp_max ?? ''} onChangeText={(t) => update('target_temp_max', t)} keyboardType="decimal-pad" /></Field>
+            <Field label={`Temp min (${tempMinField.unit})`} flex><TextInput style={styles.input} value={tempMinField.value} onChangeText={tempMinField.setValue} keyboardType="decimal-pad" /></Field>
+            <Field label={`Temp max (${tempMaxField.unit})`} flex><TextInput style={styles.input} value={tempMaxField.value} onChangeText={tempMaxField.setValue} keyboardType="decimal-pad" /></Field>
           </View>
           <View style={styles.row}>
             <Field label="Humidity min %" flex><TextInput style={styles.input} value={form.target_humidity_min ?? ''} onChangeText={(t) => update('target_humidity_min', t)} keyboardType="decimal-pad" /></Field>

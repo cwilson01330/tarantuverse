@@ -45,14 +45,21 @@ class TestFmtSizeNonLegSpanTaxa:
     """Non-leg-span taxa (scorpion, centipede, etc.) CAN fall back to mm."""
 
     def test_scorpion_with_length_returns_mm(self):
-        """Scorpion with only length_mm → "62 mm"."""
-        result = _fmt_size("scorpion", None, 62.0)
-        assert result == "62 mm"
+        """Scorpion with only length_mm → "62 mm" for a metric author; an
+        imperial (or never-chosen) author gets inches, like the app shows."""
+        assert _fmt_size("scorpion", None, 62.0, "metric") == "62 mm"
+        assert _fmt_size("scorpion", None, 62.0, "imperial") == "2.44 in"
+        assert _fmt_size("scorpion", None, 62.0) == "2.44 in"
 
     def test_centipede_with_length_returns_mm(self):
-        """Centipede with only length_mm → "50 mm"."""
-        result = _fmt_size("centipede", None, 50.0)
-        assert result == "50 mm"
+        """Centipede with only length_mm → "50 mm" (metric)."""
+        assert _fmt_size("centipede", None, 50.0, "metric") == "50 mm"
+        assert _fmt_size("centipede", None, 50.0) == "1.97 in"
+
+    def test_span_in_metric_is_cm(self):
+        """Molt span is stored in inches; a metric author sees cm."""
+        assert _fmt_size("tarantula", 3.5, None, "metric") == "8.9 cm"
+        assert _fmt_size("scorpion", 3.2, 80.0, "metric") == "8.1 cm"
 
     def test_scorpion_with_span_prefers_span(self):
         """Scorpion with both span and mm → use span in inches."""

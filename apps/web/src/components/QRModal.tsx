@@ -18,6 +18,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getSession } from 'next-auth/react'
+import { useUnits } from '@/components/UnitsProvider'
+import { lengthValue, type Units } from '@/lib/units'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 const PREFS_STORAGE_KEY = 'qrmodal_label_prefs_v1'
@@ -193,6 +195,15 @@ interface RenderLabelOptions {
    * the styled grays/accents.
    */
   highContrast?: boolean
+  /** The owner's display units for molt sizes (stored in inches). */
+  units?: Units
+}
+
+/** " (3.5\")" / " (8.9 cm)" after a molt date; '' when no size was logged. */
+export function moltSpanSuffix(legSpanInches: unknown, units: Units): string {
+  const v = lengthValue(legSpanInches, units)
+  if (v === null || Number(v) === 0) return ''
+  return units === 'metric' ? ` (${v} cm)` : ` (${v}")`
 }
 
 /** Build an HTML string for the print window. All user content is escaped. */
@@ -202,7 +213,7 @@ export function renderLabelHTML(opts: RenderLabelOptions): string {
     size, font, theme,
     showSex, showSciName, showMolts, showDomain,
     showPopulation = false, population = null, populationIsEstimated = false,
-    qrSvgMarkup, highContrast = false,
+    qrSvgMarkup, highContrast = false, units = 'imperial',
   } = opts
   const populationText =
     showPopulation && population != null
@@ -229,7 +240,7 @@ export function renderLabelHTML(opts: RenderLabelOptions): string {
   const moltsHtml = recentMolts
     .map((m, i) => {
       const date = escapeHtml(formatMoltDate(m.molted_at))
-      const span = m.leg_span_after ? ` (${Number(m.leg_span_after)}")` : ''
+      const span = moltSpanSuffix(m.leg_span_after, units)
       const sep = i < recentMolts.length - 1 ? ' · ' : ''
       return `${date}${escapeHtml(span)}${sep}`
     })
@@ -334,6 +345,8 @@ export default function QRModal({
   // label even if a caller passes them.
   const sex = resource === 'colonies' ? null : sexProp
   const molts = resource === 'colonies' ? [] : moltsProp
+  // Molt sizes print in the owner's units (this modal is owner-only).
+  const { units } = useUnits()
   const [tab, setTab] = useState<Tab>('upload')
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [uploadToken, setUploadToken] = useState<string | null>(null)
@@ -522,6 +535,7 @@ export default function QRModal({
           `style="display:block;flex-shrink:0" alt="" />`,
         // Thermal printers can't render gray/opacity — force solid black text.
         highContrast: true,
+        units,
       })
 
       const svg =
@@ -632,6 +646,7 @@ export default function QRModal({
       populationIsEstimated,
       profileUrl,
       qrSvgMarkup: qrSvg,
+      units,
     })
 
     const win = window.open('', '_blank', 'width=600,height=400')
@@ -951,7 +966,7 @@ export default function QRModal({
                         {recentMolts.map((m, i) => (
                           <span key={m.id}>
                             {formatMoltDate(m.molted_at)}
-                            {m.leg_span_after ? ` (${m.leg_span_after}")` : ''}
+                            {moltSpanSuffix(m.leg_span_after, units)}
                             {i < recentMolts.length - 1 ? ' · ' : ''}
                           </span>
                         ))}

@@ -8,6 +8,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import { INVERT_TAXA, isInvertTaxon, growthLengthLabel, finalMoltCopy } from '@/lib/inverts'
+import { useUnitField } from '@/hooks/useUnitField'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const inputCls = 'w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary focus:outline-none focus:ring-2 focus:ring-electric-blue-500'
@@ -40,9 +41,12 @@ export default function AddInvertMoltPage() {
   const [moltNum, setMoltNum] = useState('')
   const [notes, setNotes] = useState('')
   // Optional per-molt measurements (ADR-008 growth module). Stored on the
-  // legacy leg_span_* columns; label adapts per taxon.
-  const [lengthBefore, setLengthBefore] = useState('')
-  const [lengthAfter, setLengthAfter] = useState('')
+  // legacy leg_span_* columns; label adapts per taxon. Stored in INCHES for
+  // every taxon, typed in the keeper's units (cm or in).
+  const lengthBefore = useUnitField('length')
+  const lengthAfter = useUnitField('length')
+  const loadBefore = lengthBefore.load
+  const loadAfter = lengthAfter.load
   const [weightBefore, setWeightBefore] = useState('')
   const [weightAfter, setWeightAfter] = useState('')
   // Molt outcome (ADR-015). Blank by default and stays blank — most molts are
@@ -73,8 +77,8 @@ export default function AddInvertMoltPage() {
             const res = await fetch(`${API_URL}/api/v1/molts/${lid}`, { headers: { Authorization: `Bearer ${token}` } })
             if (!res.ok) return
             const m = await res.json()
-            if (m.leg_span_before != null) setLengthBefore(String(m.leg_span_before))
-            if (m.leg_span_after != null) setLengthAfter(String(m.leg_span_after))
+            loadBefore(m.leg_span_before)
+            loadAfter(m.leg_span_after)
             // A keeper often learns a molt went badly days later, so these must
             // prefill on edit or the correction silently reverts.
             if (m.outcome) setOutcome(m.outcome)
@@ -95,7 +99,7 @@ export default function AddInvertMoltPage() {
         setPrefix(isInvertTaxon(t) ? INVERT_TAXA[t].prefix : null)
       } catch { /* leave null */ }
     })()
-  }, [id, token, isAuthenticated, isLoading, router])
+  }, [id, token, isAuthenticated, isLoading, router, loadBefore, loadAfter])
 
   const lengthLabel = growthLengthLabel(taxon ?? '')
   const parseMeasure = (v: string): number | null => {
@@ -116,8 +120,8 @@ export default function AddInvertMoltPage() {
           body: JSON.stringify({
             molted_at: new Date(date + 'T12:00:00').toISOString(),
             notes: combinedNotes,
-            leg_span_before: parseMeasure(lengthBefore),
-            leg_span_after: parseMeasure(lengthAfter),
+            leg_span_before: lengthBefore.toStorage(),
+            leg_span_after: lengthAfter.toStorage(),
             weight_before: parseMeasure(weightBefore),
             weight_after: parseMeasure(weightAfter),
             outcome: outcome || null,
@@ -144,8 +148,8 @@ export default function AddInvertMoltPage() {
           <div><label className={labelCls}>Date molted</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Molt number (optional)</label><input value={moltNum} onChange={(e) => setMoltNum(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className={labelCls}>{lengthLabel} before (in)</label><input value={lengthBefore} onChange={(e) => setLengthBefore(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
-            <div><label className={labelCls}>{lengthLabel} after (in)</label><input value={lengthAfter} onChange={(e) => setLengthAfter(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
+            <div><label className={labelCls}>{lengthLabel} before ({lengthBefore.unit})</label><input value={lengthBefore.value} onChange={(e) => lengthBefore.setValue(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
+            <div><label className={labelCls}>{lengthLabel} after ({lengthAfter.unit})</label><input value={lengthAfter.value} onChange={(e) => lengthAfter.setValue(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Weight before (g)</label><input value={weightBefore} onChange={(e) => setWeightBefore(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>

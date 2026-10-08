@@ -13,6 +13,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatLength, formatTempRange } from '@/lib/units'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
@@ -114,6 +116,8 @@ export default function TarantulaPublicClient() {
   // localStorage — the JWT is only in session.accessToken. This drives the
   // logged-in social layer; anonymous / QR viewers never see it.
   const { token, isAuthenticated, isLoading: authLoading } = useAuth()
+  // The VIEWER's units (their setting, or their browser region when signed out).
+  const { units } = useUnits()
   const isLoggedIn = isAuthenticated
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
@@ -362,7 +366,7 @@ export default function TarantulaPublicClient() {
               {profile.last_molt?.leg_span_after && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">
                   <span>📏</span>
-                  {profile.last_molt.leg_span_after}&quot; leg span
+                  {formatLength(profile.last_molt.leg_span_after, units)} leg span
                 </span>
               )}
               {sp?.adult_size && (
@@ -475,7 +479,7 @@ export default function TarantulaPublicClient() {
                   </p>
                   {profile.last_molt.leg_span_after && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {profile.last_molt.leg_span_after}" leg span
+                      {formatLength(profile.last_molt.leg_span_after, units)} leg span
                     </p>
                   )}
                 </div>
@@ -506,7 +510,7 @@ export default function TarantulaPublicClient() {
                   <div className="px-4 py-3">
                     <p className="text-xs text-gray-500 dark:text-gray-400">🌡️ Temperature</p>
                     <p className="font-medium text-gray-900 dark:text-white text-sm">
-                      {sp.temperature_min}–{sp.temperature_max}°F
+                      {formatTempRange(sp.temperature_min, sp.temperature_max, units)}
                     </p>
                   </div>
                 )}

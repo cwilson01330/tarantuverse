@@ -33,6 +33,8 @@ import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { FormErrorBanner } from '../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../src/contexts/ThemeContext';
+import { useUnits } from '../../../src/hooks/useUnits';
+import { tempValue } from '../../../src/lib/units';
 import {
   OFFSPRING_STATUS_LABEL,
   type Clutch,
@@ -43,6 +45,7 @@ import {
 } from '../../../src/lib/breeding';
 
 function ClutchDetailScreen() {
+  const { units } = useUnits();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
@@ -301,11 +304,20 @@ function ClutchDetailScreen() {
                   clutch.incubation_temp_max_f) && (
                   <KV
                     label="Temp range"
-                    value={fmtRange(
-                      clutch.incubation_temp_min_f,
-                      clutch.incubation_temp_max_f,
-                      '°F',
-                    )}
+                    value={
+                      // Stored °F; shown in the keeper's units.
+                      units === 'metric'
+                        ? fmtRange(
+                            tempValue(clutch.incubation_temp_min_f, units),
+                            tempValue(clutch.incubation_temp_max_f, units),
+                            '°C',
+                          )
+                        : fmtRange(
+                            clutch.incubation_temp_min_f,
+                            clutch.incubation_temp_max_f,
+                            '°F',
+                          )
+                    }
                   />
                 )}
                 {(clutch.incubation_humidity_min_pct != null ||

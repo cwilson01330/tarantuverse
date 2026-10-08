@@ -33,6 +33,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatTempRange, lengthValue, type Units } from '../../src/lib/units';
 import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -123,6 +125,8 @@ function SpeciesDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
+  // Stored inches / °F, shown in the keeper's units.
+  const { units } = useUnits();
 
   const [species, setSpecies] = useState<ReptileSpecies | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -283,7 +287,7 @@ function SpeciesDetailScreen() {
               species.adult_length_max_in != null && (
                 <StatCell
                   label="Adult length"
-                  value={`${fmtNum(species.adult_length_min_in)}–${fmtNum(species.adult_length_max_in)} in`}
+                  value={lengthRange(species.adult_length_min_in, species.adult_length_max_in, units)}
                 />
               )}
             {species.adult_weight_min_g != null &&
@@ -331,26 +335,26 @@ function SpeciesDetailScreen() {
               {species.temp_cool_min != null && species.temp_cool_max != null && (
                 <StatCell
                   label="Cool side"
-                  value={`${fmtNum(species.temp_cool_min)}–${fmtNum(species.temp_cool_max)}°F`}
+                  value={tempRange(species.temp_cool_min, species.temp_cool_max, units)}
                 />
               )}
               {species.temp_warm_min != null && species.temp_warm_max != null && (
                 <StatCell
                   label="Warm side"
-                  value={`${fmtNum(species.temp_warm_min)}–${fmtNum(species.temp_warm_max)}°F`}
+                  value={tempRange(species.temp_warm_min, species.temp_warm_max, units)}
                 />
               )}
               {species.temp_basking_min != null &&
                 species.temp_basking_max != null && (
                   <StatCell
                     label="Basking"
-                    value={`${fmtNum(species.temp_basking_min)}–${fmtNum(species.temp_basking_max)}°F`}
+                    value={tempRange(species.temp_basking_min, species.temp_basking_max, units)}
                   />
                 )}
               {species.temp_night_min != null && species.temp_night_max != null && (
                 <StatCell
                   label="Night"
-                  value={`${fmtNum(species.temp_night_min)}–${fmtNum(species.temp_night_max)}°F`}
+                  value={tempRange(species.temp_night_min, species.temp_night_max, units)}
                 />
               )}
               {species.humidity_min != null && species.humidity_max != null && (
@@ -624,6 +628,18 @@ function fmtNum(n: string | number | null): string {
   const num = typeof n === 'number' ? n : Number(n);
   if (!Number.isFinite(num)) return '—';
   return num.toFixed(1).replace(/\.?0+$/, '');
+}
+
+/** Stored-inches range; imperial reads exactly as before, metric in cm. */
+function lengthRange(min: string | number | null, max: string | number | null, units: Units): string {
+  if (units === 'metric') return `${lengthValue(min, units) ?? '—'}–${lengthValue(max, units) ?? '—'} cm`;
+  return `${fmtNum(min)}–${fmtNum(max)} in`;
+}
+
+/** Stored-°F range; imperial reads exactly as before, metric in whole °C. */
+function tempRange(min: string | number | null, max: string | number | null, units: Units): string {
+  if (units === 'metric') return formatTempRange(min, max, units) ?? '—';
+  return `${fmtNum(min)}–${fmtNum(max)}°F`;
 }
 
 function titleCase(s: string): string {

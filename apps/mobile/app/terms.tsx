@@ -1,9 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../src/contexts/ThemeContext';
+
+// App Store copy must never name another platform's store (and vice versa).
+const STORE_ACCOUNT = Platform.OS === 'ios' ? 'Apple ID' : 'Google Play account';
+const STORE_SETTINGS = Platform.OS === 'ios' ? 'App Store account settings' : 'Google Play account settings';
 
 export default function TermsScreen() {
   const router = useRouter();
@@ -215,7 +219,7 @@ export default function TermsScreen() {
           </Text>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>Payment will be charged to your Apple ID or Google Play account at confirmation of purchase</Text>
+            <Text style={styles.bulletText}>{`Payment will be charged to your ${STORE_ACCOUNT} at confirmation of purchase`}</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
@@ -223,7 +227,7 @@ export default function TermsScreen() {
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>
-            <Text style={styles.bulletText}>You can manage and cancel your subscription in your App Store or Google Play account settings</Text>
+            <Text style={styles.bulletText}>{`You can manage and cancel your subscription in your ${STORE_SETTINGS}`}</Text>
           </View>
           <View style={styles.bulletPoint}>
             <Text style={styles.bullet}>•</Text>

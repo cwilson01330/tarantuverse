@@ -14,6 +14,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/lib/apiClient'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatLengthMm, tempUnit, tempValue, type Units } from '@/lib/units'
 import {
   type FeederSpecies,
   feederCategoryMeta,
@@ -22,6 +24,8 @@ import {
 } from '@/lib/feeders'
 
 export default function FeederCareSheetClient({ speciesId }: { speciesId: string }) {
+  // Temps are stored °F and sizes mm; both show in the viewer's units.
+  const { units } = useUnits()
   const [species, setSpecies] = useState<FeederSpecies | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -187,7 +191,7 @@ export default function FeederCareSheetClient({ speciesId }: { speciesId: string
             {hasTemps && (
               <Meta
                 label="Temperature"
-                value={rangeF(species.temperature_min, species.temperature_max)}
+                value={rangeF(species.temperature_min, species.temperature_max, units)}
               />
             )}
             {hasHumidity && (
@@ -199,7 +203,7 @@ export default function FeederCareSheetClient({ speciesId }: { speciesId: string
             {species.typical_adult_size_mm != null && (
               <Meta
                 label="Adult size"
-                value={`${species.typical_adult_size_mm} mm`}
+                value={formatLengthMm(species.typical_adult_size_mm, units) ?? '—'}
               />
             )}
           </dl>
@@ -209,7 +213,7 @@ export default function FeederCareSheetClient({ speciesId }: { speciesId: string
       {species.typical_adult_size_mm != null && !isLive && (
         <Section title="Size">
           <p className="text-sm text-neutral-300">
-            Typical adult size: {species.typical_adult_size_mm} mm
+            Typical adult size: {formatLengthMm(species.typical_adult_size_mm, units)}
           </p>
         </Section>
       )}
@@ -221,10 +225,13 @@ export default function FeederCareSheetClient({ speciesId }: { speciesId: string
 // Helpers + primitives
 // ---------------------------------------------------------------------------
 
-function rangeF(min: number | null, max: number | null): string {
-  if (min != null && max != null) return `${min}–${max}°F`
-  if (min != null) return `≥ ${min}°F`
-  if (max != null) return `≤ ${max}°F`
+/** Stored °F → the viewer's units (imperial reads exactly as before). */
+function rangeF(min: number | null, max: number | null, units: Units): string {
+  const t = (v: number) => (units === 'metric' ? tempValue(v, units) : String(v))
+  const u = tempUnit(units)
+  if (min != null && max != null) return `${t(min)}–${t(max)}${u}`
+  if (min != null) return `≥ ${t(min)}${u}`
+  if (max != null) return `≤ ${t(max)}${u}`
   return '—'
 }
 

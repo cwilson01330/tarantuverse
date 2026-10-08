@@ -12,7 +12,7 @@
  * pattern as the pairing form. Numeric fields are stored as strings and
  * coerced at submit time so empty inputs serialize cleanly to null.
  *
- * Honesty-first: we surface the constraint ranges (temp 40-120°F,
+ * Honesty-first: we surface the constraint ranges (temp 40-120°F / 5-48°C,
  * humidity 0-100, count 0-200) as hint text rather than silently
  * clamping. If a keeper types 250, we reject with an explicit message.
  *
@@ -45,6 +45,8 @@ import {
   todayISO,
 } from '../../../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../../../src/contexts/ThemeContext';
+import { useUnits } from '../../../../../src/hooks/useUnits';
+import { parseTempInput, tempUnit } from '../../../../../src/lib/units';
 import UpgradeModal from '../../../../../src/components/UpgradeModal';
 import {
   type CreateClutchPayload,
@@ -81,6 +83,12 @@ function NewClutchScreen() {
   const router = useRouter();
   const { id: pairingId } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
+  // Incubation temps are typed in the keeper's units and stored °F. The API
+  // accepts 40–120°F; in °C that's 5–48 (whole degrees inside the range).
+  const { units } = useUnits();
+  const metric = units === 'metric';
+  const tempLo = metric ? 5 : 40;
+  const tempHi = metric ? 48 : 120;
 
   const [laidDate, setLaidDate] = useState<string>(() => todayISO());
   const [pulledDate, setPulledDate] = useState<string>('');
@@ -153,8 +161,8 @@ function NewClutchScreen() {
       allowDecimal: boolean;
       key: string;
     }> = [
-      { raw: tempMin, field: 'Temp min', min: 40, max: 120, allowDecimal: true, key: 'incubation_temp_min_f' },
-      { raw: tempMax, field: 'Temp max', min: 40, max: 120, allowDecimal: true, key: 'incubation_temp_max_f' },
+      { raw: tempMin, field: 'Temp min', min: tempLo, max: tempHi, allowDecimal: true, key: 'incubation_temp_min_f' },
+      { raw: tempMax, field: 'Temp max', min: tempLo, max: tempHi, allowDecimal: true, key: 'incubation_temp_max_f' },
       { raw: humMin, field: 'Humidity min', min: 0, max: 100, allowDecimal: false, key: 'incubation_humidity_min_pct' },
       { raw: humMax, field: 'Humidity max', min: 0, max: 100, allowDecimal: false, key: 'incubation_humidity_max_pct' },
       { raw: expectedCount, field: 'Initial egg count', min: 0, max: 200, allowDecimal: false, key: 'expected_count' },
@@ -171,6 +179,10 @@ function NewClutchScreen() {
         return;
       }
       numericValues[f.key] = r.value;
+    }
+    // Typed temps → stored °F (a no-op for imperial).
+    for (const k of ['incubation_temp_min_f', 'incubation_temp_max_f']) {
+      numericValues[k] = parseTempInput(numericValues[k], units);
     }
 
     // Cross-field sanity: min ≤ max where both are present.
@@ -352,21 +364,21 @@ function NewClutchScreen() {
 
               <View style={styles.row}>
                 <View style={styles.col}>
-                  <Field label="Temp min (°F)" hint="40–120">
+                  <Field label={`Temp min (${tempUnit(units)})`} hint={`${tempLo}–${tempHi}`}>
                     <ThemedInput
                       value={tempMin}
                       onChangeText={setTempMin}
-                      placeholder="e.g. 86"
+                      placeholder={metric ? 'e.g. 30' : 'e.g. 86'}
                       keyboardType="decimal-pad"
                     />
                   </Field>
                 </View>
                 <View style={styles.col}>
-                  <Field label="Temp max (°F)" hint="40–120">
+                  <Field label={`Temp max (${tempUnit(units)})`} hint={`${tempLo}–${tempHi}`}>
                     <ThemedInput
                       value={tempMax}
                       onChangeText={setTempMax}
-                      placeholder="e.g. 91"
+                      placeholder={metric ? 'e.g. 33' : 'e.g. 91'}
                       keyboardType="decimal-pad"
                     />
                   </Field>

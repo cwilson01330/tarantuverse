@@ -12,6 +12,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatLengthMmRange, formatTempRange, stripUnit } from '../../src/lib/units';
 import { KeeperSignalsBlock } from '../../src/components/KeeperSignalsBlock';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
@@ -124,6 +126,8 @@ function InvertSpeciesCareSheetScreen() {
     hot: params.pHot === '1',
   };
   const { colors } = useTheme();
+  // Stored mm / °F; shown in the keeper's units.
+  const { units } = useUnits();
   const insets = useSafeAreaInsets();
 
   const [species, setSpecies] = useState<InvertSpecies | null>(null);
@@ -235,12 +239,12 @@ function InvertSpeciesCareSheetScreen() {
           <QuickStatsRow
             colors={colors}
             stats={[
-              { icon: 'arrow-expand-horizontal', value: species.adult_size, label: meta.sizeLabel },
+              { icon: 'arrow-expand-horizontal', value: species.adult_size, label: stripUnit(meta.sizeLabel) },
               {
                 icon: 'thermometer',
                 value:
                   species.temperature_min || species.temperature_max
-                    ? `${species.temperature_min ?? '?'}–${species.temperature_max ?? '?'}°F`
+                    ? formatTempRange(species.temperature_min, species.temperature_max, units)
                     : null,
                 label: 'Temp',
               },
@@ -405,11 +409,11 @@ function InvertSpeciesCareSheetScreen() {
             preview={previewOf(species.adult_size, species.growth_rate)}
             colors={colors}
           >
-            <CareFact label={meta.sizeLabel} value={species.adult_size} colors={colors} />
+            <CareFact label={stripUnit(meta.sizeLabel)} value={species.adult_size} colors={colors} />
             {(species.adult_length_min_mm || species.adult_length_max_mm) && (
               <CareFact
                 label="Length"
-                value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`}
+                value={(formatLengthMmRange(species.adult_length_min_mm, species.adult_length_max_mm, units) ?? '')}
                 colors={colors}
               />
             )}

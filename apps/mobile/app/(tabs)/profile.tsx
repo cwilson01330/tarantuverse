@@ -39,7 +39,7 @@ const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
 const DELETE_CONFIRM_WORD = 'DELETE';
 
 function ProfileScreen() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, units, setMeasurementUnits } = useAuth();
   const { theme, toggleTheme, colors, layout } = useTheme();
   const router = useRouter();
   const { isUpdatePending } = Updates.useUpdates();
@@ -267,6 +267,27 @@ function ProfileScreen() {
           }
         />
         <MenuRow icon="palette-outline" label="Customize theme" onPress={() => router.push('/settings/appearance')} />
+        {/* Display only: lengths and temperatures. Weights stay in grams and
+            nothing stored changes. Syncs with the website. */}
+        <MenuRow
+          icon="ruler"
+          label="Units"
+          detail={units === 'metric' ? 'Metric (cm, °C)' : 'Imperial (in, °F)'}
+          accessibilityHint="Choose inches and °F, or centimetres and °C"
+          onPress={() => {
+            const choose = (u: 'imperial' | 'metric') => {
+              if (u === units) return;
+              setMeasurementUnits(u).then((ok) => {
+                if (!ok) Alert.alert('Could not save', 'Check your connection and try again.');
+              });
+            };
+            Alert.alert('Units', 'Lengths and temperatures. Weights stay in grams.', [
+              { text: 'Imperial (in, °F)', onPress: () => choose('imperial') },
+              { text: 'Metric (cm, °C)', onPress: () => choose('metric') },
+              { text: 'Cancel', style: 'cancel' },
+            ]);
+          }}
+        />
       </MenuSection>
 
       <MenuSection title="Help & legal">

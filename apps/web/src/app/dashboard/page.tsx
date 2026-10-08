@@ -19,7 +19,7 @@ import type { ColonyListItem } from '@/lib/colonies'
 const COLONY_EMOJI: Record<string, string> = {
   scorpion: '🦂', centipede: '🐛', millipede: '🪱', roach: '🪳',
   mantis: '🦗', whip_spider: '🕸️', vinegaroon: '🦂', true_spider: '🕷',
-  tarantula: '🕷️', other: '👥',
+  tarantula: '🕷️', isopod: '🪲', other: '👥',
 }
 const colonyEmoji = (taxon: string): string => COLONY_EMOJI[taxon] ?? '👥'
 const colonyCountLabel = (c: ColonyListItem): string => {

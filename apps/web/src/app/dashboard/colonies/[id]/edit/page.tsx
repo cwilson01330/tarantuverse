@@ -11,6 +11,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { useUnitField } from '@/hooks/useUnitField'
+import { useUnits } from '@/components/UnitsProvider'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
@@ -80,8 +82,12 @@ export default function EditColonyPage() {
   const [location, setLocation] = useState<string | null>(null)
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
-  const [tempMin, setTempMin] = useState('')
-  const [tempMax, setTempMax] = useState('')
+  // Stored in °F; typed in the keeper's units.
+  const { units } = useUnits()
+  const tempMin = useUnitField('temp')
+  const tempMax = useUnitField('temp')
+  const loadTempMin = tempMin.load
+  const loadTempMax = tempMax.load
   const [humidityMin, setHumidityMin] = useState('')
   const [humidityMax, setHumidityMax] = useState('')
   const [waterDish, setWaterDish] = useState(true)
@@ -112,8 +118,8 @@ export default function EditColonyPage() {
       setLocation(c.location ?? null)
       setSubstrateType(c.substrate_type ?? '')
       setSubstrateDepth(c.substrate_depth ?? '')
-      setTempMin(numToStr(c.target_temp_min))
-      setTempMax(numToStr(c.target_temp_max))
+      loadTempMin(c.target_temp_min)
+      loadTempMax(c.target_temp_max)
       setHumidityMin(numToStr(c.target_humidity_min))
       setHumidityMax(numToStr(c.target_humidity_max))
       setWaterDish(c.water_dish ?? true)
@@ -126,7 +132,7 @@ export default function EditColonyPage() {
     } finally {
       setLoading(false)
     }
-  }, [colonyId, token])
+  }, [colonyId, token, loadTempMin, loadTempMax])
 
   useEffect(() => {
     if (isLoading) return
@@ -215,8 +221,8 @@ export default function EditColonyPage() {
         location,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
-        target_temp_min: numOrNull(tempMin),
-        target_temp_max: numOrNull(tempMax),
+        target_temp_min: tempMin.toStorage(),
+        target_temp_max: tempMax.toStorage(),
         target_humidity_min: numOrNull(humidityMin),
         target_humidity_max: numOrNull(humidityMax),
         water_dish: waterDish,
@@ -464,21 +470,21 @@ export default function EditColonyPage() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Temp min (°F)">
+            <Field label={`Temp min (${tempMin.unit})`}>
               <input
-                value={tempMin}
-                onChange={(e) => setTempMin(e.target.value)}
-                inputMode="numeric"
-                placeholder="72"
+                value={tempMin.value}
+                onChange={(e) => tempMin.setValue(e.target.value)}
+                inputMode="decimal"
+                placeholder={units === 'metric' ? '22' : '72'}
                 className={inputCls}
               />
             </Field>
-            <Field label="Temp max (°F)">
+            <Field label={`Temp max (${tempMax.unit})`}>
               <input
-                value={tempMax}
-                onChange={(e) => setTempMax(e.target.value)}
-                inputMode="numeric"
-                placeholder="82"
+                value={tempMax.value}
+                onChange={(e) => tempMax.setValue(e.target.value)}
+                inputMode="decimal"
+                placeholder={units === 'metric' ? '28' : '82'}
                 className={inputCls}
               />
             </Field>

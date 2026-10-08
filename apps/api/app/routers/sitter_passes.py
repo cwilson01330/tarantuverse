@@ -391,6 +391,8 @@ def build_pass_payload(
     now = _now()
     owner = db.query(User).filter(User.id == p.owner_user_id).first()
     keeper = _keeper_name(owner)
+    # Temperatures on the card follow the keeper's display units (storage is °F).
+    keeper_units = getattr(owner, "measurement_units", None)
     refs = sorted(p.animals, key=lambda r: r.sort_order)
 
     # Re-check ownership and activity at READ time, not just at creation: an
@@ -442,6 +444,7 @@ def build_pass_payload(
             card = sc.compose_invert_card(
                 inv, sp, facts=facts, premolt_likely=_premolt_likely(db, inv),
                 keeper_name=keeper, now=now, tz_offset_minutes=tz_offset_minutes,
+                units=keeper_units,
             )
             card.update(_logging_fields(p, card, feeds, now))
             cards.append(card)
@@ -449,6 +452,7 @@ def build_pass_payload(
             col = colonies[r.colony_id]
             card = sc.compose_colony_card(
                 col, species.get(col.species_id) if col.species_id else None, keeper_name=keeper,
+                units=keeper_units,
             )
             card.update(_logging_fields(p, card, [], now))
             cards.append(card)
@@ -468,6 +472,7 @@ def build_pass_payload(
             card = sc.compose_animal_card(
                 a, sp, facts=facts, enclosure=a.enclosure, feeds_on_cgd=feeds_cgd,
                 keeper_name=keeper, now=now, tz_offset_minutes=tz_offset_minutes,
+                units=keeper_units,
             )
             card.update(_logging_fields(p, card, feeds, now))
             cards.append(card)

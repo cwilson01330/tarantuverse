@@ -13,6 +13,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format } from "date-fns";
+import { useUnits } from "@/components/UnitsProvider";
+import { formatLength, formatLengthRate, lengthUnit, lengthValue } from "@/lib/units";
 
 interface GrowthDataPoint {
   date: string;
@@ -48,6 +50,9 @@ type DateRange = "all" | "1y" | "6m" | "3m";
 export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthChartProps) {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === "dark";
+  // Leg span / body length is stored in inches; shown in the keeper's units.
+  const { units } = useUnits();
+  const lenUnit = lengthUnit(units);
 
   const tooltipStyle = {
     backgroundColor: isDark ? "rgb(31, 41, 55)" : "rgb(255, 255, 255)",
@@ -92,7 +97,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
     date: format(new Date(point.date), "MMM d, yyyy"),
     shortDate: format(new Date(point.date), "MMM d"),
     weight: point.weight ? parseFloat(point.weight.toString()) : null,
-    legSpan: point.leg_span ? parseFloat(point.leg_span.toString()) : null,
+    legSpan: point.leg_span ? Number(lengthValue(point.leg_span, units)) : null,
   }));
 
   // Check if we have any data to display
@@ -226,7 +231,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
             <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Size Gain</div>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              +{parseFloat(data.total_leg_span_gain.toString()).toFixed(2)} in
+              +{formatLength(data.total_leg_span_gain, units)}
             </div>
           </div>
         )}
@@ -260,7 +265,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
                 orientation="right"
                 tick={tickStyle}
                 label={{
-                  value: `${lengthLabel} (in)`,
+                  value: `${lengthLabel} (${lenUnit})`,
                   angle: 90,
                   position: "insideRight",
                   style: labelStyle,
@@ -272,7 +277,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
               formatter={(value, name) => {
                 if (name === "weight") return [`${(value as number).toFixed(1)}g`, "Weight"];
                 if (name === "legSpan")
-                  return [`${(value as number).toFixed(2)} in`, lengthLabel];
+                  return [`${value} ${lenUnit}`, lengthLabel];
                 return [value, name || ""];
               }}
             />
@@ -321,8 +326,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
             <div>
               <span className="text-gray-600 dark:text-gray-400">Size Growth Rate:</span>{" "}
               <span className="font-semibold text-blue-600 dark:text-blue-400">
-                {parseFloat(data.growth_rate_leg_span.toString()).toFixed(2)}{" "}
-                in/mo
+                {formatLengthRate(data.growth_rate_leg_span, units)}
               </span>
             </div>
           )}

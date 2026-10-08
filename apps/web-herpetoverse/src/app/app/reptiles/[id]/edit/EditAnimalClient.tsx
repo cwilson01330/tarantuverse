@@ -31,6 +31,7 @@ import { LocationField } from '@/components/LocationPicker'
 import { useAuth } from '@/lib/auth'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
+import { useUnitField } from '@/hooks/useUnitField'
 import {
   type Animal,
   type Sex,
@@ -59,7 +60,6 @@ interface FormState {
   sourceBreeder: string
   pricePaid: string
   currentWeightG: string
-  currentLengthIn: string
   /** 'auto' inherits the species CGD default; yes/no overrides it. */
   cgdOverride: 'auto' | 'yes' | 'no'
   notes: string
@@ -79,7 +79,6 @@ const EMPTY: FormState = {
   sourceBreeder: '',
   pricePaid: '',
   currentWeightG: '',
-  currentLengthIn: '',
   cgdOverride: 'auto',
   notes: '',
 }
@@ -108,7 +107,6 @@ function animalToForm(a: Animal): FormState {
     sourceBreeder: a.source_breeder ?? '',
     pricePaid: a.price_paid ?? '',
     currentWeightG: a.current_weight_g ?? '',
-    currentLengthIn: a.current_length_in ?? '',
     cgdOverride:
       a.feeds_on_cgd_override === true
         ? 'yes'
@@ -127,6 +125,10 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Length is stored in inches and typed in the keeper's units. Untouched,
+  // it saves the original stored value (no round-trip drift).
+  const lengthField = useUnitField('length')
+  const loadLength = lengthField.load
   // A co-keeper (keeper role) can edit a shared animal, but deleting it and
   // arranging enclosures stay with the owner (rung 3). The API enforces both.
   const { user } = useAuth()
@@ -143,6 +145,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
         if (cancelled) return
         setAnimal(a)
         setForm(animalToForm(a))
+        loadLength(a.current_length_in)
         setLoadError(null)
       })
       .catch((err) => {
@@ -161,7 +164,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
     return () => {
       cancelled = true
     }
-  }, [animalId])
+  }, [animalId, loadLength])
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -188,7 +191,6 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
     const numericFields: Array<[keyof FormState, string]> = [
       ['pricePaid', 'Price paid'],
       ['currentWeightG', 'Current weight'],
-      ['currentLengthIn', 'Current length'],
     ]
     for (const [key, label] of numericFields) {
       const v = (form[key] as string).trim()
@@ -196,6 +198,11 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
         setError(`${label} must be a number.`)
         return
       }
+    }
+    const lengthText = lengthField.value.trim()
+    if (lengthText !== '' && Number.isNaN(Number(lengthText.replace(',', '.')))) {
+      setError('Current length must be a number.')
+      return
     }
 
     const payload: UpdateAnimalPayload = {
@@ -212,7 +219,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
       source_breeder: nullableStr(form.sourceBreeder),
       price_paid: nullableNum(form.pricePaid),
       current_weight_g: nullableNum(form.currentWeightG),
-      current_length_in: nullableNum(form.currentLengthIn),
+      current_length_in: lengthField.toStorage(),
       feeds_on_cgd_override:
         form.cgdOverride === 'yes'
           ? true
@@ -404,15 +411,15 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
               />
             </Field>
 
-            <Field label="Current length (in)">
+            <Field label={`Current length (${lengthField.unit})`}>
               <input
                 type="number"
                 inputMode="decimal"
                 step="any"
                 min="0"
-                value={form.currentLengthIn}
-                onChange={(e) => update('currentLengthIn', e.target.value)}
-                placeholder="24"
+                value={lengthField.value}
+                onChange={(e) => lengthField.setValue(e.target.value)}
+                placeholder={lengthField.unit === 'cm' ? '61' : '24'}
                 className={INPUT_CLS}
               />
             </Field>

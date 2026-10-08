@@ -22,6 +22,8 @@
 
 import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useUnits } from '@/components/UnitsProvider'
+import { lengthValue, type Units } from '@/lib/units'
 
 /** Tiny HTML-escape — used for label text inserted into the print
  *  popup. Animal names that contain `<` or `&` would otherwise produce
@@ -141,6 +143,18 @@ export interface LabelShed {
   length_after_in?: string | null
 }
 
+/**
+ * ' (38")' / ' (96.5 cm)' after a shed date, or '' when not measured.
+ * Stored inches; printed in the owner's units (this modal is owner-only).
+ * Imperial output is unchanged from before units existed.
+ */
+export function shedLengthSuffix(lengthAfterIn: string | null | undefined, units: Units): string {
+  const lenRaw = lengthAfterIn ? Number(lengthAfterIn) : null
+  if (lenRaw == null || !Number.isFinite(lenRaw)) return ''
+  if (units === 'metric') return ` (${lengthValue(lenRaw, units)} cm)`
+  return ` (${lenRaw.toString().replace(/\.0+$/, '')}")`
+}
+
 /** "Apr 2026" — short month + year for tight label real estate. */
 function formatShedDate(iso: string): string {
   try {
@@ -175,6 +189,8 @@ interface RenderLabelOptions {
   showDomain: boolean
   /** Pre-rendered inline QR SVG markup pulled from the live preview. */
   qrSvgMarkup: string
+  /** The owner's display units for shed lengths (stored in inches). */
+  units?: Units
 }
 
 /** Sort sheds newest-first and take the most recent N — same shape used
@@ -204,22 +220,18 @@ function renderLabelHTML(opts: RenderLabelOptions): string {
     showSheds,
     showDomain,
     qrSvgMarkup,
+    units = 'imperial',
   } = opts
 
   const sexInfo = sex && SEX_LABEL[sex] ? SEX_LABEL[sex] : null
   const recentSheds = topRecentSheds(sheds, 3)
 
   // "Apr 2026 (38\") · Mar 2026 · Feb 2026 (35\")" — length suffix only
-  // when measured. Length-shedded snakes can be a couple feet long
-  // so we use the inch suffix to keep the line skimmable.
+  // when measured, in the owner's units (" for inches, "cm" for metric).
   const shedsHtml = recentSheds
     .map((s, i) => {
       const date = escapeHtml(formatShedDate(s.shed_at))
-      const lenRaw = s.length_after_in ? Number(s.length_after_in) : null
-      const len =
-        lenRaw != null && Number.isFinite(lenRaw)
-          ? ` (${lenRaw.toString().replace(/\.0+$/, '')}")`
-          : ''
+      const len = shedLengthSuffix(s.length_after_in, units)
       const sep = i < recentSheds.length - 1 ? ' · ' : ''
       return `${date}${escapeHtml(len)}${sep}`
     })
@@ -390,6 +402,8 @@ export default function ReptileQRModal({
   onClose,
   onPhotoAdded,
 }: Props) {
+  // Shed lengths print in the owner's units (only the owner opens this).
+  const { units } = useUnits()
   const [tab, setTab] = useState<Tab>('upload')
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [copied, setCopied] = useState(false)
@@ -634,6 +648,7 @@ export default function ReptileQRModal({
       showSheds,
       showDomain,
       qrSvgMarkup,
+      units,
     })
 
     const win = window.open(
@@ -1117,13 +1132,7 @@ export default function ReptileQRModal({
                           Sheds:{' '}
                         </span>
                         {recentSheds.map((s, i) => {
-                          const lenRaw = s.length_after_in
-                            ? Number(s.length_after_in)
-                            : null
-                          const len =
-                            lenRaw != null && Number.isFinite(lenRaw)
-                              ? ` (${lenRaw.toString().replace(/\.0+$/, '')}")`
-                              : ''
+                          const len = shedLengthSuffix(s.length_after_in, units)
                           return (
                             <span key={s.id}>
                               {formatShedDate(s.shed_at)}

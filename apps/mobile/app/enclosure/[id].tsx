@@ -19,6 +19,8 @@ import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatTempRange } from '../../src/lib/units';
 import { toISODateLocal } from '../../src/utils/date';
 import { getImageUrl } from '../../src/utils/image-url';
 
@@ -119,6 +121,7 @@ export default function EnclosureDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { colors, layout } = useTheme();
+  const { units } = useUnits();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [enclosure, setEnclosure] = useState<EnclosureDetail | null>(null);
   const [inhabitants, setInhabitants] = useState<Inhabitant[]>([]);
@@ -919,7 +922,7 @@ export default function EnclosureDetailScreen() {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Temperature</Text>
                 <Text style={styles.infoValue}>
-                  {enclosure.target_temp_min || '?'}°F – {enclosure.target_temp_max || '?'}°F
+                  {formatTempRange(enclosure.target_temp_min || null, enclosure.target_temp_max || null, units)}
                 </Text>
               </View>
             )}

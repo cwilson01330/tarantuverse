@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/themeStore';
 import DashboardLayout from '@/components/DashboardLayout';
 import { resetDashboardTour } from '@/components/DashboardTour';
 import LinkedAccounts from '@/components/settings/LinkedAccounts';
+import { useUnits } from '@/components/UnitsProvider';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function SettingsPage() {
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null);
+  const { units, setUnits } = useUnits();
+  const [unitsError, setUnitsError] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
@@ -191,6 +194,47 @@ export default function SettingsPage() {
 
             <div className="text-sm text-theme-secondary p-4 bg-surface-elevated rounded-lg">
               Current theme: <span className="font-semibold capitalize text-theme-primary">{theme}</span>
+            </div>
+
+            <div className="p-4 bg-surface-elevated rounded-lg">
+              <h3 className="font-semibold text-theme-primary mb-1">Units</h3>
+              <p className="text-sm text-theme-secondary mb-3">
+                Lengths and temperatures. Weights stay in grams.
+              </p>
+              <div role="radiogroup" aria-label="Units" className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'imperial', label: 'Imperial', hint: 'in, °F' },
+                  { value: 'metric', label: 'Metric', hint: 'cm, °C' },
+                ] as const).map((opt) => {
+                  const active = units === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        if (active) return
+                        setUnitsError('')
+                        setUnits(opt.value).then((ok) => {
+                          if (!ok) setUnitsError('Could not save. Check your connection and try again.')
+                        })
+                      }}
+                      className={`px-4 py-3 rounded-lg border text-left transition-colors ${
+                        active
+                          ? 'border-electric-blue-500 bg-electric-blue-50 dark:bg-electric-blue-900/30 text-theme-primary'
+                          : 'border-theme bg-surface text-theme-secondary hover:border-electric-blue-400'
+                      }`}
+                    >
+                      <span className="block font-semibold">{opt.label}</span>
+                      <span className="block text-sm">{opt.hint}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {unitsError && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{unitsError}</p>
+              )}
             </div>
 
             <button

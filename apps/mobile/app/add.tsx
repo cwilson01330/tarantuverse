@@ -60,6 +60,7 @@ import { INVERT_TAXA, INVERT_TAXON_ORDER, type InvertTaxon } from '../src/lib/in
 import { SpeciesSuggestion, taxonLabel, useSpeciesMatch } from '../src/components/SpeciesSuggestion';
 import { careLevelMeta } from '../src/components/caresheet';
 import { useAuth } from '../src/contexts/AuthContext';
+import { formatTempRange } from '../src/lib/units';
 import { SPACING, TYPE } from '../src/theme/tokens';
 import { LocationPicker } from '../src/components/LocationPicker';
 import { MEMBER_APP, loadSharedWithMe } from '../src/lib/co-keepers';
@@ -138,7 +139,7 @@ function AddScreen() {
   } = useLocalSearchParams<{ speciesId?: string; collection?: string; enclosureId?: string }>();
   const collection = typeof collectionParam === 'string' && collectionParam ? collectionParam : null;
   const enclosureId = !collection && typeof enclosureParam === 'string' && enclosureParam ? enclosureParam : null;
-  const { user } = useAuth();
+  const { user, units } = useAuth();
   // Whose collection this lands in, for the banner. Null = your own.
   const [ownerName, setOwnerName] = useState<string | null>(null);
   useEffect(() => {
@@ -264,11 +265,11 @@ function AddScreen() {
     if (picked.substrate_type) out.push(picked.substrate_type);
     if (picked.substrate_depth) out.push(`${picked.substrate_depth} deep`);
     if (picked.temperature_min && picked.temperature_max)
-      out.push(`${picked.temperature_min}–${picked.temperature_max}°F`);
+      out.push(formatTempRange(picked.temperature_min, picked.temperature_max, units) ?? '');
     if (picked.humidity_min && picked.humidity_max)
       out.push(`${picked.humidity_min}–${picked.humidity_max}%`);
     return out;
-  }, [picked, lifeStage, mode]);
+  }, [picked, lifeStage, mode, units]);
 
   const displayName = nickname || commonName || scientificName || 'animal';
   const canSave = !!(scientificName.trim() || commonName.trim() || nickname.trim());

@@ -12,6 +12,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/hooks/useAuth'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatTempRange } from '@/lib/units'
 import { ROLE_LABEL, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 import DashboardLayout from '@/components/DashboardLayout'
 import ColonyPopulationChart from '@/components/ColonyPopulationChart'
@@ -133,6 +135,7 @@ export default function ColonyDetailPage() {
   const params = useParams<{ id: string }>()
   const colonyId = params?.id
   const { token, user, isAuthenticated, isLoading } = useAuth()
+  const { units } = useUnits()
 
   const [colony, setColony] = useState<ColonyResponse | null>(null)
   // Co-keepers: hide what this viewer's role can't do. The API enforces it.
@@ -1182,7 +1185,7 @@ export default function ColonyDetailPage() {
                 <div>
                   <div className="text-theme-tertiary">Temperature</div>
                   <div className="text-theme-primary font-medium">
-                    {colony.target_temp_min ?? '?'}–{colony.target_temp_max ?? '?'} °F
+                    {formatTempRange(colony.target_temp_min, colony.target_temp_max, units)}
                   </div>
                 </div>
               )}

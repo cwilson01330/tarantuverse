@@ -18,6 +18,9 @@ import DashboardLayout from '@/components/DashboardLayout'
 import ChangeTaxonDialog, { describeTaxonChangeFailure } from '@/components/ChangeTaxonDialog'
 import { INVERT_TAXA, isInvertTaxon, stageCountLabel, type InvertTaxon } from '@/lib/inverts'
 import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
+import { useUnitField } from '@/hooks/useUnitField'
+import { useUnits } from '@/components/UnitsProvider'
+import { withMmUnit } from '@/lib/units'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -38,6 +41,15 @@ export default function EditInvertPage() {
   // animal whose stored link is stale (or in another taxon) can still have
   // its nickname edited without the whole save being rejected.
   const [loadedSpeciesId, setLoadedSpeciesId] = useState<string | null>(null)
+  // Stored in mm / °F, edited in the keeper's units. Untouched fields save
+  // their original value, so opening and saving never drifts them.
+  const { units } = useUnits()
+  const sizeField = useUnitField('lengthMm')
+  const tempMinField = useUnitField('temp')
+  const tempMaxField = useUnitField('temp')
+  const loadSize = sizeField.load
+  const loadTempMin = tempMinField.load
+  const loadTempMax = tempMaxField.load
 
   useEffect(() => {
     if (isLoading) return
@@ -54,6 +66,9 @@ export default function EditInvertPage() {
         const loaded = await res.json()
         setForm(loaded)
         setLoadedSpeciesId(loaded?.species_id ?? null)
+        loadSize(loaded?.current_length_mm)
+        loadTempMin(loaded?.target_temp_min)
+        loadTempMax(loaded?.target_temp_max)
       } catch {
         alert('Could not load this animal.')
         router.back()
@@ -61,7 +76,7 @@ export default function EditInvertPage() {
         setLoading(false)
       }
     })()
-  }, [id, token, isAuthenticated, isLoading, router])
+  }, [id, token, isAuthenticated, isLoading, router, loadSize, loadTempMin, loadTempMax])
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }))
   const isOwner = !!form?.user_id && !!user?.id && form.user_id === user.id
@@ -114,7 +129,7 @@ export default function EditInvertPage() {
           ...((form.species_id ?? null) !== loadedSpeciesId ? { species_id: form.species_id ?? null } : {}),
           sex: form.sex,
           current_instar: form.current_instar,
-          current_length_mm: form.current_length_mm,
+          current_length_mm: sizeField.toStorage(),
           date_acquired: form.date_acquired || null,
           source: form.source || null,
           price_paid: form.price_paid || null,
@@ -123,8 +138,8 @@ export default function EditInvertPage() {
           location: form.location ?? null,
           substrate_type: form.substrate_type,
           substrate_depth: form.substrate_depth,
-          target_temp_min: form.target_temp_min,
-          target_temp_max: form.target_temp_max,
+          target_temp_min: tempMinField.toStorage(),
+          target_temp_max: tempMaxField.toStorage(),
           target_humidity_min: form.target_humidity_min,
           target_humidity_max: form.target_humidity_max,
           water_dish: form.water_dish,
@@ -229,7 +244,7 @@ export default function EditInvertPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label={stageCountLabel(form.taxon)}><input value={form.current_instar ?? ''} onChange={(e) => set('current_instar', e.target.value ? Number(e.target.value) : null)} inputMode="numeric" className={inputCls} /></Field>
-                <Field label={meta?.sizeLabel ?? 'Size (mm)'}><input value={form.current_length_mm ?? ''} onChange={(e) => set('current_length_mm', e.target.value)} inputMode="decimal" className={inputCls} /></Field>
+                <Field label={withMmUnit(meta?.sizeLabel ?? 'Size', units)}><input value={sizeField.value} onChange={(e) => sizeField.setValue(e.target.value)} inputMode="decimal" className={inputCls} /></Field>
               </div>
 
               {form.taxon === 'tarantula' && (
@@ -280,8 +295,8 @@ export default function EditInvertPage() {
               <Field label="Substrate type"><input value={form.substrate_type ?? ''} onChange={(e) => set('substrate_type', e.target.value)} className={inputCls} /></Field>
               <Field label="Substrate depth"><input value={form.substrate_depth ?? ''} onChange={(e) => set('substrate_depth', e.target.value)} className={inputCls} /></Field>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Temp min (°F)"><input value={form.target_temp_min ?? ''} onChange={(e) => set('target_temp_min', e.target.value)} inputMode="decimal" className={inputCls} /></Field>
-                <Field label="Temp max (°F)"><input value={form.target_temp_max ?? ''} onChange={(e) => set('target_temp_max', e.target.value)} inputMode="decimal" className={inputCls} /></Field>
+                <Field label={`Temp min (${tempMinField.unit})`}><input value={tempMinField.value} onChange={(e) => tempMinField.setValue(e.target.value)} inputMode="decimal" className={inputCls} /></Field>
+                <Field label={`Temp max (${tempMaxField.unit})`}><input value={tempMaxField.value} onChange={(e) => tempMaxField.setValue(e.target.value)} inputMode="decimal" className={inputCls} /></Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Humidity min %"><input value={form.target_humidity_min ?? ''} onChange={(e) => set('target_humidity_min', e.target.value)} inputMode="decimal" className={inputCls} /></Field>

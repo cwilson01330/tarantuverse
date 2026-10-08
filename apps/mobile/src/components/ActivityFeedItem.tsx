@@ -3,6 +3,8 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useUnits } from '../hooks/useUnits';
+import { formatLength } from '../lib/units';
 
 export type ActionType =
   | 'new_tarantula'
@@ -57,6 +59,8 @@ interface Props {
 export default function ActivityFeedItem({ activity }: Props) {
   const router = useRouter();
   const { colors } = useTheme();
+  // Molt sizes are stored in inches; shown in the viewer's units.
+  const { units } = useUnits();
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -132,7 +136,7 @@ export default function ActivityFeedItem({ activity }: Props) {
           tarantulaName: meta.tarantula_name,
           speciesName: meta.species_name,
           thumbnailUrl: meta.thumbnail_url,
-          subtitle: meta.leg_span_after ? `New leg span: ${meta.leg_span_after}"` : undefined,
+          subtitle: meta.leg_span_after ? `New leg span: ${formatLength(meta.leg_span_after, units)}` : undefined,
           onPress: openTarantulaProfile(),
         };
 

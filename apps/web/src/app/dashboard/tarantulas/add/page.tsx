@@ -8,6 +8,8 @@ import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
 import UpgradeModal from '@/components/UpgradeModal'
+import { useUnits } from '@/components/UnitsProvider'
+import { parseTempInput, tempUnit } from '@/lib/units'
 
 interface SelectedSpecies {
   id: string
@@ -22,6 +24,8 @@ function AddTarantulaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, token, isAuthenticated, isLoading } = useAuth()
+  // Temps are typed in the keeper's units and stored in °F.
+  const { units } = useUnits()
   const [formData, setFormData] = useState({
     name: '',
     common_name: '',
@@ -133,8 +137,8 @@ function AddTarantulaContent() {
         substrate_type: formData.substrate_type || null,
         substrate_depth: formData.substrate_depth || null,
         last_substrate_change: formData.last_substrate_change || null,
-        target_temp_min: formData.target_temp_min ? parseInt(formData.target_temp_min) : null,
-        target_temp_max: formData.target_temp_max ? parseInt(formData.target_temp_max) : null,
+        target_temp_min: parseTempInput(formData.target_temp_min, units),
+        target_temp_max: parseTempInput(formData.target_temp_max, units),
         target_humidity_min: formData.target_humidity_min ? parseInt(formData.target_humidity_min) : null,
         target_humidity_max: formData.target_humidity_max ? parseInt(formData.target_humidity_max) : null,
         water_dish: formData.water_dish,
@@ -421,7 +425,7 @@ function AddTarantulaContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Target Temperature (°F)</label>
+                  <label className="block text-sm font-medium mb-1">Target Temperature ({tempUnit(units)})</label>
                   <div className="flex gap-2 items-center">
                     <input
                       type="number"

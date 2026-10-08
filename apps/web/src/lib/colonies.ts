@@ -32,6 +32,7 @@ export type ColonyTaxon =
   | 'millipede'
   | 'mantis'
   | 'roach'
+  | 'isopod'
   | 'other'
 
 export type ColonySource = 'bought' | 'bred' | 'wild_caught'
@@ -660,7 +661,7 @@ export const PREDATOR_FOODS = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm
 export const DETRITIVORE_FOODS = ['Veg / greens', 'Fruit', 'Dry gutload', 'Protein (fish flake)', 'Leaf litter', 'Other']
 
 export function colonyFoodTypes(taxon: string | null | undefined): string[] {
-  return taxon === 'roach' || taxon === 'millipede' ? DETRITIVORE_FOODS : PREDATOR_FOODS
+  return taxon === 'roach' || taxon === 'millipede' || taxon === 'isopod' ? DETRITIVORE_FOODS : PREDATOR_FOODS
 }
 
 /** Prey size is a live-prey concept — a handful of greens has no "Medium". */

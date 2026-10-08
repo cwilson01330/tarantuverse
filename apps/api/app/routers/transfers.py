@@ -572,9 +572,13 @@ async def _claim_animal_transfer(
 ) -> dict:
     """HV claim path — create a new Animal owned by the buyer, copy photos,
     badge the source animal handed-off. Mirrors the invert claim (§5)."""
-    source = db.query(Animal).filter(Animal.id == transfer.animal_id).first()
+    source = (
+        db.query(Animal).filter(Animal.id == transfer.animal_id)
+        .with_for_update().populate_existing().first()
+    )
     if not source:
         raise HTTPException(status_code=404, detail="The source animal no longer exists.")
+    _refuse_handed_off_source(source)
 
     snap = transfer.snapshot or {}
     snap_for_record = {**snap, "transferred_at": _now().isoformat()}
@@ -937,6 +941,16 @@ async def _claim_colony_transfer(
     }
 
 
+def _refuse_handed_off_source(source) -> None:
+    """One animal, one claim. A keeper can have several pending links for the
+    same animal; the first claim moves it, and every later one must fail rather
+    than mint a second copy. A died animal can't be handed over either."""
+    if getattr(source, "transferred_out_at", None) is not None:
+        raise HTTPException(status_code=409, detail="This animal has already been transferred to another keeper.")
+    if getattr(source, "died_at", None) is not None:
+        raise HTTPException(status_code=409, detail="This animal is no longer available to transfer.")
+
+
 @router.post("/transfers/{token}/claim")
 @policy("owner_only")
 async def claim_transfer(
@@ -974,6 +988,20 @@ async def claim_transfer(
     if transfer.from_user_id == current_user.id:
         raise HTTPException(status_code=400, detail="You can't claim your own transfer.")
 
+    # Serialize claims: lock the transfer row and re-check it, so two claims of
+    # the same link at the same moment can't both create an animal (fresh
+    # audit 2026-10-08). The colony path re-locks in the same transaction.
+    locked = (
+        db.query(AnimalTransfer)
+        .filter(AnimalTransfer.id == transfer.id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if locked is None or locked.status != "pending":
+        raise HTTPException(status_code=409, detail="This transfer has already been claimed.")
+    transfer = locked
+
     # HV animals take the parallel claim path (creates an Animal, not an Invert).
     if transfer.animal_id is not None:
         return await _claim_animal_transfer(db, transfer, current_user, body)
@@ -981,9 +1009,13 @@ async def claim_transfer(
     if transfer.colony_id is not None:
         return await _claim_colony_transfer(db, transfer, current_user, body)
 
-    source = db.query(Invert).filter(Invert.id == transfer.invert_id).first()
+    source = (
+        db.query(Invert).filter(Invert.id == transfer.invert_id)
+        .with_for_update().populate_existing().first()
+    )
     if not source:
         raise HTTPException(status_code=404, detail="The source animal no longer exists.")
+    _refuse_handed_off_source(source)
 
     snap = transfer.snapshot or {}
     snap_for_record = {**snap, "transferred_at": _now().isoformat()}

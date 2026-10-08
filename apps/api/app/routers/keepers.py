@@ -9,14 +9,20 @@ from app.database import get_db
 from app.models.user import User
 from app.utils.test_accounts import real_user_clause
 from app.models.tarantula import Tarantula
-from app.schemas.user import UserResponse
+from app.schemas.user import PublicKeeperResponse
 from app.schemas.tarantula import TarantulaResponse
 from app.utils.dependencies import get_current_user_optional
 
 router = APIRouter()
 
+# Owner-only fields blanked when someone else views a public collection.
+PRIVATE_ANIMAL_FIELDS_CLEARED = {
+    "price_paid": None, "source": None, "notes": None, "enclosure_notes": None,
+    "death_notes": None, "location": None, "enclosure_id": None,
+}
 
-@router.get("/", response_model=List[UserResponse])
+
+@router.get("/", response_model=List[PublicKeeperResponse])
 async def list_public_keepers(
     experience_level: Optional[str] = Query(None, description="Filter by experience level"),
     specialty: Optional[str] = Query(None, description="Filter by specialty"),
@@ -61,10 +67,10 @@ async def list_public_keepers(
     # Apply pagination
     keepers = query.offset(offset).limit(limit).all()
     
-    return [UserResponse.from_orm(keeper) for keeper in keepers]
+    return [PublicKeeperResponse.model_validate(keeper) for keeper in keepers]
 
 
-@router.get("/{username}/", response_model=UserResponse)
+@router.get("/{username}/", response_model=PublicKeeperResponse)
 async def get_keeper_profile(
     username: str,
     db: Session = Depends(get_db),
@@ -94,7 +100,7 @@ async def get_keeper_profile(
             detail="This keeper's profile is private"
         )
 
-    return UserResponse.from_orm(user)
+    return PublicKeeperResponse.model_validate(user)
 
 
 @router.get("/{username}/collection/", response_model=List[TarantulaResponse])
@@ -144,7 +150,13 @@ async def get_keeper_collection(
             )
         ).order_by(Tarantula.created_at.desc()).all()
 
-    return [TarantulaResponse.from_orm(t) for t in tarantulas]
+    rows = [TarantulaResponse.from_orm(t) for t in tarantulas]
+    if is_own_profile:
+        return rows
+    # Visitors see the animal, not the keeper's private records: what it cost,
+    # where it came from, notes, where it lives, and death notes stay owner-only
+    # (as on /t, which shows source and notes to the owner alone).
+    return [r.model_copy(update=PRIVATE_ANIMAL_FIELDS_CLEARED) for r in rows]
 
 
 @router.get("/{username}/stats/")

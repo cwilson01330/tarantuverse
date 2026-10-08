@@ -318,9 +318,19 @@ async def update_profile(
     - **profile_specialties**: Array of specialties (e.g., ['arboreal', 'breeding'])
     - **social_links**: Social media links (JSON object)
     - **collection_visibility**: 'private' or 'public'
+    - **measurement_units**: 'imperial' or 'metric' (display only)
     """
     # Update only provided fields
     update_data = profile_data.model_dump(exclude_unset=True)
+
+    # The schema already limits the value to imperial/metric. An explicit
+    # null would reset the keeper to "never chosen" and make every client
+    # re-guess from its region, so it is refused rather than stored.
+    if 'measurement_units' in update_data and update_data['measurement_units'] is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="measurement_units must be 'imperial' or 'metric'"
+        )
 
     # Validate collection_visibility if provided
     if 'collection_visibility' in update_data:

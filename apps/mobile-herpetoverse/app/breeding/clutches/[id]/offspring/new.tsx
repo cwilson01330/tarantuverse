@@ -41,6 +41,8 @@ import {
   todayISO,
 } from '../../../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../../../src/contexts/ThemeContext';
+import { useUnits } from '../../../../../src/hooks/useUnits';
+import { lengthUnit, parseLengthInput } from '../../../../../src/lib/units';
 import UpgradeModal from '../../../../../src/components/UpgradeModal';
 import {
   OFFSPRING_STATUS_LABEL,
@@ -75,6 +77,9 @@ function NewOffspringScreen() {
   const router = useRouter();
   const { id: clutchId } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  // Hatch length is typed in the keeper's units (in or cm), stored inches.
+  const { units } = useUnits();
+  const lengthMax = units === 'metric' ? 76 : 30;
 
   const [morphLabel, setMorphLabel] = useState('');
   const [status, setStatus] = useState<OffspringStatus>('hatched');
@@ -116,9 +121,9 @@ function NewOffspringScreen() {
       setError(weight.error);
       return;
     }
-    // Length in inches. 30 is a generous ceiling — boa hatchlings
-    // are the longest at ~22-26 inches.
-    const length = parsePositive(hatchLength, 'Hatch length', 30);
+    // 30 in (76 cm) is a generous ceiling — boa hatchlings are the
+    // longest at ~22-26 inches.
+    const length = parsePositive(hatchLength, 'Hatch length', lengthMax);
     if (!length.ok) {
       setError(length.error);
       return;
@@ -132,7 +137,7 @@ function NewOffspringScreen() {
         status,
         status_date: statusIso,
         hatch_weight_g: weight.value,
-        hatch_length_in: length.value,
+        hatch_length_in: parseLengthInput(length.value, units),
         notes: notes.trim() || null,
       };
       const created = await createOffspring(payload);
@@ -220,11 +225,11 @@ function NewOffspringScreen() {
               </Field>
             </View>
             <View style={styles.col}>
-              <Field label="Hatch length (in)" hint="Optional. 0–30.">
+              <Field label={`Hatch length (${lengthUnit(units)})`} hint={`Optional. 0–${lengthMax}.`}>
                 <ThemedInput
                   value={hatchLength}
                   onChangeText={setHatchLength}
-                  placeholder="e.g. 16"
+                  placeholder={units === 'metric' ? 'e.g. 40' : 'e.g. 16'}
                   keyboardType="decimal-pad"
                 />
               </Field>

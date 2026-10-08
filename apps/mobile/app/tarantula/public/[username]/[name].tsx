@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useTheme } from '../../../../src/contexts/ThemeContext'
+import { useUnits } from '../../../../src/hooks/useUnits'
+import { formatLength, lengthUnit, lengthValue } from '../../../../src/lib/units'
 
 interface TarantulaPublicProfile {
   tarantula: {
@@ -58,6 +60,8 @@ export default function PublicTarantulaProfile() {
   const params = useLocalSearchParams()
   const router = useRouter()
   const { colors: theme } = useTheme()
+  // Leg spans are stored in inches; shown in the viewer's units.
+  const { units } = useUnits()
   // Used so the header respects the iOS status bar / Dynamic Island
   // inset and the bottom scroll edge respects the home indicator.
   // This screen doesn't live under a tab navigator (it's pushed from
@@ -200,7 +204,7 @@ export default function PublicTarantulaProfile() {
   // Most recent molt's leg-span, if the keeper logged one.
   const latestMolt = profile.molt_timeline[0]
   const legSpan = latestMolt?.leg_span_after
-    ? `${latestMolt.leg_span_after}" leg span`
+    ? `${formatLength(latestMolt.leg_span_after, units)} leg span`
     : null
 
   // Type from species catalog (terrestrial / arboreal / fossorial).
@@ -601,9 +605,9 @@ export default function PublicTarantulaProfile() {
               </Text>
               {(molt.leg_span_before !== undefined && molt.leg_span_after !== undefined) && (
                 <View style={{ marginBottom: 8 }}>
-                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Leg Span</Text>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Leg Span ({lengthUnit(units)})</Text>
                   <Text style={{ fontSize: 14, color: theme.textPrimary, fontWeight: '600' }}>
-                    {molt.leg_span_before}" → {molt.leg_span_after}"
+                    {lengthValue(molt.leg_span_before, units)} → {lengthValue(molt.leg_span_after, units)}
                   </Text>
                 </View>
               )}

@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatTempRange } from '../../src/lib/units';
 import { KeeperSignalsBlock } from '../../src/components/KeeperSignalsBlock';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -74,6 +76,8 @@ interface Species {
 
 export default function SpeciesDetailScreen() {
   const { colors } = useTheme();
+  // Stored mm / °F; shown in the keeper's units.
+  const { units } = useUnits();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     id?: string;
@@ -249,7 +253,7 @@ export default function SpeciesDetailScreen() {
                 icon: 'thermometer',
                 value:
                   species.temperature_min && species.temperature_max
-                    ? `${species.temperature_min}–${species.temperature_max}°F`
+                    ? formatTempRange(species.temperature_min, species.temperature_max, units)
                     : null,
                 label: 'Temp',
               },

@@ -12,6 +12,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatTempRange } from '@/lib/units'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -81,6 +83,8 @@ function stageLabel(key: string): string {
 }
 
 export default function ColonyPublicClient() {
+  // The VIEWER's units (their setting, or their browser region when signed out).
+  const { units } = useUnits()
   const params = useParams()
   const id = params?.id as string
 
@@ -239,7 +243,7 @@ export default function ColonyPublicClient() {
               Care at a glance
             </p>
             {(sp.temperature_min || sp.temperature_max) && (
-              <Row label="Temperature" value={`${sp.temperature_min ?? '?'}–${sp.temperature_max ?? '?'} °F`} />
+              <Row label="Temperature" value={formatTempRange(sp.temperature_min, sp.temperature_max, units) ?? ''} />
             )}
             {(sp.humidity_min || sp.humidity_max) && (
               <Row label="Humidity" value={`${sp.humidity_min ?? '?'}–${sp.humidity_max ?? '?'}%`} />

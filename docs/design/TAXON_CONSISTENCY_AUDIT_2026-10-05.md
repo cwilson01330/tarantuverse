@@ -95,12 +95,14 @@ module.
 
 ## Follow-up: units preference (requested 2026-10-05)
 
+**[DONE 2026-10-08: `users.measurement_units` (migration `unt_20261008`), length in↔cm/mm and °F↔°C on every TV + HV edge, share cards in the author's units. Weight stays grams by decision.]**
+
 UK and most non-US keepers measure in centimetres. Plan:
 - Storage stays inches (one source of truth).
 - `users.measurement_units` = `imperial` | `metric`. It defaults from the device region on first launch (US, Liberia and Myanmar → imperial, everywhere else → metric), syncs across devices, and can be switched in Settings on web and mobile.
 - Convert at the edges: molt forms (input), growth charts, molt history, share cards, QR labels, public pages and exports. One helper per platform (`formatLength`, `parseLength`), plus a server helper for share cards and exports.
 - Herpetoverse weight/length fields should follow the same setting.
 
-To stop the drift recurring: one shared taxon registry module that the secondary lists
+**[DONE 2026-10-08: `apps/api/tests/test_taxon_lists_in_sync.py` fails when a taxon is missing from any complete list; deliberate subsets are allow-listed with a reason. HV taxa not yet covered.]** To stop the drift recurring: one shared taxon registry module that the secondary lists
 import, rather than copy; a test that fails when a taxon value is missing from any list;
 and a rule that new collection features must name their colony and HV story in the plan.

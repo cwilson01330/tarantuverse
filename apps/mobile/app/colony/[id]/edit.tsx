@@ -41,6 +41,7 @@ import {
 import { getErrorMessage } from '../../../src/utils/errors';
 import { LocationPicker } from '../../../src/components/LocationPicker';
 import { parseLocalDate, toISODateLocal } from '../../../src/utils/date';
+import { useUnitField } from '../../../src/hooks/useUnitField';
 
 const SOURCE_OPTIONS: { value: Source; label: string }[] = [
   { value: 'bred', label: 'Captive bred' },
@@ -101,8 +102,11 @@ export default function EditColonyScreen() {
   const [enclosureSize, setEnclosureSize] = useState('');
   const [substrateType, setSubstrateType] = useState('');
   const [substrateDepth, setSubstrateDepth] = useState('');
-  const [tempMin, setTempMin] = useState('');
-  const [tempMax, setTempMax] = useState('');
+  // Stored in °F; typed in the keeper's units.
+  const tempMin = useUnitField('temp');
+  const tempMax = useUnitField('temp');
+  const loadTempMin = tempMin.load;
+  const loadTempMax = tempMax.load;
   const [humidityMin, setHumidityMin] = useState('');
   const [humidityMax, setHumidityMax] = useState('');
   const [waterDish, setWaterDish] = useState(false);
@@ -141,8 +145,8 @@ export default function EditColonyScreen() {
       // Putting a number straight into state is what made `tempMin.trim()`
       // throw and kill the save silently — the old type said `string | null`
       // and was simply wrong.
-      setTempMin(toStr(c.target_temp_min));
-      setTempMax(toStr(c.target_temp_max));
+      loadTempMin(c.target_temp_min);
+      loadTempMax(c.target_temp_max);
       setHumidityMin(toStr(c.target_humidity_min));
       setHumidityMax(toStr(c.target_humidity_max));
       setWaterDish(c.water_dish);
@@ -161,7 +165,7 @@ export default function EditColonyScreen() {
     } finally {
       setLoading(false);
     }
-  }, [colonyId]);
+  }, [colonyId, loadTempMin, loadTempMax]);
 
   useEffect(() => {
     loadColony();
@@ -254,8 +258,8 @@ export default function EditColonyScreen() {
         enclosure_size: toStr(enclosureSize).trim() || null,
         substrate_type: toStr(substrateType).trim() || null,
         substrate_depth: toStr(substrateDepth).trim() || null,
-        target_temp_min: numOrNull(tempMin),
-        target_temp_max: numOrNull(tempMax),
+        target_temp_min: tempMin.toStorage(),
+        target_temp_max: tempMax.toStorage(),
         target_humidity_min: numOrNull(humidityMin),
         target_humidity_max: numOrNull(humidityMax),
         water_dish: waterDish,
@@ -468,13 +472,13 @@ export default function EditColonyScreen() {
           </Field>
           <View style={styles.row}>
             <View style={styles.rowCol}>
-              <Field label="Temp min (°F)">
-                <TextInput style={styles.input} placeholder="72" placeholderTextColor={colors.textTertiary} value={tempMin} onChangeText={setTempMin} keyboardType="number-pad" />
+              <Field label={`Temp min (${tempMin.unit})`}>
+                <TextInput style={styles.input} placeholder={tempMin.unit === '°C' ? '22' : '72'} placeholderTextColor={colors.textTertiary} value={tempMin.value} onChangeText={tempMin.setValue} keyboardType="decimal-pad" />
               </Field>
             </View>
             <View style={styles.rowCol}>
-              <Field label="Temp max (°F)">
-                <TextInput style={styles.input} placeholder="82" placeholderTextColor={colors.textTertiary} value={tempMax} onChangeText={setTempMax} keyboardType="number-pad" />
+              <Field label={`Temp max (${tempMax.unit})`}>
+                <TextInput style={styles.input} placeholder={tempMax.unit === '°C' ? '28' : '82'} placeholderTextColor={colors.textTertiary} value={tempMax.value} onChangeText={tempMax.setValue} keyboardType="decimal-pad" />
               </Field>
             </View>
           </View>

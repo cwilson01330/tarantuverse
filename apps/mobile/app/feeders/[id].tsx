@@ -18,6 +18,8 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatTempRange } from '../../src/lib/units';
 
 type InventoryMode = 'count' | 'life_stage';
 type LogType =
@@ -195,6 +197,8 @@ export default function FeederColonyDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const colonyId = params.id;
   const { colors, layout } = useTheme();
+  // Stored °F; shown in the keeper's units.
+  const { units } = useUnits();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [colony, setColony] = useState<FeederColony | null>(null);
@@ -462,7 +466,7 @@ export default function FeederColonyDetailScreen() {
           ? `${careSpecies.care_level.charAt(0).toUpperCase()}${careSpecies.care_level.slice(1)} care`
           : null,
         careSpecies.temperature_min != null && careSpecies.temperature_max != null
-          ? `${careSpecies.temperature_min}–${careSpecies.temperature_max}°F`
+          ? formatTempRange(careSpecies.temperature_min, careSpecies.temperature_max, units)
           : null,
         careSpecies.humidity_min != null && careSpecies.humidity_max != null
           ? `${careSpecies.humidity_min}–${careSpecies.humidity_max}% RH`

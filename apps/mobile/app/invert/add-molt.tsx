@@ -16,6 +16,7 @@ import { COPY as LIFECYCLE_COPY, pronounsFor } from '../../src/lib/lifecycle-cop
 import { requestMarkDied } from '../../src/lib/pending-intent';
 import { finalMoltCopy, growthLengthLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
+import { useUnitField } from '../../src/hooks/useUnitField';
 
 /** successful / stuck / lost_limb / fatal — the backend vocabulary. Finer
  *  gradations would be guesses about a process the keeper mostly didn't watch. */
@@ -45,8 +46,11 @@ export default function AddInvertMoltScreen() {
   const [notes, setNotes] = useState(notesParam || '');
   // Optional measurements (ADR-008 growth module). Stored on the legacy
   // leg_span_* columns; the label adapts per taxon (leg span vs body length).
-  const [lengthBefore, setLengthBefore] = useState('');
-  const [lengthAfter, setLengthAfter] = useState('');
+  // Stored in INCHES for every taxon, typed in the keeper's units (cm or in).
+  const lengthBefore = useUnitField('length');
+  const lengthAfter = useUnitField('length');
+  const loadBefore = lengthBefore.load;
+  const loadAfter = lengthAfter.load;
   const [weightBefore, setWeightBefore] = useState('');
   const [weightAfter, setWeightAfter] = useState('');
   /** When premolt was first observed. Optional, and genuinely often unknown —
@@ -79,8 +83,8 @@ export default function AddInvertMoltScreen() {
   useEffect(() => {
     if (!logId) return;
     getInvertMolt(logId).then((m) => {
-      if (m.leg_span_before != null) setLengthBefore(String(m.leg_span_before));
-      if (m.leg_span_after != null) setLengthAfter(String(m.leg_span_after));
+      loadBefore(m.leg_span_before);
+      loadAfter(m.leg_span_after);
       if (m.outcome) setOutcome(m.outcome);
       if (m.complication_notes) setComplication(m.complication_notes);
       if (m.is_ultimate) setIsUltimate(true);
@@ -91,7 +95,7 @@ export default function AddInvertMoltScreen() {
         setPremoltStart(toISODateLocal(new Date(m.premolt_started_at)));
       }
     }).catch(() => {});
-  }, [logId]);
+  }, [logId, loadBefore, loadAfter]);
 
   const lengthLabel = growthLengthLabel(taxon ?? '');
 
@@ -113,8 +117,8 @@ export default function AddInvertMoltScreen() {
         premolt_started_at: hasPremoltStart
           ? new Date(premoltStart + 'T12:00:00').toISOString()
           : null,
-        leg_span_before: parseMeasure(lengthBefore),
-        leg_span_after: parseMeasure(lengthAfter),
+        leg_span_before: lengthBefore.toStorage(),
+        leg_span_after: lengthAfter.toStorage(),
         weight_before: parseMeasure(weightBefore),
         weight_after: parseMeasure(weightAfter),
         outcome: outcome || null,
@@ -210,10 +214,10 @@ export default function AddInvertMoltScreen() {
           </Field>
           <View style={styles.measureRow}>
             <View style={styles.measureCol}>
-              <Field label={`${lengthLabel} before (in)`} colors={colors}><TextInput style={styles.input} value={lengthBefore} onChangeText={setLengthBefore} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
+              <Field label={`${lengthLabel} before (${lengthBefore.unit})`} colors={colors}><TextInput style={styles.input} value={lengthBefore.value} onChangeText={lengthBefore.setValue} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
             </View>
             <View style={styles.measureCol}>
-              <Field label={`${lengthLabel} after (in)`} colors={colors}><TextInput style={styles.input} value={lengthAfter} onChangeText={setLengthAfter} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
+              <Field label={`${lengthLabel} after (${lengthAfter.unit})`} colors={colors}><TextInput style={styles.input} value={lengthAfter.value} onChangeText={lengthAfter.setValue} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
             </View>
           </View>
           <View style={styles.measureRow}>

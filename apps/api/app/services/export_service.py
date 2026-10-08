@@ -45,6 +45,7 @@ from app.models.animal_genotype import AnimalGenotype
 from app.models.reptile_pairing import ReptilePairing
 from app.models.clutch import Clutch
 from app.models.reptile_offspring import ReptileOffspring
+from app.utils.units import EXPORT_UNITS
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +214,7 @@ USER_PROFILE_FIELDS = [
     "id", "email", "username", "display_name", "avatar_url", "bio",
     "profile_bio", "profile_location", "profile_experience_level",
     "profile_years_keeping", "profile_specialties", "social_links",
-    "is_breeder", "collection_visibility", "created_at",
+    "is_breeder", "collection_visibility", "measurement_units", "created_at",
 ]
 
 # --- Herpetoverse (reptile/amphibian) field lists ---
@@ -502,6 +503,8 @@ class ExportService:
             "export_version": "1.0",
             "exported_at": datetime.utcnow().isoformat(),
             "platform": "tarantuverse",
+            # Exports keep storage units, whatever the keeper displays.
+            "units": EXPORT_UNITS,
             "user": data["profile"],
             # `inverts` is the complete animal list across all eleven taxa.
             # `tarantulas` is the legacy tarantula-only view of the same rows,
@@ -761,6 +764,8 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, 
                 "exported_at": datetime.utcnow().isoformat(),
                 "platform": "tarantuverse",
                 "username": username,
+                # Exports keep storage units, whatever the keeper displays.
+                "units": EXPORT_UNITS,
             }, indent=2))
             zf.writestr("profile.json", json.dumps(data["profile"], indent=2, default=str))
 
@@ -874,6 +879,11 @@ Files included:
   colony_events.csv     – Colony population events (if any)
   profile.json          – Your profile information
 
+Units: every number is in the units it is stored in, whatever your
+Settings > Units choice is. Lengths are in inches (molt leg span / body
+length), except fields ending in _mm, which are millimetres. Temperatures
+are in degrees Fahrenheit. Weights are in grams.
+
 To re-import your tarantulas into Tarantuverse, use the Import feature
 in Dashboard > Collection > Import and upload tarantulas.csv.
 
@@ -904,6 +914,11 @@ Structure:
   all_substrate_changes.csv   – Substrate changes in spreadsheet format
   all_care_logs.csv           – Water, overflow and misting records
   all_colonies.csv            – Colonies (if any)
+
+Units: every number is in the units it is stored in, whatever your
+Settings > Units choice is. Lengths are in inches (molt leg span / body
+length), except fields ending in _mm, which are millimetres. Temperatures
+are in degrees Fahrenheit. Weights are in grams.
 
 To re-import your animals into Tarantuverse, use the Import feature in
 Dashboard > Collection > Import and upload all_animals.csv.

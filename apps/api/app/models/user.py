@@ -1,7 +1,7 @@
 """
 User model
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey
+from sqlalchemy import CheckConstraint, Column, String, Boolean, DateTime, Text, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -29,8 +29,17 @@ FREE_TIER_MAX_TARANTULAS = 15
 HV_FREE_TIER_MAX_ANIMALS = 5
 
 
+MEASUREMENT_UNITS = ("imperial", "metric")
+
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "measurement_units IS NULL OR measurement_units IN ('imperial', 'metric')",
+            name="users_measurement_units_check",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
@@ -95,6 +104,12 @@ class User(Base):
     # shown after the first completed Feeding Day batch. NULL = never shown.
     # On the user, not the device, so it can't reappear on a second phone.
     premium_intro_seen_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Display units: 'imperial' (in, °F) or 'metric' (cm, °C). NULL = never
+    # chosen; clients default from the device/browser region and save it once.
+    # Display only -- storage stays inches / mm / °F / grams whatever this is
+    # (see utils/units.py). Migration unt_20261008_measurement_units.
+    measurement_units = Column(String(10), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

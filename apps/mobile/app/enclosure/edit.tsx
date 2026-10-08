@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnitField } from '../../src/hooks/useUnitField';
 
 interface Species {
   id: string;
@@ -54,8 +55,9 @@ export default function EditEnclosureScreen() {
   const [mistingSchedule, setMistingSchedule] = useState('');
 
   // Climate
-  const [tempMin, setTempMin] = useState('');
-  const [tempMax, setTempMax] = useState('');
+  // Stored in °F; typed in the keeper's units.
+  const tempMin = useUnitField('temp');
+  const tempMax = useUnitField('temp');
   const [humidityMin, setHumidityMin] = useState('');
   const [humidityMax, setHumidityMax] = useState('');
 
@@ -88,8 +90,8 @@ export default function EditEnclosureScreen() {
       setSubstrateDepth(data.substrate_depth || '');
       setWaterDish(data.water_dish ?? true);
       setMistingSchedule(data.misting_schedule || '');
-      setTempMin(data.target_temp_min?.toString() || '');
-      setTempMax(data.target_temp_max?.toString() || '');
+      tempMin.load(data.target_temp_min);
+      tempMax.load(data.target_temp_max);
       setHumidityMin(data.target_humidity_min?.toString() || '');
       setHumidityMax(data.target_humidity_max?.toString() || '');
       setNotes(data.notes || '');
@@ -155,8 +157,8 @@ export default function EditEnclosureScreen() {
       data.substrate_type = substrateType || null;
       data.substrate_depth = substrateDepth || null;
       data.misting_schedule = mistingSchedule || null;
-      data.target_temp_min = tempMin ? parseFloat(tempMin) : null;
-      data.target_temp_max = tempMax ? parseFloat(tempMax) : null;
+      data.target_temp_min = tempMin.toStorage();
+      data.target_temp_max = tempMax.toStorage();
       data.target_humidity_min = humidityMin ? parseFloat(humidityMin) : null;
       data.target_humidity_max = humidityMax ? parseFloat(humidityMax) : null;
       data.notes = notes || null;
@@ -536,24 +538,24 @@ export default function EditEnclosureScreen() {
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Temp Min (°F)</Text>
+              <Text style={styles.label}>Temp Min ({tempMin.unit})</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 75"
+                placeholder={tempMin.unit === '°C' ? 'e.g., 24' : 'e.g., 75'}
                 placeholderTextColor={colors.textTertiary}
-                value={tempMin}
-                onChangeText={setTempMin}
+                value={tempMin.value}
+                onChangeText={tempMin.setValue}
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Temp Max (°F)</Text>
+              <Text style={styles.label}>Temp Max ({tempMax.unit})</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g., 82"
+                placeholder={tempMax.unit === '°C' ? 'e.g., 28' : 'e.g., 82'}
                 placeholderTextColor={colors.textTertiary}
-                value={tempMax}
-                onChangeText={setTempMax}
+                value={tempMax.value}
+                onChangeText={tempMax.setValue}
                 keyboardType="decimal-pad"
               />
             </View>

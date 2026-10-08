@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { clearSession, getToken, setSession } from '@/lib/auth'
+import { useUnits } from '@/components/UnitsProvider'
 
 // HV-owned legal pages, served from this same app at herpetoverse.com — so the
 // URLs baked into the mobile build never break if brand hosting changes.
@@ -404,6 +405,9 @@ export default function SettingsPage() {
             </div>
           </form>
 
+          {/* ---------- Units ---------- */}
+          <UnitsCard />
+
           {/* ---------- Support & legal ---------- */}
           <div className={CARD_CLS}>
             <h2 className={SECTION_HDR_CLS}>Support &amp; legal</h2>
@@ -564,6 +568,62 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Imperial / metric. Shared with Tarantuverse (one setting per keeper) and
+ * saved straight away — it isn't part of the profile form's Save button.
+ */
+function UnitsCard() {
+  const { units, setUnits } = useUnits()
+  const [error, setError] = useState<string | null>(null)
+  const options = [
+    { value: 'imperial', label: 'Imperial', hint: 'in, °F' },
+    { value: 'metric', label: 'Metric', hint: 'cm, °C' },
+  ] as const
+
+  return (
+    <div className={CARD_CLS}>
+      <h2 className={SECTION_HDR_CLS}>Units</h2>
+      <p className="text-sm text-neutral-500 mt-1">
+        Lengths and temperatures. Weights stay in grams. Also applies in
+        Tarantuverse.
+      </p>
+      <div role="radiogroup" aria-label="Units" className="mt-4 grid grid-cols-2 gap-3">
+        {options.map((opt) => {
+          const active = units === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => {
+                if (active) return
+                setError(null)
+                setUnits(opt.value).then((ok) => {
+                  if (!ok) setError('Could not save. Check your connection and try again.')
+                })
+              }}
+              className={`px-4 py-3 rounded-md border text-left transition-colors ${
+                active
+                  ? 'border-herp-teal bg-herp-teal/10 text-white'
+                  : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-600'
+              }`}
+            >
+              <span className="block font-semibold">{opt.label}</span>
+              <span className="block text-sm">{opt.hint}</span>
+            </button>
+          )
+        })}
+      </div>
+      {error && (
+        <p className="text-sm text-rose-400 mt-3" role="alert">
+          {error}
+        </p>
       )}
     </div>
   )

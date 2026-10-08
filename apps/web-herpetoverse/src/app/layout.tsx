@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import SafeAnalytics from '@/components/SafeAnalytics'
 import './globals.css'
 import { PostHogProvider } from '@/components/PostHogProvider'
+import { UnitsProvider } from '@/components/UnitsProvider'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -53,7 +54,7 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <body>
         <PostHogProvider>
-          {children}
+          <UnitsProvider>{children}</UnitsProvider>
           <SafeAnalytics />
         </PostHogProvider>
       </body>

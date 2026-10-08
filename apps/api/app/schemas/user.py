@@ -2,7 +2,7 @@
 User schemas
 """
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 import uuid
 import re
@@ -68,6 +68,9 @@ class UserProfileUpdate(BaseModel):
     profile_specialties: Optional[List[str]] = None
     social_links: Optional[Dict[str, str]] = None
     collection_visibility: Optional[str] = Field(None, max_length=20)
+    # Display units. Only 'imperial' or 'metric'; an explicit null is
+    # rejected by the route (NULL is reserved for "never chosen").
+    measurement_units: Optional[Literal['imperial', 'metric']] = None
 
 
 class UserVisibilityUpdate(BaseModel):
@@ -104,6 +107,31 @@ class ForgotPasswordRequest(BaseModel):
     frontend_url: Optional[str] = None
 
 
+class PublicKeeperResponse(BaseModel):
+    """What anyone may see about a keeper on the public directory/profile.
+
+    Never email, admin/superuser/premium flags, verification state or unit
+    preferences — those are account data, served only by /auth/me
+    (2026-10-08: the public routes used UserResponse and leaked emails)."""
+    id: uuid.UUID
+    username: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    is_breeder: Optional[bool] = False
+    created_at: datetime
+    profile_bio: Optional[str] = None
+    profile_location: Optional[str] = None
+    profile_experience_level: Optional[str] = None
+    profile_years_keeping: Optional[int] = None
+    profile_specialties: Optional[List[str]] = None
+    social_links: Optional[Dict[str, Any]] = None
+    collection_visibility: str = 'private'
+
+    class Config:
+        from_attributes = True
+
+
 class UserResponse(BaseModel):
     """Schema for user response (without password)"""
     id: uuid.UUID
@@ -127,6 +155,9 @@ class UserResponse(BaseModel):
     profile_specialties: Optional[List[str]] = None
     social_links: Optional[Dict[str, Any]] = None
     collection_visibility: str = 'private'
+    # 'imperial' | 'metric' | None (never chosen -- client uses its region
+    # default and saves it once). Display only; storage units never change.
+    measurement_units: Optional[str] = None
 
     class Config:
         from_attributes = True

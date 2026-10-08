@@ -20,6 +20,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatLengthMmRange, formatTempRange } from '../../src/lib/units';
 import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
@@ -34,6 +36,8 @@ function ScorpionSpeciesCareSheetScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
+  // Stored mm / °F; shown in the keeper's units.
+  const { units } = useUnits();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [species, setSpecies] = useState<ScorpionSpecies | null>(null);
@@ -193,7 +197,7 @@ function ScorpionSpeciesCareSheetScreen() {
           {(species.adult_length_min_mm || species.adult_length_max_mm) && (
             <FactRow
               label="Length"
-              value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`}
+              value={(formatLengthMmRange(species.adult_length_min_mm, species.adult_length_max_mm, units) ?? '')}
               colors={colors}
             />
           )}
@@ -209,7 +213,7 @@ function ScorpionSpeciesCareSheetScreen() {
           {(species.temperature_min || species.temperature_max) && (
             <FactRow
               label="Temperature"
-              value={`${species.temperature_min ?? '?'}–${species.temperature_max ?? '?'} °F`}
+              value={formatTempRange(species.temperature_min, species.temperature_max, units)}
               colors={colors}
             />
           )}

@@ -10,6 +10,8 @@ import {
 import { LineChart } from 'react-native-chart-kit';
 import { format } from 'date-fns';
 import { useTheme } from '../contexts/ThemeContext';
+import { useUnits } from '../hooks/useUnits';
+import { formatLength, formatLengthRate, lengthUnit, lengthValue } from '../lib/units';
 
 interface GrowthDataPoint {
   date: string;
@@ -45,6 +47,8 @@ type Metric = 'weight' | 'leg_span' | 'both';
 
 const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span' }) => {
   const { colors } = useTheme();
+  // Leg span / body length is stored in inches; shown in the keeper's units.
+  const { units } = useUnits();
   const [dateRange, setDateRange] = useState<DateRange>('all');
   const [metric, setMetric] = useState<Metric>('both');
   const screenWidth = Dimensions.get('window').width;
@@ -78,7 +82,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
     x: index,
     date: format(new Date(point.date), 'MMM d'),
     weight: point.weight ? parseFloat(point.weight.toString()) : null,
-    legSpan: point.leg_span ? parseFloat(point.leg_span.toString()) : null,
+    legSpan: point.leg_span ? Number(lengthValue(point.leg_span, units)) : null,
   }));
 
   // Check if we have data
@@ -182,7 +186,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
           <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Size Gain</Text>
             <Text style={[styles.statValue, { color: colors.info }]}>
-              +{parseFloat(data.total_leg_span_gain.toString()).toFixed(2)} in
+              +{formatLength(data.total_leg_span_gain, units)}
             </Text>
           </View>
         )}
@@ -241,7 +245,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
         )}
         {(metric === 'both' || metric === 'leg_span') && hasLegSpanData && (
           <View style={styles.chartWrapper}>
-            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{lengthLabel} (in)</Text>
+            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{lengthLabel} ({lengthUnit(units)})</Text>
             <LineChart
               data={{
                 labels: chartData.map((d) => d.date),
@@ -305,7 +309,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
             <Text style={styles.infoText}>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Size Growth Rate: </Text>
               <Text style={[styles.infoValueBlue, { color: colors.info }]}>
-                {parseFloat(data.growth_rate_leg_span.toString()).toFixed(2)} in/mo
+                {formatLengthRate(data.growth_rate_leg_span, units)}
               </Text>
             </Text>
           )}

@@ -18,6 +18,9 @@ import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
 import { INVERT_TAXA, isInvertTaxon, stageCountLabel, type InvertTaxon } from '@/lib/inverts'
 import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
+import { useUnitField } from '@/hooks/useUnitField'
+import { withMmUnit } from '@/lib/units'
+import { useUnits } from '@/components/UnitsProvider'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -45,7 +48,9 @@ function AddInvertForm() {
   const [speciesId, setSpeciesId] = useState<string | null>(null)
   const [sex, setSex] = useState<'unknown' | 'male' | 'female'>('unknown')
   const [molts, setMolts] = useState('')
-  const [sizeMm, setSizeMm] = useState('')
+  // Stored in mm / °F; typed in the keeper's units.
+  const { units } = useUnits()
+  const sizeMm = useUnitField('lengthMm')
   // Acquisition + husbandry (parity with the tarantula add form)
   const [dateAcquired, setDateAcquired] = useState('')
   const [source, setSource] = useState<'bred' | 'bought' | 'wild_caught' | ''>('')
@@ -55,8 +60,8 @@ function AddInvertForm() {
   const [location, setLocation] = useState<string | null>(null)
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
-  const [tempMin, setTempMin] = useState('')
-  const [tempMax, setTempMax] = useState('')
+  const tempMin = useUnitField('temp')
+  const tempMax = useUnitField('temp')
   const [humidityMin, setHumidityMin] = useState('')
   const [humidityMax, setHumidityMax] = useState('')
   const [waterDish, setWaterDish] = useState(true)
@@ -147,7 +152,7 @@ function AddInvertForm() {
           species_id: speciesId,
           sex,
           current_instar: molts ? Number(molts) : null,
-          current_length_mm: sizeMm.trim() || null,
+          current_length_mm: sizeMm.toStorage(),
           date_acquired: dateAcquired.trim() || null,
           source: source || null,
           price_paid: pricePaid.trim() || null,
@@ -156,8 +161,8 @@ function AddInvertForm() {
           location,
           substrate_type: substrateType.trim() || null,
           substrate_depth: substrateDepth.trim() || null,
-          target_temp_min: tempMin.trim() || null,
-          target_temp_max: tempMax.trim() || null,
+          target_temp_min: tempMin.toStorage(),
+          target_temp_max: tempMax.toStorage(),
           target_humidity_min: humidityMin.trim() || null,
           target_humidity_max: humidityMax.trim() || null,
           water_dish: waterDish,
@@ -254,7 +259,7 @@ function AddInvertForm() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label={stageCountLabel(taxon)}><input value={molts} onChange={(e) => setMolts(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></Field>
-            <Field label={meta.sizeLabel}><input value={sizeMm} onChange={(e) => setSizeMm(e.target.value)} inputMode="decimal" placeholder="e.g. 180" className={inputCls} /></Field>
+            <Field label={withMmUnit(meta.sizeLabel, units)}><input value={sizeMm.value} onChange={(e) => sizeMm.setValue(e.target.value)} inputMode="decimal" placeholder={units === 'metric' ? 'e.g. 180' : 'e.g. 7'} className={inputCls} /></Field>
           </div>
 
           <h2 className="text-sm font-bold uppercase tracking-wide text-theme-secondary pt-2">Acquisition</h2>
@@ -285,8 +290,8 @@ function AddInvertForm() {
             <Field label="Substrate depth"><input value={substrateDepth} onChange={(e) => setSubstrateDepth(e.target.value)} placeholder='e.g. 3"' className={inputCls} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Temp min (°F)"><input value={tempMin} onChange={(e) => setTempMin(e.target.value)} inputMode="numeric" placeholder="72" className={inputCls} /></Field>
-            <Field label="Temp max (°F)"><input value={tempMax} onChange={(e) => setTempMax(e.target.value)} inputMode="numeric" placeholder="82" className={inputCls} /></Field>
+            <Field label={`Temp min (${tempMin.unit})`}><input value={tempMin.value} onChange={(e) => tempMin.setValue(e.target.value)} inputMode="decimal" placeholder={units === 'metric' ? '22' : '72'} className={inputCls} /></Field>
+            <Field label={`Temp max (${tempMax.unit})`}><input value={tempMax.value} onChange={(e) => tempMax.setValue(e.target.value)} inputMode="decimal" placeholder={units === 'metric' ? '28' : '82'} className={inputCls} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Humidity min (%)"><input value={humidityMin} onChange={(e) => setHumidityMin(e.target.value)} inputMode="numeric" placeholder="60" className={inputCls} /></Field>

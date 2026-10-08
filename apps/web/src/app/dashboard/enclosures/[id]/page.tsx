@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import { formatLocalDate, toISODateLocal } from '@/lib/date'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatTempRange } from '@/lib/units'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -120,6 +122,7 @@ export default function EnclosureDetailPage() {
   const params = useParams()
   const enclosureId = params.id as string
   const { token, isAuthenticated, isLoading } = useAuth()
+  const { units } = useUnits()
 
   const [enclosure, setEnclosure] = useState<Enclosure | null>(null)
   const [inhabitants, setInhabitants] = useState<Inhabitant[]>([])
@@ -472,7 +475,7 @@ export default function EnclosureDetailPage() {
                   <dt className="text-gray-600 dark:text-gray-400">Temperature</dt>
                   <dd className="text-gray-900 dark:text-white">
                     {enclosure.target_temp_min && enclosure.target_temp_max
-                      ? `${enclosure.target_temp_min}–${enclosure.target_temp_max}°F`
+                      ? formatTempRange(enclosure.target_temp_min, enclosure.target_temp_max, units)
                       : '—'}
                   </dd>
                 </div>

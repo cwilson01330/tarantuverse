@@ -40,6 +40,8 @@ import { LocationField } from '@/components/LocationPicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import UpgradeModal from '@/components/UpgradeModal'
 import { ApiError } from '@/lib/apiClient'
+import { useUnits } from '@/components/UnitsProvider'
+import { lengthInput, lengthUnit, parseLengthInput } from '@/lib/units'
 import {
   ANIMAL_TAXA,
   ANIMAL_TAXON_ORDER,
@@ -174,6 +176,7 @@ const SECTION_HDR_CLS =
 
 function AddReptileForm() {
   const router = useRouter()
+  const { units } = useUnits()
   const searchParams = useSearchParams()
   // Set when a keeper adds to a collection shared with them (co-keepers).
   const collection = searchParams.get('collection')
@@ -253,7 +256,8 @@ function AddReptileForm() {
       source_breeder: nullableStr(form.sourceBreeder),
       price_paid: nullableNum(form.pricePaid),
       current_weight_g: nullableNum(form.currentWeightG),
-      current_length_in: nullableNum(form.currentLengthIn),
+      // Typed in the keeper's units (in or cm); stored inches.
+      current_length_in: parseLengthInput(form.currentLengthIn, units),
       feeds_on_cgd_override:
         form.cgdOverride === 'yes'
           ? true
@@ -472,7 +476,7 @@ function AddReptileForm() {
               />
             </Field>
 
-            <Field label="Starting length (in)">
+            <Field label={`Starting length (${lengthUnit(units)})`}>
               <input
                 type="number"
                 inputMode="decimal"
@@ -480,7 +484,7 @@ function AddReptileForm() {
                 min="0"
                 value={form.currentLengthIn}
                 onChange={(e) => update('currentLengthIn', e.target.value)}
-                placeholder={ex.length}
+                placeholder={lengthInput(ex.length, units)}
                 className={INPUT_CLS}
               />
             </Field>

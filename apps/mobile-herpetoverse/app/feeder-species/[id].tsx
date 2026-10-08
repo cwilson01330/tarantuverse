@@ -27,6 +27,8 @@ import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { FormErrorBanner } from '../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnits } from '../../src/hooks/useUnits';
+import { formatLengthMm, tempUnit, tempValue } from '../../src/lib/units';
 import {
   FEEDER_CATEGORIES,
   feederCategoryGlyph,
@@ -59,6 +61,8 @@ function StatCell({
 function FeederSpeciesCareSheet() {
   const router = useRouter();
   const { colors, layout } = useTheme();
+  // Temps are stored °F and sizes mm; both show in the keeper's units.
+  const { units } = useUnits();
   const params = useLocalSearchParams<{ id?: string }>();
   const speciesId = typeof params.id === 'string' ? params.id : null;
 
@@ -114,11 +118,14 @@ function FeederSpeciesCareSheet() {
   }
 
   const commonName = sp.common_names?.[0] ?? sp.scientific_name;
+  // Imperial reads exactly as before; metric converts to whole °C.
+  const tv = (f: number) => (units === 'metric' ? tempValue(f, units) : String(f));
+  const tu = tempUnit(units);
   const temp =
     sp.temperature_min != null && sp.temperature_max != null
-      ? `${sp.temperature_min}–${sp.temperature_max}°F`
+      ? `${tv(sp.temperature_min)}–${tv(sp.temperature_max)}${tu}`
       : sp.temperature_min != null
-        ? `${sp.temperature_min}°F+`
+        ? `${tv(sp.temperature_min)}${tu}+`
         : null;
   const humidity =
     sp.humidity_min != null && sp.humidity_max != null
@@ -201,7 +208,7 @@ function FeederSpeciesCareSheet() {
               {sp.typical_adult_size_mm != null ? (
                 <StatCell
                   label="ADULT SIZE"
-                  value={`${sp.typical_adult_size_mm} mm`}
+                  value={formatLengthMm(sp.typical_adult_size_mm, units) ?? '—'}
                   colors={colors}
                 />
               ) : null}

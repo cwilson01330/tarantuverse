@@ -8,6 +8,14 @@ import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
 import DateInput from '@/components/DateInput'
 import { toISODateLocal } from '@/lib/date'
+import { useUnits } from '@/components/UnitsProvider'
+import { parseTempInput, tempUnit } from '@/lib/units'
+
+/** Incubation temps are whole °F columns; typed in the keeper's units. */
+function incubationTempF(text: string, units: 'imperial' | 'metric'): number | null {
+  const f = parseTempInput(text, units)
+  return f === null ? null : Math.round(f)
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -60,6 +68,7 @@ function AddEggSacInner() {
   // re-pick the parent they just opened.
   const prefilledPairingId = searchParams?.get('pairing_id') ?? ''
   const { user, token, isAuthenticated, isLoading } = useAuth()
+  const { units } = useUnits()
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -140,8 +149,8 @@ function AddEggSacInner() {
         pulled_date: formData.pulled_date || null,
         expected_hatch_date: formData.expected_hatch_date || null,
         hatch_date: formData.hatch_date || null,
-        incubation_temp_min: formData.incubation_temp_min ? parseInt(formData.incubation_temp_min) : null,
-        incubation_temp_max: formData.incubation_temp_max ? parseInt(formData.incubation_temp_max) : null,
+        incubation_temp_min: incubationTempF(formData.incubation_temp_min, units),
+        incubation_temp_max: incubationTempF(formData.incubation_temp_max, units),
         incubation_humidity_min: formData.incubation_humidity_min ? parseInt(formData.incubation_humidity_min) : null,
         incubation_humidity_max: formData.incubation_humidity_max ? parseInt(formData.incubation_humidity_max) : null,
         spiderling_count: formData.spiderling_count ? parseInt(formData.spiderling_count) : null,
@@ -303,7 +312,7 @@ function AddEggSacInner() {
 
             {/* Incubation Temperature */}
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Incubation Temperature (°F)</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Incubation Temperature ({tempUnit(units)})</h3>
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -313,7 +322,7 @@ function AddEggSacInner() {
                     type="number"
                     value={formData.incubation_temp_min}
                     onChange={(e) => setFormData({...formData, incubation_temp_min: e.target.value})}
-                    placeholder="70"
+                    placeholder={units === 'metric' ? '21' : '70'}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -325,7 +334,7 @@ function AddEggSacInner() {
                     type="number"
                     value={formData.incubation_temp_max}
                     onChange={(e) => setFormData({...formData, incubation_temp_max: e.target.value})}
-                    placeholder="80"
+                    placeholder={units === 'metric' ? '27' : '80'}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white"
                   />
                 </div>

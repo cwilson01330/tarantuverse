@@ -23,6 +23,7 @@ import {
   INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, type InvertTaxon,
 } from '../../src/lib/inverts';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
+import { useUnitField } from '../../src/hooks/useUnitField';
 
 interface TarantulaData {
   name: string;
@@ -65,6 +66,9 @@ export default function EditTarantulaScreen() {
   const [taxonSheet, setTaxonSheet] = useState(false);
   const [changingTaxon, setChangingTaxon] = useState(false);
 
+  // Stored in °F; typed in the keeper's units. Untouched → original value.
+  const tempMinField = useUnitField('temp');
+  const tempMaxField = useUnitField('temp');
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
     common_name: '',
@@ -121,6 +125,8 @@ export default function EditTarantulaScreen() {
         notes: data.notes,
         visibility: data.visibility === 'private' ? 'private' : 'public',
       });
+      tempMinField.load(data.target_temp_min);
+      tempMaxField.load(data.target_temp_max);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantula details');
       console.error(error);
@@ -164,7 +170,12 @@ export default function EditTarantulaScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await apiClient.put(`/tarantulas/${id}`, formData);
+      // Temps are typed in the keeper's units; the API stores °F.
+      await apiClient.put(`/tarantulas/${id}`, {
+        ...formData,
+        target_temp_min: tempMinField.toStorage() ?? undefined,
+        target_temp_max: tempMaxField.toStorage() ?? undefined,
+      });
       Alert.alert('Success', 'Tarantula updated successfully');
       router.back();
     } catch (error: any) {
@@ -472,24 +483,24 @@ export default function EditTarantulaScreen() {
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Min Temp (°F)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Min Temp ({tempMinField.unit})</Text>
               <TextInput
                 style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
-                value={formData.target_temp_min?.toString()}
-                onChangeText={(text) => setFormData({ ...formData, target_temp_min: text ? parseInt(text) : undefined })}
-                placeholder="72"
+                value={tempMinField.value}
+                onChangeText={tempMinField.setValue}
+                placeholder={tempMinField.unit === '°C' ? '22' : '72'}
                 keyboardType="numeric"
                 placeholderTextColor={colors.textTertiary}
               />
             </View>
 
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Max Temp (°F)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Max Temp ({tempMaxField.unit})</Text>
               <TextInput
                 style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
-                value={formData.target_temp_max?.toString()}
-                onChangeText={(text) => setFormData({ ...formData, target_temp_max: text ? parseInt(text) : undefined })}
-                placeholder="78"
+                value={tempMaxField.value}
+                onChangeText={tempMaxField.setValue}
+                placeholder={tempMaxField.unit === '°C' ? '26' : '78'}
                 keyboardType="numeric"
                 placeholderTextColor={colors.textTertiary}
               />

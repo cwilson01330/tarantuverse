@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { useUnits } from '@/components/UnitsProvider'
+import { tempUnit, tempValue, type Units } from '@/lib/units'
 import DashboardLayout from '@/components/DashboardLayout'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
@@ -147,14 +149,18 @@ function careGuideCareLevelClasses(level: string | null): string {
   }
 }
 
-function careGuideClimateSummary(s: FeederSpeciesSummary): string | null {
+function careGuideClimateSummary(s: FeederSpeciesSummary, units: Units): string | null {
   const parts: string[] = []
-  if (s.temperature_min != null && s.temperature_max != null) {
-    parts.push(`${s.temperature_min}–${s.temperature_max} °F`)
-  } else if (s.temperature_min != null) {
-    parts.push(`from ${s.temperature_min} °F`)
-  } else if (s.temperature_max != null) {
-    parts.push(`up to ${s.temperature_max} °F`)
+  // Stored °F; shown in the keeper's units.
+  const lo = tempValue(s.temperature_min, units)
+  const hi = tempValue(s.temperature_max, units)
+  const u = tempUnit(units)
+  if (lo != null && hi != null) {
+    parts.push(`${lo}–${hi} ${u}`)
+  } else if (lo != null) {
+    parts.push(`from ${lo} ${u}`)
+  } else if (hi != null) {
+    parts.push(`up to ${hi} ${u}`)
   }
   if (s.humidity_min != null && s.humidity_max != null) {
     parts.push(`${s.humidity_min}–${s.humidity_max}%`)
@@ -219,6 +225,7 @@ export default function FeederColonyDetailPage() {
   const params = useParams<{ id: string }>()
   const colonyId = params?.id
   const { token, isAuthenticated, isLoading } = useAuth()
+  const { units } = useUnits()
 
   const [colony, setColony] = useState<FeederColony | null>(null)
   const [logs, setLogs] = useState<FeederCareLog[]>([])
@@ -636,8 +643,8 @@ export default function FeederColonyDetailPage() {
               <div className="text-theme-primary font-medium capitalize">
                 {careSpecies.category}
               </div>
-              {careGuideClimateSummary(careSpecies) && (
-                <div>{careGuideClimateSummary(careSpecies)}</div>
+              {careGuideClimateSummary(careSpecies, units) && (
+                <div>{careGuideClimateSummary(careSpecies, units)}</div>
               )}
               {careSpecies.prey_size_notes && (
                 <div className="truncate">{careSpecies.prey_size_notes}</div>

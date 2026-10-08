@@ -16,6 +16,7 @@ import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { useUnitField } from '../../src/hooks/useUnitField';
 
 const MOLT_OUTCOMES = [
   { value: 'successful', label: 'Went fine', color: (c: any) => c.success ?? '#22c55e' },
@@ -37,8 +38,9 @@ export default function AddMoltScreen() {
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [moltDate, setMoltDate] = useState(new Date());
   const [premoltDate, setPremoltDate] = useState<Date | null>(null);
-  const [legSpanBefore, setLegSpanBefore] = useState('');
-  const [legSpanAfter, setLegSpanAfter] = useState('');
+  // Stored in inches; typed in the keeper's units.
+  const legSpanBefore = useUnitField('length');
+  const legSpanAfter = useUnitField('length');
   const [weightBefore, setWeightBefore] = useState('');
   const [weightAfter, setWeightAfter] = useState('');
   const [notes, setNotes] = useState('');
@@ -61,8 +63,8 @@ export default function AddMoltScreen() {
       const m = response.data;
       if (m.molted_at) setMoltDate(new Date(m.molted_at));
       if (m.premolt_started_at) setPremoltDate(new Date(m.premolt_started_at));
-      if (m.leg_span_before != null) setLegSpanBefore(String(m.leg_span_before));
-      if (m.leg_span_after != null) setLegSpanAfter(String(m.leg_span_after));
+      legSpanBefore.load(m.leg_span_before);
+      legSpanAfter.load(m.leg_span_after);
       if (m.weight_before != null) setWeightBefore(String(m.weight_before));
       if (m.weight_after != null) setWeightAfter(String(m.weight_after));
       setNotes(m.notes ?? '');
@@ -81,8 +83,8 @@ export default function AddMoltScreen() {
       const payload = {
         molted_at: moltDate.toISOString(),
         premolt_started_at: premoltDate?.toISOString() || undefined,
-        leg_span_before: legSpanBefore ? parseFloat(legSpanBefore) : undefined,
-        leg_span_after: legSpanAfter ? parseFloat(legSpanAfter) : undefined,
+        leg_span_before: legSpanBefore.toStorage() ?? undefined,
+        leg_span_after: legSpanAfter.toStorage() ?? undefined,
         weight_before: weightBefore ? parseFloat(weightBefore) : undefined,
         weight_after: weightAfter ? parseFloat(weightAfter) : undefined,
         outcome: outcome || null,
@@ -166,22 +168,22 @@ export default function AddMoltScreen() {
 
           <View style={styles.row}>
             <View style={styles.measurementGroup}>
-              <Text style={[styles.label, { color: colors.textPrimary }]}>Leg Span Before (inches)</Text>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Leg Span Before ({legSpanBefore.unit})</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
-                value={legSpanBefore}
-                onChangeText={setLegSpanBefore}
+                value={legSpanBefore.value}
+                onChangeText={legSpanBefore.setValue}
                 placeholder="0.0"
                 placeholderTextColor={colors.textTertiary}
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={styles.measurementGroup}>
-              <Text style={[styles.label, { color: colors.textPrimary }]}>Leg Span After (inches)</Text>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Leg Span After ({legSpanAfter.unit})</Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
-                value={legSpanAfter}
-                onChangeText={setLegSpanAfter}
+                value={legSpanAfter.value}
+                onChangeText={legSpanAfter.setValue}
                 placeholder="0.0"
                 placeholderTextColor={colors.textTertiary}
                 keyboardType="decimal-pad"

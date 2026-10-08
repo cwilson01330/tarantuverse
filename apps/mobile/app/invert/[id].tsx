@@ -56,6 +56,7 @@ import { COPY as LIFECYCLE_COPY, historicalRecordLine, pronounsFor, tenureLabel 
 import { parseLocalDate } from '../../src/utils/date';
 import { clearMarkDied, hasMarkDied } from '../../src/lib/pending-intent';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { formatLengthMm, formatTempRange, stripUnit } from '../../src/lib/units';
 import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
 function InvertDetailScreen() {
@@ -106,7 +107,7 @@ function InvertDetailScreen() {
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
   // would fail — the API checks every request. Nothing write-shaped shows
   // until the role resolves.
-  const { user } = useAuth();
+  const { user, units } = useAuth();
   const { role, ownerName } = useCollectionRole(user?.id, invert?.user_id);
   const isOwner = role === 'owner';
   // A died animal is a historical record (ADR-015 §14.3): readable, closed to
@@ -437,7 +438,7 @@ function InvertDetailScreen() {
   if (invert.enclosure_type) husbandryItems.push({ icon: 'shape-outline', label: 'Type', value: invert.enclosure_type });
   if (invert.enclosure_size) husbandryItems.push({ icon: 'cube-outline', label: 'Enclosure', value: invert.enclosure_size });
   if (invert.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: invert.substrate_depth ? `${invert.substrate_type} (${invert.substrate_depth})` : invert.substrate_type });
-  if (invert.target_temp_min || invert.target_temp_max) husbandryItems.push({ icon: 'thermometer', label: 'Temperature', value: `${invert.target_temp_min ?? '?'}–${invert.target_temp_max ?? '?'} °F` });
+  if (invert.target_temp_min || invert.target_temp_max) husbandryItems.push({ icon: 'thermometer', label: 'Temperature', value: formatTempRange(invert.target_temp_min, invert.target_temp_max, units) ?? '—' });
   if (invert.target_humidity_min || invert.target_humidity_max) husbandryItems.push({ icon: 'water-percent', label: 'Humidity', value: `${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%` });
   husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: invert.water_dish ? 'Yes' : 'No' });
 
@@ -898,7 +899,7 @@ function InvertDetailScreen() {
       <Section title="Identity">
         <InfoRow label="Sex" value={fmtSex(invert.sex)} colors={colors} />
         <InfoRow label="Molts" value={invert.current_instar ? String(invert.current_instar) : '—'} colors={colors} />
-        <InfoRow label={meta?.sizeLabel ?? 'Size'} value={invert.current_length_mm ? `${invert.current_length_mm} mm` : '—'} colors={colors} />
+        <InfoRow label={stripUnit(meta?.sizeLabel ?? 'Size')} value={(invert.current_length_mm ? formatLengthMm(invert.current_length_mm, units) : null) ?? '—'} colors={colors} />
         <InfoRow label="Acquired" value={invert.date_acquired ?? '—'} colors={colors} />
       </Section>
 

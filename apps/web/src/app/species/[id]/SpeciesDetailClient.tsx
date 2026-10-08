@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatTempRange } from '@/lib/units'
 import PublicCareShell from '@/components/PublicCareShell'
 import ShortlistButton from '@/components/ShortlistButton'
 import KeeperSignalsBlock, {
@@ -65,6 +67,9 @@ export default function EnhancedSpeciesDetailPage({
    *  renders nothing either way, which is the honest outcome in both cases. */
   keeperSignals?: KeeperSignals | null
 } = {}) {
+  // Stored °F; the viewer's units first, the other system underneath.
+  const { units } = useUnits()
+  const otherUnits = units === 'metric' ? 'imperial' : 'metric'
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
@@ -461,10 +466,10 @@ export default function EnhancedSpeciesDetailPage({
                   <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Temperature Range</p>
                     <p className="font-semibold text-gray-900 dark:text-white text-lg">
-                      {species.temperature_min}°F - {species.temperature_max}°F
+                      {formatTempRange(species.temperature_min, species.temperature_max, units)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      ({Math.round((species.temperature_min - 32) * 5/9)}°C - {Math.round((species.temperature_max - 32) * 5/9)}°C)
+                      ({formatTempRange(species.temperature_min, species.temperature_max, otherUnits)})
                     </p>
                   </div>
                 )}

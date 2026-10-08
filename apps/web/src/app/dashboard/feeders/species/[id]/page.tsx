@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatLengthMm, tempUnit, tempValue } from '@/lib/units'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -62,8 +64,8 @@ function careLevelClasses(level: string | null): string {
 }
 
 function rangeLabel(
-  min: number | null,
-  max: number | null,
+  min: number | string | null,
+  max: number | string | null,
   unit: string,
 ): string | null {
   if (min != null && max != null) return `${min}–${max} ${unit}`.trim()
@@ -77,6 +79,8 @@ export default function FeederSpeciesDetailPage() {
   const params = useParams<{ id: string }>()
   const speciesId = params?.id
   const { isAuthenticated, isLoading } = useAuth()
+  // Stored °F / mm; shown in the keeper's units.
+  const { units } = useUnits()
 
   const [species, setSpecies] = useState<FeederSpecies | null>(null)
   const [loading, setLoading] = useState(true)
@@ -172,14 +176,14 @@ export default function FeederSpeciesDetailPage() {
       : []
 
   const tempLabel = rangeLabel(
-    species.temperature_min,
-    species.temperature_max,
-    '°F',
+    tempValue(species.temperature_min, units),
+    tempValue(species.temperature_max, units),
+    tempUnit(units),
   )
   const humidityLabel = rangeLabel(species.humidity_min, species.humidity_max, '%')
   const sizeLabel =
     species.typical_adult_size_mm != null
-      ? `${species.typical_adult_size_mm} mm`
+      ? formatLengthMm(species.typical_adult_size_mm, units)
       : null
 
   const hasOverview =

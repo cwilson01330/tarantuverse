@@ -22,6 +22,8 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatTempRange } from '@/lib/units'
 import {
   type PublicReptileProfile,
   getPublicProfile,
@@ -42,6 +44,9 @@ type LoadState =
 
 export default function ReptilePublicProfile({ animalId }: Props) {
   const router = useRouter()
+  // The viewer's units: their own setting when signed in, else the browser
+  // region (UnitsProvider). Stored temps are °F.
+  const { units } = useUnits()
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
 
   useEffect(() => {
@@ -287,8 +292,9 @@ export default function ReptilePublicProfile({ animalId }: Props) {
                     <div>
                       <dt className="text-neutral-500">Temp</dt>
                       <dd className="text-neutral-200">
-                        {formatNum(p.species.temperature_min)}–
-                        {formatNum(p.species.temperature_max)}°F
+                        {units === 'metric'
+                          ? formatTempRange(p.species.temperature_min, p.species.temperature_max, units)
+                          : `${formatNum(p.species.temperature_min)}–${formatNum(p.species.temperature_max)}°F`}
                       </dd>
                     </div>
                   )}

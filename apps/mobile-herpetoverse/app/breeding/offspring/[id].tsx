@@ -38,6 +38,8 @@ import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { FormErrorBanner } from '../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../src/contexts/ThemeContext';
+import { useUnits } from '../../../src/hooks/useUnits';
+import { formatLength } from '../../../src/lib/units';
 import {
   OFFSPRING_STATUS_LABEL,
   type OffspringStatus,
@@ -141,6 +143,7 @@ const STATUS_COLORS: Record<
 };
 
 function OffspringDetailScreen() {
+  const { units } = useUnits();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
@@ -492,7 +495,12 @@ function OffspringDetailScreen() {
                 {offspring.hatch_length_in != null && (
                   <KV
                     label="Hatch length"
-                    value={`${offspring.hatch_length_in} in`}
+                    value={
+                      // Stored inches; shown in the keeper's units.
+                      units === 'metric'
+                        ? formatLength(offspring.hatch_length_in, units) ?? '—'
+                        : `${offspring.hatch_length_in} in`
+                    }
                   />
                 )}
                 {offspring.price_sold != null && (

@@ -40,6 +40,7 @@ import { createColony, type StageCounts } from '../../src/lib/colonies';
 import { LocationPicker } from '../../src/components/LocationPicker';
 import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
+import { useUnitField } from '../../src/hooks/useUnitField';
 
 const SOURCE_OPTIONS: { value: Source; label: string }[] = [
   { value: 'bred', label: 'Captive bred' },
@@ -93,8 +94,9 @@ export default function AddColonyScreen() {
   const [enclosureSize, setEnclosureSize] = useState('');
   const [substrateType, setSubstrateType] = useState('');
   const [substrateDepth, setSubstrateDepth] = useState('');
-  const [tempMin, setTempMin] = useState('');
-  const [tempMax, setTempMax] = useState('');
+  // Stored in °F; typed in the keeper's units.
+  const tempMin = useUnitField('temp');
+  const tempMax = useUnitField('temp');
   const [humidityMin, setHumidityMin] = useState('');
   const [humidityMax, setHumidityMax] = useState('');
   const [waterDish, setWaterDish] = useState(false);
@@ -153,8 +155,8 @@ export default function AddColonyScreen() {
         enclosure_size: enclosureSize.trim() || null,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
-        target_temp_min: tempMin.trim() || null,
-        target_temp_max: tempMax.trim() || null,
+        target_temp_min: tempMin.toStorage(),
+        target_temp_max: tempMax.toStorage(),
         target_humidity_min: humidityMin.trim() || null,
         target_humidity_max: humidityMax.trim() || null,
         water_dish: waterDish,
@@ -400,13 +402,13 @@ export default function AddColonyScreen() {
           </Field>
           <View style={styles.row}>
             <View style={styles.rowCol}>
-              <Field label="Temp min (°F)">
-                <TextInput style={styles.input} placeholder="72" placeholderTextColor={colors.textTertiary} value={tempMin} onChangeText={setTempMin} keyboardType="number-pad" />
+              <Field label={`Temp min (${tempMin.unit})`}>
+                <TextInput style={styles.input} placeholder={tempMin.unit === '°C' ? '22' : '72'} placeholderTextColor={colors.textTertiary} value={tempMin.value} onChangeText={tempMin.setValue} keyboardType="decimal-pad" />
               </Field>
             </View>
             <View style={styles.rowCol}>
-              <Field label="Temp max (°F)">
-                <TextInput style={styles.input} placeholder="82" placeholderTextColor={colors.textTertiary} value={tempMax} onChangeText={setTempMax} keyboardType="number-pad" />
+              <Field label={`Temp max (${tempMax.unit})`}>
+                <TextInput style={styles.input} placeholder={tempMax.unit === '°C' ? '28' : '82'} placeholderTextColor={colors.textTertiary} value={tempMax.value} onChangeText={tempMax.setValue} keyboardType="decimal-pad" />
               </Field>
             </View>
           </View>

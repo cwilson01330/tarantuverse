@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { Metadata } from 'next'
 import Link from 'next/link'
+import { useUnits } from '@/components/UnitsProvider'
+import { lengthValue, lengthUnit } from '@/lib/units'
 
 interface TarantulaPublicProfile {
   tarantula: {
@@ -61,6 +63,8 @@ export default function PublicTarantulaProfile() {
   const tarantula = params.tarantula as string
 
   const [profile, setProfile] = useState<TarantulaPublicProfile | null>(null)
+  // Leg spans are stored in inches; shown in the viewer's units.
+  const { units } = useUnits()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -388,11 +392,11 @@ export default function PublicTarantulaProfile() {
                           molt.leg_span_after !== undefined && (
                             <div>
                               <p className="text-gray-600 dark:text-gray-400">
-                                Leg Span
+                                Leg Span ({lengthUnit(units)})
                               </p>
                               <p className="font-semibold">
-                                {molt.leg_span_before}" →{' '}
-                                {molt.leg_span_after}"
+                                {lengthValue(molt.leg_span_before, units)} →{' '}
+                                {lengthValue(molt.leg_span_after, units)}
                               </p>
                             </div>
                           )}

@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
+from app.utils.units import format_length, format_length_mm, length_unit, length_value, normalize_units
+
 SHAPES = ("story", "post", "square", "wide")
 # How the card looks. All three render from the same composed payload; the
 # Field notes frame also reads the `notes` block below.
@@ -84,7 +86,14 @@ class CardSubject:
     photo_url: Optional[str]
     taxon: str
     molt_count: int = 0
+    # Pre-formatted size text. Only used when neither raw value below is set
+    # (older callers); the router fills the raw values so the card can print
+    # them in the author's units.
     latest_size: Optional[str] = None
+    # Raw stored sizes (TV): newest molt leg span / body length in INCHES, and
+    # inverts.current_length_mm in MILLIMETRES.
+    latest_span_in: Optional[float] = None
+    length_mm: Optional[float] = None
     weight_g: Optional[float] = None
     length_in: Optional[float] = None
     shed_count: int = 0
@@ -184,6 +193,20 @@ def in_care_label(start: date, end: date) -> Optional[str]:
 
 def _size_label(taxon: str) -> str:
     return "Leg span" if taxon in _LEG_SPAN_TAXA else "Body length"
+
+
+def size_text(taxon: str, latest_span_in, length_mm, units: Optional[str] = None) -> Optional[str]:
+    """A TV animal's size in the given units ('imperial' when unset): the
+    newest molt measurement (stored inches) first, else the body length
+    (stored mm) — but only for taxa whose size isn't a leg span, since a
+    body length printed as "Leg span" would be wrong."""
+    if latest_span_in is not None:
+        return format_length(latest_span_in, units)
+    if taxon in _LEG_SPAN_TAXA:
+        return None
+    if length_mm is not None:
+        return format_length_mm(length_mm, units)
+    return None
 
 
 def allowed_photo_url(url: Optional[str], base: Optional[str] = None) -> Optional[str]:
@@ -291,8 +314,13 @@ def compose_card(
     today: Optional[date] = None,
     shed: Optional[ShedFacts] = None,
     weight: Optional[WeightFacts] = None,
+    units: Optional[str] = None,
 ) -> dict:
+    """`units` is the card author's display units ('imperial' | 'metric';
+    None reads as imperial). Only lengths convert — weights stay grams, and
+    storage is never touched."""
     today = today or date.today()
+    units = normalize_units(units)
     f = set(fields)
     sex = (getattr(subject.sex, "value", subject.sex) or "").lower()
     facts: list[dict] = []
@@ -320,11 +348,11 @@ def compose_card(
         header = f"Specimen · molt no. {molt.number}"
         if "size_change" in f:
             b, a = molt.span_before, molt.span_after
-            unit = " in"
+            unit = f" {length_unit(units)}"
             if b is not None and a is not None:
-                value = f"{_num(b)} → {_num(a)}{unit}"
+                value = f"{length_value(b, units)} → {length_value(a, units)}{unit}"
             elif a is not None:
-                value = f"{_num(a)}{unit}"
+                value = f"{length_value(a, units)}{unit}"
             else:
                 value = None
             fact(_size_label(subject.taxon), value)
@@ -417,8 +445,12 @@ def compose_card(
         fact("In care", in_care)
         if subject.app == "tarantuverse":
             if "size" in f:
-                fact(_size_label(subject.taxon), subject.latest_size)
-                note(subject.latest_size)
+                if subject.latest_span_in is not None or subject.length_mm is not None:
+                    size = size_text(subject.taxon, subject.latest_span_in, subject.length_mm, units)
+                else:
+                    size = subject.latest_size
+                fact(_size_label(subject.taxon), size)
+                note(size)
             if "molts" in f and subject.molt_count > 0:
                 fact("Molts", str(subject.molt_count))
                 note(_plural(subject.molt_count, "molt"))
@@ -431,7 +463,7 @@ def compose_card(
                 fact("Weight", w)
                 note(w)
             if "length" in f and subject.length_in:
-                ln = f"{_num(float(subject.length_in))} in"
+                ln = format_length(subject.length_in, units)
                 fact("Length", ln)
                 note(ln)
             if "sheds" in f and subject.shed_count > 0:

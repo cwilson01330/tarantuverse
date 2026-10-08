@@ -19,6 +19,8 @@ import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
 import ShortlistButton from '@/components/ShortlistButton'
 import { growthLengthLabel } from '@/lib/inverts'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatLengthMmRange, formatTempRange } from '@/lib/units'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -90,6 +92,7 @@ const TAXON_LABELS: Record<string, string> = {
   tarantula: 'Tarantula',
   mantis: 'Mantis',
   roach: 'Roach',
+  isopod: 'Isopod',
   millipede: 'Millipede',
   vinegaroon: 'Vinegaroon',
   true_spider: 'True spider',
@@ -212,6 +215,8 @@ export default function InvertCareSheetClient({
   const params = useParams()
   const id = params?.id as string
   const { user } = useAuth()
+  // Stored mm / °F, shown in the viewer's units.
+  const { units } = useUnits()
 
   // Seed from the server fetch so the full care sheet ships in the SSR HTML
   // (SEO) with no loading flash; only fetch client-side if it wasn't provided.
@@ -393,7 +398,7 @@ export default function InvertCareSheetClient({
               {(species.adult_length_min_mm || species.adult_length_max_mm) && (
                 <Fact
                   label={growthLengthLabel(species.taxon)}
-                  value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`}
+                  value={formatLengthMmRange(species.adult_length_min_mm, species.adult_length_max_mm, units)}
                 />
               )}
               <Fact label="Growth rate" value={species.growth_rate} />
@@ -432,7 +437,7 @@ export default function InvertCareSheetClient({
               {(species.temperature_min || species.temperature_max) && (
                 <Fact
                   label="Temperature"
-                  value={`${species.temperature_min ?? '?'}–${species.temperature_max ?? '?'} °F`}
+                  value={formatTempRange(species.temperature_min, species.temperature_max, units)}
                 />
               )}
               {(species.humidity_min || species.humidity_max) && (

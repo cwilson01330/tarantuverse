@@ -41,6 +41,8 @@ import FeedingStatsCard, { type FeedingStats as TarantulaFeedingStats } from '@/
 import PauseFeedingModal from '@/components/PauseFeedingModal'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
 import QRModal from '@/components/QRModal'
+import { useUnits } from '@/components/UnitsProvider'
+import { formatLengthMm, formatTempRange } from '@/lib/units'
 import { ROLE_LABEL, attribution, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -184,6 +186,7 @@ export default function InvertDetailPage() {
   const id = params?.id as string
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
+  const { units } = useUnits()
 
   const [invert, setInvert] = useState<Invert | null>(null)
   // Co-keepers (PRD-shared-keeping rung 3): what can this viewer do here? Only
@@ -807,7 +810,7 @@ export default function InvertDetailPage() {
               <Fact label="Last molt" value={lastMoltAgo(molts)} />
               <Fact
                 label={isWhipSpider ? 'Leg span' : 'Size'}
-                value={invert.current_length_mm != null ? `${invert.current_length_mm} mm` : null}
+                value={formatLengthMm(invert.current_length_mm, units)}
               />
               <Fact label="Acquired" value={invert.date_acquired ? formatLocalDate(invert.date_acquired) : null} />
             </Section>
@@ -822,7 +825,7 @@ export default function InvertDetailPage() {
                 <Fact label="Substrate depth" value={invert.substrate_depth} />
                 <Fact label="Last substrate change" value={invert.last_substrate_change ? formatLocalDate(invert.last_substrate_change) : null} />
                 {(invert.target_temp_min || invert.target_temp_max) && (
-                  <Fact label="Temperature" value={`${invert.target_temp_min ?? '?'}–${invert.target_temp_max ?? '?'} °F`} />
+                  <Fact label="Temperature" value={formatTempRange(invert.target_temp_min, invert.target_temp_max, units)} />
                 )}
                 {(invert.target_humidity_min || invert.target_humidity_max) && (
                   <Fact label="Humidity" value={`${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%`} />
@@ -1192,7 +1195,8 @@ export default function InvertDetailPage() {
           scientificName={invert.scientific_name ?? null}
           sex={invert.sex ?? null}
           // Recent molts on the label, as the legacy tarantula page offered.
-          // leg_span_after is inches for every taxon; the label prints ".
+          // leg_span_after is inches for every taxon; QRModal prints it in
+          // the keeper's units.
           molts={molts.map((m) => ({
             id: m.id,
             molted_at: m.molted_at,

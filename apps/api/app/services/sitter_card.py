@@ -32,6 +32,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable, List, Optional, Sequence
 
+from app.utils.units import f_to_c, normalize_units
+
 # ── line sources ──────────────────────────────────────────────────────────────
 SAFETY = "safety"      # species hazard; can't be hidden
 KEEPER = "keeper"      # the keeper wrote it or set it
@@ -94,6 +96,19 @@ def _range(lo: Any, hi: Any, unit: str) -> Optional[str]:
     if lo is not None and hi is not None:
         return f"{_fmt_num(lo)}–{_fmt_num(hi)}{unit}" if lo != hi else f"{_fmt_num(lo)}{unit}"
     return f"{'at least ' if lo is not None else 'up to '}{_fmt_num(lo if lo is not None else hi)}{unit}"
+
+
+def _temp_range(lo: Any, hi: Any, units: Optional[str]) -> Optional[str]:
+    """Stored °F range in the KEEPER's display units (users.measurement_units).
+    Imperial is printed exactly as stored; metric converts to whole °C."""
+    if normalize_units(units) != "metric":
+        return _range(lo, hi, "°F")
+    lo, hi = _num(lo), _num(hi)
+    return _range(
+        None if lo is None else round(f_to_c(lo)),
+        None if hi is None else round(f_to_c(hi)),
+        "°C",
+    )
 
 
 def _local_date(dt: datetime, tz_offset_minutes: Optional[int]) -> date:
@@ -338,6 +353,7 @@ def compose_invert_card(
     keeper_name: str,
     now: Optional[datetime] = None,
     tz_offset_minutes: Optional[int] = None,
+    units: Optional[str] = None,
 ) -> dict:
     now = now or datetime.now(timezone.utc)
     detritivore = (getattr(species, "feeding_mode", None) or "predator") == "detritivore" if species else False
@@ -393,11 +409,11 @@ def compose_invert_card(
         water.add("Keep one side of the substrate damp and the other dry — never soak it all.", SPECIES)
 
     heat = Section("heat", "Heat")
-    t = _range(getattr(invert, "target_temp_min", None), getattr(invert, "target_temp_max", None), "°F")
+    t = _temp_range(getattr(invert, "target_temp_min", None), getattr(invert, "target_temp_max", None), units)
     if t:
         heat.add(f"Room or enclosure should read {t}.", RECORD)
     elif species is not None:
-        t = _range(getattr(species, "temperature_min", None), getattr(species, "temperature_max", None), "°F")
+        t = _temp_range(getattr(species, "temperature_min", None), getattr(species, "temperature_max", None), units)
         if t:
             heat.add(f"Room or enclosure should read {t}.", SPECIES)
 
@@ -411,7 +427,7 @@ def compose_invert_card(
 
 # ── colony card ───────────────────────────────────────────────────────────────
 
-def compose_colony_card(colony: Any, species: Any, *, keeper_name: str) -> dict:
+def compose_colony_card(colony: Any, species: Any, *, keeper_name: str, units: Optional[str] = None) -> dict:
     care = Section("feeding", "Food")
     care.add("Keep leaf litter and a little food available; top it up when it's gone and "
              "remove anything mouldy.", DEFAULT)
@@ -432,7 +448,7 @@ def compose_colony_card(colony: Any, species: Any, *, keeper_name: str) -> dict:
         water.add("Keep one side of the substrate damp and the other dry — never soak it all.", SPECIES)
 
     heat = Section("heat", "Heat")
-    t = _range(getattr(colony, "target_temp_min", None), getattr(colony, "target_temp_max", None), "°F")
+    t = _temp_range(getattr(colony, "target_temp_min", None), getattr(colony, "target_temp_max", None), units)
     if t:
         heat.add(f"Room or enclosure should read {t}.", RECORD)
 
@@ -459,6 +475,7 @@ def compose_animal_card(
     keeper_name: str,
     now: Optional[datetime] = None,
     tz_offset_minutes: Optional[int] = None,
+    units: Optional[str] = None,
 ) -> dict:
     now = now or datetime.now(timezone.utc)
     state = feeding_state(
@@ -512,14 +529,14 @@ def compose_animal_card(
     heat = Section("heat", "Heat & light")
     t = None
     if enclosure is not None:
-        t = _range(getattr(enclosure, "target_temp_min", None), getattr(enclosure, "target_temp_max", None), "°F")
+        t = _temp_range(getattr(enclosure, "target_temp_min", None), getattr(enclosure, "target_temp_max", None), units)
     if t:
         heat.add(f"Enclosure should read {t}.", RECORD)
     elif species is not None:
-        bask = _range(getattr(species, "temp_basking_min", None), getattr(species, "temp_basking_max", None), "°F")
-        warm = _range(getattr(species, "temp_warm_min", None), getattr(species, "temp_warm_max", None), "°F")
-        cool = _range(getattr(species, "temp_cool_min", None), getattr(species, "temp_cool_max", None), "°F")
-        night = _range(getattr(species, "temp_night_min", None), getattr(species, "temp_night_max", None), "°F")
+        bask = _temp_range(getattr(species, "temp_basking_min", None), getattr(species, "temp_basking_max", None), units)
+        warm = _temp_range(getattr(species, "temp_warm_min", None), getattr(species, "temp_warm_max", None), units)
+        cool = _temp_range(getattr(species, "temp_cool_min", None), getattr(species, "temp_cool_max", None), units)
+        night = _temp_range(getattr(species, "temp_night_min", None), getattr(species, "temp_night_max", None), units)
         if bask:
             heat.add(f"Basking spot: {bask}.", SPECIES)
         if warm:

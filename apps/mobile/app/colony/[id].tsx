@@ -90,6 +90,7 @@ import {
   type ColonyEventType,
 } from '../../src/lib/colonies';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { formatTempRange } from '../../src/lib/units';
 import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
 const EVENT_TYPES: ColonyEventType[] = [
@@ -176,7 +177,7 @@ export default function ColonyDetailScreen() {
 
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
   // would fail — the API checks every request.
-  const { user } = useAuth();
+  const { user, units } = useAuth();
   const { role, ownerName } = useCollectionRole(user?.id, colony?.user_id);
   const isOwner = role === 'owner';
   // An ended colony is a historical record: like a died animal's screen, every
@@ -832,7 +833,7 @@ export default function ColonyDetailScreen() {
     husbandryItems.push({
       icon: 'thermometer',
       label: 'Temperature',
-      value: `${colony.target_temp_min ?? '—'}–${colony.target_temp_max ?? '—'}°F`,
+      value: formatTempRange(colony.target_temp_min, colony.target_temp_max, units) ?? '—',
     });
   if (colony.target_humidity_min || colony.target_humidity_max)
     husbandryItems.push({
@@ -844,10 +845,11 @@ export default function ColonyDetailScreen() {
   husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: colony.water_dish ? 'Yes' : 'No' });
   if (colony.last_substrate_change)
     husbandryItems.push({ icon: 'calendar-refresh', label: 'Substrate changed', value: formatLocalDate(colony.last_substrate_change, { month: 'short', day: 'numeric', year: 'numeric' }) });
-  // One-line preview for the collapsed Husbandry row: "85–95°F · egg flats".
+  // One-line preview for the collapsed Husbandry row: "85–95°F · egg flats"
+  // (in the keeper's units).
   const husbandryPreview = [
     colony.target_temp_min || colony.target_temp_max
-      ? `${colony.target_temp_min ?? '—'}–${colony.target_temp_max ?? '—'}°F`
+      ? formatTempRange(colony.target_temp_min, colony.target_temp_max, units)
       : null,
     colony.substrate_type,
     colony.enclosure_size,
