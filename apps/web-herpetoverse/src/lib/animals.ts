@@ -345,10 +345,31 @@ export function createAnimal(payload: CreateAnimalPayload, collection?: string |
 
 /**
  * AnimalUpdate on the backend is all-optional and does NOT accept
- * `taxon` (immutable). We reuse a Partial of the create payload minus
- * taxon — the add page and edit page fill the same bag otherwise.
+ * `taxon` — that changes only through changeAnimalTaxon below. We reuse a
+ * Partial of the create payload minus taxon — the add page and edit page
+ * fill the same bag otherwise.
  */
 export type UpdateAnimalPayload = Partial<Omit<CreateAnimalPayload, 'taxon'>>
+
+/**
+ * Correct a mis-filed taxon (POST /animals/{id}/change-taxon, audit-2 M10).
+ *
+ * Keeps every log, photo, gene and breeding record. Pass `herpSpeciesId`
+ * when the keeper picked one — it must belong to the new taxon. Omitting it
+ * does NOT keep the old link: a species from the previous group is cleared,
+ * because a corn snake's care sheet on a gecko would drive the wrong prey
+ * sizes and cadence. The CGD diet override resets to follow the species.
+ */
+export function changeAnimalTaxon(
+  id: string,
+  taxon: AnimalTaxon,
+  herpSpeciesId: string | null,
+): Promise<Animal> {
+  return apiFetch<Animal>(`/api/v1/animals/${encodeURIComponent(id)}/change-taxon`, {
+    method: 'POST',
+    json: { taxon, herp_species_id: herpSpeciesId },
+  })
+}
 
 export function updateAnimal(
   id: string,

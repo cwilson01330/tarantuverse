@@ -394,6 +394,27 @@ export async function updateAnimal(
   return data;
 }
 
+/**
+ * Correct a mis-filed taxon (POST /animals/{id}/change-taxon, audit-2 M10).
+ * Mirrors the web-herpetoverse lib.
+ *
+ * Keeps every log, photo, gene and breeding record. Pass `herpSpeciesId`
+ * when the keeper picked one — it must belong to the new taxon. Omitting it
+ * does NOT keep the old link: a species from the previous group is cleared.
+ * The CGD diet override resets to follow the species.
+ */
+export async function changeAnimalTaxon(
+  id: string,
+  taxon: AnimalTaxon,
+  herpSpeciesId: string | null,
+): Promise<Animal> {
+  const { data } = await apiClient.post<Animal>(
+    `/animals/${encodeURIComponent(id)}/change-taxon`,
+    { taxon, herp_species_id: herpSpeciesId },
+  );
+  return data;
+}
+
 export async function deleteAnimal(id: string): Promise<void> {
   await apiClient.delete(`/animals/${encodeURIComponent(id)}`);
 }

@@ -31,6 +31,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { ThemedInput } from './FormPrimitives';
 import {
   CARE_LEVEL_LABELS,
+  type HerpTaxon,
   type ReptileSpeciesSearchResult,
   searchReptileSpecies,
 } from '../../lib/reptile-species';
@@ -47,6 +48,9 @@ export interface ReptileSpeciesAutocompleteProps {
    */
   onPick?: (species: ReptileSpeciesSearchResult) => void;
   placeholder?: string;
+  /** Restrict matches to one herp group (the change-type sheet). Omitted,
+   *  the whole catalog is searched, as the add/edit forms always have. */
+  taxon?: HerpTaxon;
 }
 
 export function ReptileSpeciesAutocomplete({
@@ -55,6 +59,7 @@ export function ReptileSpeciesAutocomplete({
   onChange,
   onPick,
   placeholder = 'Python regius',
+  taxon,
 }: ReptileSpeciesAutocompleteProps) {
   const { colors, layout } = useTheme();
 
@@ -90,7 +95,7 @@ export function ReptileSpeciesAutocomplete({
     setLoading(true);
     const handle = setTimeout(async () => {
       try {
-        const data = await searchReptileSpecies(trimmed, 8);
+        const data = await searchReptileSpecies(trimmed, 8, taxon);
         setResults(data);
       } catch {
         // Network errors during typing are noisy; swallow + keep last
@@ -101,7 +106,7 @@ export function ReptileSpeciesAutocomplete({
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(handle);
-  }, [query]);
+  }, [query, taxon]);
 
   function handleInput(next: string) {
     userTyped.current = true;

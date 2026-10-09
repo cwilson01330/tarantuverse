@@ -14,8 +14,11 @@
  *    Decimal fields arrive as strings; we keep them as strings in form state
  *    so the user can see what's there and re-type without precision loss.
  *  - On submit we PUT to /api/v1/animals/{id}. AnimalUpdate on the backend
- *    is all-optional and excludes `taxon` (immutable) plus the denormalized
+ *    is all-optional and excludes `taxon` plus the denormalized
  *    last_fed_at/last_shed_at timestamps — we never write those here.
+ *  - Type: a row with its own Change button (ChangeTaxonDialog), not a
+ *    select. A taxon change is its own endpoint and applies immediately;
+ *    see handleChangeTaxon for why it doesn't wait for Save.
  *  - Danger Zone: typed-confirm delete. CASCADE wipes all weight logs,
  *    feedings, sheds, and photos — the extra friction is load-bearing.
  *
@@ -31,15 +34,20 @@ import { LocationField } from '@/components/LocationPicker'
 import { useAuth } from '@/lib/auth'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import DeleteAnimalModal from '@/components/DeleteAnimalModal'
+import ChangeTaxonDialog from '@/components/ChangeTaxonDialog'
 import { ApiError } from '@/lib/apiClient'
 import { useUnitField } from '@/hooks/useUnitField'
 import {
   type Animal,
   type Sex,
   type Source,
+  type AnimalTaxon,
   type UpdateAnimalPayload,
+  ANIMAL_TAXA,
   animalTitle,
+  changeAnimalTaxon,
   getAnimal,
+  isAnimalTaxon,
   updateAnimal,
 } from '@/lib/animals'
 
@@ -125,6 +133,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [taxonDialog, setTaxonDialog] = useState(false)
   // Length is stored in inches and typed in the keeper's units. Untouched,
   // it saves the original stored value (no round-trip drift).
   const lengthField = useUnitField('length')
@@ -179,6 +188,35 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
     const trimmed = s.trim()
     if (trimmed === '') return null
     return trimmed
+  }
+
+  /**
+   * Apply a taxon change immediately — its own endpoint, its own commit
+   * (POST /animals/{id}/change-taxon), like TV's edit page.
+   *
+   * Merges back only the fields the server rewrites. Replacing the whole form
+   * with the response would discard an edit in progress (the keeper may have
+   * come here to fix a nickname AND the type); those still go out on Save.
+   * Throws on failure so the dialog stays open and shows the reason.
+   */
+  async function handleChangeTaxon(taxon: AnimalTaxon, speciesId: string | null) {
+    try {
+      const updated = await changeAnimalTaxon(animalId, taxon, speciesId)
+      setAnimal(updated)
+      setForm((prev) => ({
+        ...prev,
+        speciesId: updated.herp_species_id,
+        scientificName: updated.scientific_name ?? '',
+        commonName: updated.common_name ?? '',
+        cgdOverride: 'auto',
+      }))
+      setTaxonDialog(false)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        throw new Error(err.message || 'Something went wrong. Your animal was not changed.')
+      }
+      throw new Error('Could not reach the server. Your animal was not changed.')
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -297,6 +335,30 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
           <h2 className={SECTION_HDR_CLS}>Identity</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Type leads because it scopes the species search and care
+                sheet. A row with its own button, not a select: changing it
+                is a separate server operation, applied straight away. */}
+            <div className="sm:col-span-2">
+              <Field label="Type">
+                <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-neutral-950 border border-neutral-800">
+                  <span className="text-xl" aria-hidden="true">
+                    {isAnimalTaxon(animal.taxon) ? ANIMAL_TAXA[animal.taxon].glyph : '🦎'}
+                  </span>
+                  <span className="flex-1 text-sm font-semibold text-neutral-100">
+                    {isAnimalTaxon(animal.taxon) ? ANIMAL_TAXA[animal.taxon].label : animal.taxon}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setTaxonDialog(true)}
+                    aria-label="Change type"
+                    className="px-3.5 py-1.5 rounded-full border border-neutral-700 text-herp-teal text-xs font-bold hover:border-herp-teal hover:bg-herp-teal/10 transition-colors"
+                  >
+                    Change
+                  </button>
+                </div>
+              </Field>
+            </div>
+
             <Field label="Nickname" hint="Optional — what you call them.">
               <input
                 type="text"
@@ -588,6 +650,17 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
       {/* activated by an Enter keypress inside an input.                 */}
       {/* ------------------------------------------------------------- */}
       {isOwner && <DangerZone animal={animal} />}
+
+      {isAnimalTaxon(animal.taxon) && (
+        <ChangeTaxonDialog
+          open={taxonDialog}
+          current={animal.taxon}
+          animalName={animalTitle(animal) || 'this animal'}
+          hasDietOverride={animal.feeds_on_cgd_override != null}
+          onClose={() => setTaxonDialog(false)}
+          onConfirm={handleChangeTaxon}
+        />
+      )}
     </div>
   )
 }

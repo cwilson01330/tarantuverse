@@ -8,6 +8,7 @@ surface, filtered by `taxon`:
   GET    /api/v1/animals/{id}           fetch one
   PUT    /api/v1/animals/{id}           partial update
   DELETE /api/v1/animals/{id}           delete + cascade
+  POST   /api/v1/animals/{id}/change-taxon  correct a mis-filed taxon
 
 Ownership model: every query filters by
 `Animal.user_id == current_user.id`. Anonymous / public reads go
@@ -42,8 +43,10 @@ from app.schemas.animal import (
     AnimalResponse,
     AnimalFeedingStatusItem,
     BrumationRequest,
+    ChangeAnimalTaxonRequest,
     DeleteImpactResponse,
 )
+from app.models.reptile_species import ReptileSpecies
 from app.schemas.feeding import (
     AnimalBulkFeedingRequest,
     AnimalBulkFeedingResult,
@@ -314,7 +317,7 @@ async def create_animal(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new animal for the authenticated user. `taxon` is
-    required and immutable once set."""
+    required; correcting it later is POST /{id}/change-taxon."""
     # Free-tier cap (HV_FREE_TIER_MAX_ANIMALS). Raises 402 with an
     # upgrade-prompt payload when the free keeper is at the limit; premium
     # (any active subscription) is uncapped.
@@ -673,8 +676,8 @@ async def update_animal(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Partial update. Only provided fields are written. `taxon` is
-    immutable — it's not in the update schema."""
+    """Partial update. Only provided fields are written. `taxon` is not
+    in the update schema — it changes only via POST /{id}/change-taxon."""
     animal, access = load_animal(db, current_user, animal_id, "keeper")
     refuse_if_closed(animal)
 
@@ -897,6 +900,121 @@ async def mark_animal_died(
     # a husbandry judgment attached to a record it can no longer describe.
     animal.feeding_paused_reason = None
     animal.feeding_paused_until = None
+
+    db.commit()
+    db.refresh(animal)
+    return animal
+
+
+@router.post("/{animal_id}/change-taxon", response_model=AnimalResponse)
+@policy("keeper")
+async def change_animal_taxon(
+    animal_id: UUID,
+    payload: ChangeAnimalTaxonRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Correct an animal's taxon, keeping its whole history (audit-2 M10).
+
+    HV counterpart of POST /inverts/{id}/change-taxon, with the same rules:
+    keeper role and up (as PUT), same-taxon is a 400, and died/transferred
+    records are NOT refused — TV allows correcting them, and fixing what a
+    memorial says the animal was is a correction, not new husbandry.
+
+    Before this the only fix for a mis-filed herp was delete, which also
+    deletes every pairing it's a parent in, with their clutches and
+    offspring. Here nothing is deleted or re-pointed: every log, photo,
+    event, weight, shed, genotype and breeding row hangs off `animals.id`,
+    which doesn't change. (TV's version is longer only because it has
+    legacy mirror rows to unwind — HV has none.)
+
+    What does change:
+      - species: a picked `herp_species_id` must belong to the new taxon
+        (400 otherwise, 404 if missing). With none picked, a link to a
+        species from another group is cleared along with its cached
+        scientific name, as TV does; the keeper's common name stays.
+      - feeds_on_cgd_override goes back to NULL (inherit). It is a per-animal
+        deviation from a species' diet default; the species it deviated from
+        is gone, and a leftover `true` would put a snake on the 4-day CGD
+        reminder (AnimalResponse.feeds_on_cgd = override ?? species).
+      - pairings: left in place, never deleted. The pairing's denormalized
+        `taxon` ("both parents' group") is updated only when the mate is now
+        the same new taxon — i.e. the keeper has fixed both parents — so a
+        held-back hatchling gets the right group. A pairing whose parents
+        now differ keeps its old label; TV has no cross-taxon pairing rule
+        to copy, and refusing would push the keeper back to deleting.
+      - everything else (cadence, brumation, lengths, genes, notes) describes
+        the individual, not its group, and is kept.
+    """
+    animal, _access = load_animal(db, current_user, animal_id, "keeper")
+
+    new_taxon = payload.taxon
+    if animal.taxon == new_taxon:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Already a {new_taxon}.",
+        )
+
+    # Resolve the species before mutating anything, so a bad id fails clean.
+    species = None
+    if payload.herp_species_id is not None:
+        species = (
+            db.query(ReptileSpecies)
+            .filter(ReptileSpecies.id == payload.herp_species_id)
+            .first()
+        )
+        if species is None:
+            raise HTTPException(status_code=404, detail="Species not found")
+        if species.taxon != new_taxon:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"{species.scientific_name} isn't listed as a {new_taxon}. "
+                    "Pick a species from that group, or leave it blank."
+                ),
+            )
+
+    animal.taxon = new_taxon
+
+    if species is not None:
+        animal.herp_species_id = species.id
+        animal.scientific_name = species.scientific_name
+        if species.common_names:
+            animal.common_name = species.common_names[0]
+    elif animal.herp_species_id is not None:
+        stale = (
+            db.query(ReptileSpecies)
+            .filter(ReptileSpecies.id == animal.herp_species_id)
+            .first()
+        )
+        if stale is None or stale.taxon != new_taxon:
+            animal.herp_species_id = None
+            animal.scientific_name = None
+
+    animal.feeds_on_cgd_override = None
+
+    pairings = (
+        db.query(ReptilePairing)
+        .filter(
+            (ReptilePairing.male_animal_id == animal.id)
+            | (ReptilePairing.female_animal_id == animal.id)
+        )
+        .all()
+    )
+    if pairings:
+        mate_ids = {
+            p.female_animal_id if p.male_animal_id == animal.id else p.male_animal_id
+            for p in pairings
+        }
+        mates = {
+            m.id: m
+            for m in db.query(Animal).filter(Animal.id.in_(mate_ids)).all()
+        }
+        for p in pairings:
+            mate_id = p.female_animal_id if p.male_animal_id == animal.id else p.male_animal_id
+            mate = mates.get(mate_id)
+            if mate is not None and mate.taxon == new_taxon:
+                p.taxon = new_taxon
 
     db.commit()
     db.refresh(animal)

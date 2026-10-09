@@ -1,19 +1,22 @@
 """Animal schemas — unified Herpetoverse taxon record.
 
 Implements ADR-003. Replaces the per-taxon Snake / Lizard / Frog
-schemas. `taxon` is set once on create and is immutable thereafter
-(it's not in AnimalUpdate) — an animal doesn't change taxon.
+schemas. `taxon` is set on create and is NOT in AnimalUpdate; correcting
+a mis-filed taxon goes through POST /animals/{id}/change-taxon
+(ChangeAnimalTaxonRequest), never through an ordinary edit.
 
 The species FK field is `herp_species_id` (table renamed from
 reptile_species in anh_20260514). The catalog *route* stays
 `/api/v1/reptile-species/` because appalachiantarantulas.com reads it
 — only the table + this FK field were renamed.
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 from typing import Any, Optional
 from datetime import date, datetime
 from decimal import Decimal
 import uuid
+
+from app.models.animal import ANIMAL_TAXON_VALUES
 
 
 class AnimalBase(BaseModel):
@@ -86,7 +89,8 @@ class AnimalCreate(AnimalBase):
 
 class AnimalUpdate(AnimalBase):
     """Schema for updating an animal. Inherits all-optional from
-    AnimalBase. `taxon` is intentionally absent — immutable."""
+    AnimalBase. `taxon` is intentionally absent — it changes only through
+    POST /animals/{id}/change-taxon (ChangeAnimalTaxonRequest)."""
     herp_species_id: Optional[uuid.UUID] = None
     enclosure_id: Optional[uuid.UUID] = None
     # Denormalized timestamps are usually updated by the app from
@@ -137,6 +141,29 @@ class BrumationRequest(BaseModel):
     current rest, not a history."""
     active: bool
     started_at: Optional[date] = None
+
+
+class ChangeAnimalTaxonRequest(BaseModel):
+    """Correct an animal's taxon (POST /animals/{id}/change-taxon, audit-2 M10).
+
+    Its own request model rather than a field on AnimalUpdate, mirroring TV's
+    ChangeTaxonRequest: an edit form echoes back what it fetched, and a taxon
+    change must be asked for on purpose, never as a side effect of a save.
+
+    `herp_species_id` (alias `species_id`, TV's name) is optional. Without it
+    a species link from the OLD group is cleared — a corn snake's care sheet
+    on an animal now filed as a lizard would drive the wrong prey sizes and
+    feeding cadence. Better blank than wrong.
+
+    The pattern is built from ANIMAL_TAXON_VALUES rather than copied, so this
+    can't become one more hand-maintained taxon list.
+    """
+    taxon: str = Field(
+        ..., pattern="^(" + "|".join(ANIMAL_TAXON_VALUES) + ")$"
+    )
+    herp_species_id: Optional[uuid.UUID] = Field(
+        None, validation_alias=AliasChoices("herp_species_id", "species_id")
+    )
 
 
 class DeleteImpactResponse(BaseModel):

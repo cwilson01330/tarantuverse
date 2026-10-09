@@ -13,6 +13,10 @@
  * future cleanup pass extracts the shared body into a `ReptileForm`
  * component that both screens compose. Add a TODO to revisit.
  *
+ * Type (taxon) is a row with its own Change button opening ChangeTaxonSheet
+ * (POST /animals/{id}/change-taxon, audit-2 M10) — applied immediately, never
+ * sent with Save. See handleChangeTaxon.
+ *
  * TODO(bundle 6+): Extract shared form body into `<ReptileForm />` so
  * add + edit don't drift in field shape, validation, or copy.
  */
@@ -45,13 +49,18 @@ import { EnclosurePicker } from '../components/forms/EnclosurePicker';
 import { LocationPicker } from '../components/LocationPicker';
 import { useAuth } from '../contexts/AuthContext';
 import { ReptileSpeciesAutocomplete } from '../components/forms/ReptileSpeciesAutocomplete';
+import { ChangeTaxonSheet } from '../components/ChangeTaxonSheet';
 import {
   type Animal,
+  type AnimalTaxon,
   type Sex,
   type Source,
   type UpdateAnimalPayload,
+  ANIMAL_TAXA,
   animalTitle,
+  changeAnimalTaxon,
   getAnimal,
+  isAnimalTaxon,
   updateAnimal,
 } from '../lib/animals';
 import { confirmDeleteAnimal } from '../lib/confirm-delete-animal';
@@ -110,6 +119,9 @@ export function EditReptileScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [taxonSheet, setTaxonSheet] = useState(false);
+  const [taxonSaving, setTaxonSaving] = useState(false);
+  const [taxonError, setTaxonError] = useState<string | null>(null);
 
   // Fetch + prefill. We don't refetch on every focus — only on first
   // mount — because the user is in mid-edit and an unsolicited refetch
@@ -158,6 +170,33 @@ export function EditReptileScreen() {
       };
     }, [id, animal]),
   );
+
+  /**
+   * Apply a taxon change immediately — its own endpoint, its own commit.
+   * Merges back only the fields the server rewrites, so any edit in progress
+   * on this form survives and still goes out on Save. On failure the sheet
+   * stays open with the reason; nothing was changed server-side.
+   */
+  async function handleChangeTaxon(taxon: AnimalTaxon, newSpeciesId: string | null) {
+    if (!id || taxonSaving) return;
+    setTaxonSaving(true);
+    setTaxonError(null);
+    try {
+      const updated = await changeAnimalTaxon(id, taxon, newSpeciesId);
+      setAnimal(updated);
+      setSpeciesId(updated.herp_species_id);
+      setScientificName(updated.scientific_name ?? '');
+      setCommonName(updated.common_name ?? '');
+      setCgdOverride('auto');
+      setTaxonSheet(false);
+    } catch (err) {
+      setTaxonError(
+        extractErrorMessage(err, 'Something went wrong. Your animal was not changed.'),
+      );
+    } finally {
+      setTaxonSaving(false);
+    }
+  }
 
   async function handleSave() {
     if (!id || submitting) return;
@@ -278,6 +317,44 @@ export function EditReptileScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Type leads because it scopes the species search and care
+              sheet. Its own button, not a chip group: changing it is a
+              separate server operation, applied straight away. */}
+          <Field label="Type">
+            <View
+              style={[
+                styles.typeRow,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderRadius: layout.radius.md,
+                },
+              ]}
+            >
+              <Text style={styles.typeGlyph}>
+                {isAnimalTaxon(animal.taxon) ? ANIMAL_TAXA[animal.taxon].glyph : '🦎'}
+              </Text>
+              <Text style={[styles.typeLabel, { color: colors.textPrimary }]}>
+                {isAnimalTaxon(animal.taxon) ? ANIMAL_TAXA[animal.taxon].label : animal.taxon}
+              </Text>
+              {isAnimalTaxon(animal.taxon) && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setTaxonError(null);
+                    setTaxonSheet(true);
+                  }}
+                  style={[styles.typeButton, { borderColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change type"
+                >
+                  <Text style={[styles.typeButtonText, { color: colors.primary }]}>
+                    Change
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </Field>
+
           <Field label="Name" hint="What you call them.">
             <ThemedInput
               value={name}
@@ -459,6 +536,22 @@ export function EditReptileScreen() {
           </View>}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {isAnimalTaxon(animal.taxon) && (
+        <ChangeTaxonSheet
+          visible={taxonSheet}
+          current={animal.taxon}
+          animalName={animalTitle(animal) || 'this animal'}
+          hasDietOverride={animal.feeds_on_cgd_override != null}
+          saving={taxonSaving}
+          error={taxonError}
+          onClose={() => {
+            setTaxonSheet(false);
+            setTaxonError(null);
+          }}
+          onConfirm={handleChangeTaxon}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -498,6 +591,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  typeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  typeGlyph: { fontSize: 20 },
+  typeLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+  typeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  typeButtonText: { fontSize: 12, fontWeight: '700' },
   dangerHelp: {
     fontSize: 12,
     fontStyle: 'italic',
