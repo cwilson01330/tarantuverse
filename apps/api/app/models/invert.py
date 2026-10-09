@@ -22,6 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.sql.expression import false as sa_false
 import uuid
 
 from app.database import Base
@@ -141,6 +142,15 @@ class Invert(Base):
     photo_url = Column(String(500))
     is_public = Column(Boolean, default=False)
     visibility = Column(String(20), default='private')
+    # True once the KEEPER has chosen this animal's visibility (an edit that
+    # changed it, or a value sent at create). False = it was inherited from
+    # the collection at create (or a transfer claim). Turning the collection
+    # private->public flips only non-explicit private animals, so a hidden
+    # holdback stays hidden (`routers/auth.py::_cascade_collection_to_public`).
+    # Lives on `inverts` only; the legacy tables have no copy.
+    visibility_explicit = Column(
+        Boolean, nullable=False, default=False, server_default=sa_false(),
+    )
     notes = Column(Text)
     # Written FOR a sitter (PRD-shared-keeping). Deliberately separate from
     # `notes`/`enclosure_notes`, which are private and never reach a pass —

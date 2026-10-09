@@ -35,6 +35,7 @@ from app.services.inverts_dualwrite import (
 )
 from app.utils.access import policy, require_own_enclosure
 from app.utils.photo_cleanup import collect_for_animal, delete_files
+from app.utils.animal_visibility import mark_explicit, visibility_changed, visibility_chosen_at_create
 
 router = APIRouter()
 
@@ -166,6 +167,7 @@ async def create_scorpion(
 
     payload = _coerce_enums(scorpion_data.model_dump())
 
+    chose_visibility = visibility_chosen_at_create(payload.get("visibility"))
     # Default visibility to the owner's profile visibility, matching
     # the tarantula router.
     if not payload.get("visibility"):
@@ -179,7 +181,9 @@ async def create_scorpion(
     # ADR-005 A2 mirror — flush so the new id is materialized, then
     # insert the matching `inverts` row in the same transaction.
     db.flush()
-    mirror_scorpion_create(db, new_scorpion)
+    mirror = mirror_scorpion_create(db, new_scorpion)
+    if chose_visibility:
+        mark_explicit(mirror)
     db.commit()
     db.refresh(new_scorpion)
 
@@ -244,11 +248,15 @@ async def update_scorpion(
         _validate_colony(db, current_user, update_data["colony_id"])
 
     update_data = _coerce_enums(update_data)
+    chose_visibility = visibility_changed(scorpion, update_data)
     for field, value in update_data.items():
         setattr(scorpion, field, value)
 
-    # ADR-005 A2 mirror — keep the unified `inverts` row in sync.
-    mirror_scorpion_update(db, scorpion)
+    # ADR-005 A2 mirror — keep the unified `inverts` row in sync. The
+    # "keeper chose this visibility" flag lives on the mirror only.
+    mirror = mirror_scorpion_update(db, scorpion)
+    if chose_visibility:
+        mark_explicit(mirror)
     db.commit()
     db.refresh(scorpion)
     return scorpion

@@ -183,24 +183,29 @@ def _apply_forward(invert: "Invert", fields: dict, owned: frozenset) -> None:
         setattr(invert, k, v)
 
 
-def mirror_tarantula_create(db: Session, t: "Tarantula") -> None:
-    """Insert a matching `inverts` row for a newly-created Tarantula."""
-    db.add(Invert(**_tarantula_to_invert_kwargs(t)))
+def mirror_tarantula_create(db: Session, t: "Tarantula") -> "Invert":
+    """Insert a matching `inverts` row for a newly-created Tarantula.
+    Returns it (callers set invert-only columns such as visibility_explicit)."""
+    invert = Invert(**_tarantula_to_invert_kwargs(t))
+    db.add(invert)
+    return invert
 
 
-def mirror_tarantula_update(db: Session, t: "Tarantula") -> None:
+def mirror_tarantula_update(db: Session, t: "Tarantula") -> "Invert":
     """Update the matching `inverts` row to reflect a Tarantula edit.
 
     If the matching Invert doesn't exist (legacy row created before A2,
     backfill hasn't run yet), we lazily insert it — that keeps the two
     surfaces consistent without waiting for backfill. From Phase B
-    onward this path stops triggering."""
+    onward this path stops triggering. Returns the mirror row."""
     invert = db.query(Invert).filter(Invert.id == t.id).first()
     fields = _tarantula_to_invert_kwargs(t)
     if invert is None:
-        db.add(Invert(**fields))
-        return
+        invert = Invert(**fields)
+        db.add(invert)
+        return invert
     _apply_forward(invert, fields, _INVERT_OWNED_TARANTULA)
+    return invert
 
 
 def mirror_tarantula_delete(db: Session, tarantula_id: UUID) -> None:
@@ -215,17 +220,21 @@ def mirror_tarantula_delete(db: Session, tarantula_id: UUID) -> None:
         db.delete(invert)
 
 
-def mirror_scorpion_create(db: Session, s: "Scorpion") -> None:
-    db.add(Invert(**_scorpion_to_invert_kwargs(s)))
+def mirror_scorpion_create(db: Session, s: "Scorpion") -> "Invert":
+    invert = Invert(**_scorpion_to_invert_kwargs(s))
+    db.add(invert)
+    return invert
 
 
-def mirror_scorpion_update(db: Session, s: "Scorpion") -> None:
+def mirror_scorpion_update(db: Session, s: "Scorpion") -> "Invert":
     invert = db.query(Invert).filter(Invert.id == s.id).first()
     fields = _scorpion_to_invert_kwargs(s)
     if invert is None:
-        db.add(Invert(**fields))
-        return
+        invert = Invert(**fields)
+        db.add(invert)
+        return invert
     _apply_forward(invert, fields, _INVERT_OWNED_SCORPION)
+    return invert
 
 
 def mirror_scorpion_delete(db: Session, scorpion_id: UUID) -> None:

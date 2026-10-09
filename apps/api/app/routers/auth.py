@@ -2,6 +2,7 @@
 Authentication routes
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel
@@ -44,27 +45,43 @@ router = APIRouter()
 
 
 def _cascade_collection_to_public(db: Session, user_id) -> None:
-    """Flip a keeper's currently-private animals to public when their
-    profile goes public.
+    """Flip a keeper's DEFAULT-private animals to public when their profile
+    goes public. Animals the keeper hid by hand stay hidden.
+
+    "Hidden by hand" is `inverts.visibility_explicit` (2026-10-09): set when
+    the keeper changes an animal's visibility or sends one at create; never
+    set by inheriting the collection's visibility. Before it existed this
+    flipped EVERY private animal, so a breeder's hidden holdbacks went public
+    each time they reopened their profile.
 
     Writes across BOTH the unified `inverts` surface and the legacy
-    per-taxon tables so the dual-write invariant holds — otherwise the
-    `inverts` mirror drifts stale (the bug this replaced: a bulk
-    Tarantula update that never touched `inverts`).
+    per-taxon tables so the dual-write invariant holds. The flag lives on
+    `inverts` only; legacy `tarantulas`/`scorpions` rows share the invert's
+    id, so they're skipped when their mirror is explicit (a legacy row with
+    no mirror has no recorded choice and flips as before).
 
-    Coverage: `inverts` catches every taxon including centipedes (which
-    have no legacy table); `tarantulas` + `scorpions` keep their legacy
-    rows in sync. Only private→public is cascaded — going public→private
-    preserves individual per-animal hide choices.
+    Only private→public is cascaded — going public→private preserves
+    individual per-animal choices.
     """
     from app.models.invert import Invert
     from app.models.tarantula import Tarantula
     from app.models.scorpion import Scorpion
 
-    for model in (Invert, Tarantula, Scorpion):
+    db.query(Invert).filter(
+        Invert.user_id == user_id,
+        Invert.visibility == 'private',
+        Invert.visibility_explicit.is_(False),
+    ).update({Invert.visibility: 'public'}, synchronize_session=False)
+
+    hidden_by_hand = (
+        select(Invert.id)
+        .where(Invert.user_id == user_id, Invert.visibility_explicit.is_(True))
+    )
+    for model in (Tarantula, Scorpion):
         db.query(model).filter(
             model.user_id == user_id,
             model.visibility == 'private',
+            model.id.not_in(hidden_by_hand),
         ).update({model.visibility: 'public'}, synchronize_session=False)
 
 

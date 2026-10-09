@@ -57,6 +57,7 @@ from app.utils.access import (
 from app.services.retaxon_service import change_invert_taxon
 from app.schemas.death import MarkDiedRequest
 from app.utils.photo_cleanup import collect_for_animal, delete_files
+from app.utils.animal_visibility import mark_explicit, visibility_changed, visibility_chosen_at_create
 
 router = APIRouter()
 
@@ -219,6 +220,9 @@ def create_invert_row(
     # One spelling per place per keeper — see utils/locations.
     data["location"] = canonical_location(db, user.id, data.get("location"))
 
+    # Inheriting the collection's visibility is not a keeper choice; sending
+    # one is (utils/animal_visibility).
+    data["visibility_explicit"] = visibility_chosen_at_create(data.get("visibility"))
     if not data.get("visibility"):
         data["visibility"] = (
             "public" if user.collection_visibility == "public" else "private"
@@ -641,8 +645,13 @@ async def update_invert(
     data = _coerce_enums(data)
     if "location" in data:
         data["location"] = canonical_location(db, access.owner.id, data["location"])
+    # Edit forms echo `visibility` on every save; only a CHANGE is the keeper
+    # hiding/showing the animal (utils/animal_visibility).
+    chose_visibility = visibility_changed(invert, data)
     for field, value in data.items():
         setattr(invert, field, value)
+    if chose_visibility:
+        mark_explicit(invert)
 
     # Push the edit back onto the legacy tarantulas/scorpions row.
     #

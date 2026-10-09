@@ -39,6 +39,7 @@ from app.utils.dependencies import get_current_user
 from app.utils.limits import active_inverts_query, enforce_collection_limit
 from app.utils.access import policy, require_own_enclosure
 from app.utils.photo_cleanup import collect_for_animal, delete_files
+from app.utils.animal_visibility import mark_explicit, visibility_changed, visibility_chosen_at_create
 
 router = APIRouter()
 
@@ -143,6 +144,7 @@ async def create_centipede(
 
     # Default visibility to the owner's profile preference, matching
     # the tarantula + scorpion path.
+    data["visibility_explicit"] = visibility_chosen_at_create(data.get("visibility"))
     if not data.get("visibility"):
         data["visibility"] = (
             "public" if current_user.collection_visibility == "public"
@@ -204,8 +206,11 @@ async def update_centipede(
         _validate_species(db, data["species_id"])
 
     data = _coerce_enums(data)
+    chose_visibility = visibility_changed(centipede, data)
     for field, value in data.items():
         setattr(centipede, field, value)
+    if chose_visibility:
+        mark_explicit(centipede)
 
     db.commit()
     db.refresh(centipede)

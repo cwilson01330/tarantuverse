@@ -41,6 +41,7 @@ from app.services.inverts_dualwrite import (
 from app.utils.access import load_invert, policy
 from app.utils.photo_cleanup import collect_for_animal, delete_files
 from app.utils.legacy_logs import tarantula_logs
+from app.utils.animal_visibility import mark_explicit, visibility_changed, visibility_chosen_at_create
 
 router = APIRouter()
 
@@ -157,6 +158,7 @@ async def create_tarantula(
     # visible to themselves regardless. If the client explicitly passed
     # a `visibility` value, respect it — this lets keepers opt a new
     # tarantula into being hidden at creation time.
+    chose_visibility = visibility_chosen_at_create(tarantula_dict.get('visibility'))
     if 'visibility' not in tarantula_dict or tarantula_dict.get('visibility') is None:
         tarantula_dict['visibility'] = (
             'public' if current_user.collection_visibility == 'public' else 'private'
@@ -171,7 +173,9 @@ async def create_tarantula(
     # Flush so new_tarantula.id is populated before we build the
     # mirrored Invert row — both inserts then commit atomically.
     db.flush()
-    mirror_tarantula_create(db, new_tarantula)
+    mirror = mirror_tarantula_create(db, new_tarantula)
+    if chose_visibility:
+        mark_explicit(mirror)
     db.flush()
     _write_location_to_mirror(db, new_tarantula, location_raw)
     db.commit()
@@ -268,11 +272,15 @@ async def update_tarantula(
             update_data['source'] = Source(update_data['source'])
         except ValueError:
             pass
+    chose_visibility = visibility_changed(tarantula, update_data)
     for field, value in update_data.items():
         setattr(tarantula, field, value)
 
-    # Mirror the same edit to the unified `inverts` row (ADR-005 A2).
-    mirror_tarantula_update(db, tarantula)
+    # Mirror the same edit to the unified `inverts` row (ADR-005 A2). The
+    # "keeper chose this visibility" flag lives on the mirror only.
+    mirror = mirror_tarantula_update(db, tarantula)
+    if chose_visibility:
+        mark_explicit(mirror)
     if location_set:
         db.flush()
         _write_location_to_mirror(db, tarantula, location_raw)
