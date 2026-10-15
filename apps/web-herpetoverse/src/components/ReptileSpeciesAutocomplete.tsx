@@ -20,6 +20,7 @@ import {
   searchReptileSpecies,
   type ReptileSpeciesSearchResult,
 } from '@/lib/reptileSpecies'
+import type { AnimalTaxon } from '@/lib/animals'
 
 interface Props {
   /** The currently selected species id, if any. */
@@ -38,6 +39,12 @@ interface Props {
   onPick?: (species: ReptileSpeciesSearchResult) => void
   placeholder?: string
   autoFocus?: boolean
+  /**
+   * The animal's taxon. When set, only species filed under it are offered —
+   * the API refuses a species from another group (routers/animals.py
+   * species_for_taxon), so offering one would only end in an error.
+   */
+  taxon?: AnimalTaxon | null
 }
 
 const DEBOUNCE_MS = 300
@@ -49,6 +56,7 @@ export default function ReptileSpeciesAutocomplete({
   onPick,
   placeholder = 'Python regius',
   autoFocus = false,
+  taxon = null,
 }: Props) {
   const [query, setQuery] = useState(scientificName)
   const [results, setResults] = useState<ReptileSpeciesSearchResult[]>([])
@@ -77,7 +85,7 @@ export default function ReptileSpeciesAutocomplete({
     setLoading(true)
     const handle = setTimeout(async () => {
       try {
-        const data = await searchReptileSpecies(trimmed, 8)
+        const data = await searchReptileSpecies(trimmed, 8, taxon ?? undefined)
         setResults(data)
         setHighlight(data.length > 0 ? 0 : -1)
       } catch {
@@ -87,7 +95,7 @@ export default function ReptileSpeciesAutocomplete({
       }
     }, DEBOUNCE_MS)
     return () => clearTimeout(handle)
-  }, [query, speciesId])
+  }, [query, speciesId, taxon])
 
   // Close on outside click.
   useEffect(() => {

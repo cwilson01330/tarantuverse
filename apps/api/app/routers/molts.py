@@ -27,6 +27,7 @@ from app.services.activity_service import create_activity
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.utils.legacy_logs import tarantula_logs
 from app.utils.instar import adjust_instar_for_molt
+from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_legacy
 
 router = APIRouter()
 
@@ -72,6 +73,7 @@ async def create_molt_log(
 
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
+    refuse_if_closed_legacy(db, tarantula)  # no new logs on a died / transferred animal
 
     new_molt = MoltLog(
         tarantula_id=tarantula_id,
@@ -152,6 +154,7 @@ async def create_scorpion_molt_log(
     ).first()
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
+    refuse_if_closed_legacy(db, scorpion)
 
     new_molt = MoltLog(
         scorpion_id=scorpion_id,
@@ -217,6 +220,7 @@ async def create_centipede_molt_log(
     ).first()
     if not centipede:
         raise HTTPException(status_code=404, detail="Centipede not found")
+    refuse_if_closed_invert(centipede)
 
     new_molt = MoltLog(
         invert_id=centipede_id,
@@ -276,6 +280,7 @@ async def create_whip_spider_molt_log(
     ).first()
     if not whip_spider:
         raise HTTPException(status_code=404, detail="Whip spider not found")
+    refuse_if_closed_invert(whip_spider)
 
     new_molt = MoltLog(
         invert_id=whip_spider_id,
@@ -324,6 +329,7 @@ async def create_invert_molt_log(
 ):
     """Log a molt for any invert the caller owns. Sets only invert_id."""
     invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
+    refuse_if_closed_invert(invert)  # no new logs on a died / transferred animal
     new_molt = MoltLog(**invert_log_fields(db, invert), logged_by_user_id=access.logged_by_user_id, **molt_data.model_dump())
     db.add(new_molt)
     db.flush()

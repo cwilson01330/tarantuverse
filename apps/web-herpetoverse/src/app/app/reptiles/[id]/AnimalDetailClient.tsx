@@ -1482,7 +1482,9 @@ function FeedingIntelligence({
 
   const overdue = useMemo(() => {
     // A brumating animal isn't overdue — the keeper has said it's resting.
+    // Nor is one that died or was transferred — it has no next feeding.
     if (!nextWindow || animal.brumation_active) return false
+    if (animal.died_at || animal.transferred_out_at) return false
     return Date.now() > nextWindow.max.getTime()
   }, [nextWindow, animal.brumation_active])
 

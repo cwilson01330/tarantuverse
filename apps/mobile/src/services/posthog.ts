@@ -11,6 +11,7 @@
  * running (and keep shipping OTA updates) even if the key isn't wired
  * to the EAS build env yet.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PostHog from 'posthog-react-native';
 
 const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY;
@@ -28,6 +29,12 @@ export async function initPostHog(): Promise<PostHog | null> {
     // posthog-react-native renamed this option in a recent release.
     captureNativeAppLifecycleEvents: true,
     enableSessionReplay: false,
+    // Persist through AsyncStorage explicitly. Left to itself the SDK
+    // (3.16.x) prefers expo-file-system's old API, which throws on SDK 54
+    // ("deprecated, import from expo-file-system/legacy") — every persist
+    // was an unhandled rejection and the anonymous id / event queue were
+    // never saved.
+    customStorage: AsyncStorage,
   });
   await posthog.ready;
   return posthog;

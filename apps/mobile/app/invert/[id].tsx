@@ -111,9 +111,10 @@ function InvertDetailScreen() {
   const { user, units } = useAuth();
   const { role, ownerName } = useCollectionRole(user?.id, invert?.user_id);
   const isOwner = role === 'owner';
-  // A died animal is a historical record (ADR-015 §14.3): readable, closed to
-  // new logs. canKeep stays so Undo / Edit details remain available.
-  const canLog = can(role, 'logger') && !invert?.died_at;
+  // A died or transferred animal is a historical record (ADR-015 §14.3):
+  // readable, closed to new logs — the API answers 409 for both
+  // (utils/closed_animals). canKeep stays so Undo / Edit details remain.
+  const canLog = can(role, 'logger') && !invert?.died_at && !invert?.transferred_out_at;
   const canKeep = can(role, 'keeper');
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
 
@@ -382,15 +383,16 @@ function InvertDetailScreen() {
     // than on the edit form — a keeper adding their first sling has no basis
     // for answering this and should never be asked. Wording is an offer, not a
     // setting, because most keepers never need it.
-    {
-      need: 'keeper',
+    // No feeding schedule for an animal that's gone.
+    ...(invert.died_at || invert.transferred_out_at ? [] : [{
+      need: 'keeper' as const,
       key: 'cadence',
       label: invert.feeding_interval_days
         ? `Feeding schedule — every ${invert.feeding_interval_days}d`
         : 'Feed on my own schedule',
-      icon: 'calendar-clock',
+      icon: 'calendar-clock' as const,
       onPress: () => setCadenceOpen(true),
-    },
+    }]),
     {
       need: 'owner',
       key: 'delete',
@@ -454,7 +456,9 @@ function InvertDetailScreen() {
   // "feed every 7 days" would quietly become husbandry advice.
   const lastPrey = feedings.find((f) => f.accepted)?.food_type?.trim() || null;
   const feedingVerdict = (() => {
-    if (!feedingStats) return null;
+    // A died or transferred animal has no next feeding — no countdown, no
+    // "overdue" nag.
+    if (!feedingStats || invert?.died_at || invert?.transferred_out_at) return null;
     const d = feedingStats.days_since_last_feeding;
     const iv = feedingStats.interval_days;
 

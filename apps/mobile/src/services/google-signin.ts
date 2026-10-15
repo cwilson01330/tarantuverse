@@ -50,6 +50,9 @@ export type ProviderIdentity = {
   /** The raw signed ID / identity token. This is the ONLY field the server
    *  trusts — it verifies the signature against the provider's JWKS. */
   idToken: string;
+  /** Apple only: one-time code the server exchanges for a revocable refresh
+   *  token (account deletion revokes it). Send as `authorization_code`. */
+  authorizationCode?: string;
   /** Display-only echoes of the provider profile. The server ignores these. */
   id?: string;
   email?: string;
@@ -118,6 +121,7 @@ export const getAppleIdentity = async (): Promise<ProviderIdentity> => {
   return {
     provider: 'apple',
     idToken: credential.identityToken,
+    authorizationCode: credential.authorizationCode ?? undefined,
     id: credential.user,
     email: credential.email ?? undefined,
     name: name || undefined,
@@ -303,6 +307,9 @@ export const signInWithApple = async (): Promise<{
       body: JSON.stringify({
         provider: 'apple',
         identity_token: credential.identityToken,
+        // One-time code the server exchanges for a refresh token, so deleting
+        // the account can revoke Sign in with Apple (App Store 5.1.1(v)).
+        authorization_code: credential.authorizationCode ?? undefined,
         name: name || 'Apple User',
       }),
     });

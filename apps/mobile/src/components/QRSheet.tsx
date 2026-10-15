@@ -41,7 +41,10 @@ interface QRSheetProps {
 type Tab = 'upload' | 'profile'
 type UploadState = 'idle' | 'loading' | 'ready' | 'received' | 'expired'
 
-const WEB_BASE = process.env.EXPO_PUBLIC_WEB_URL || 'https://tarantuverse.com'
+// www, not the apex: the apex redirects /.well-known/* to www, which fails
+// Universal Link / App Link verification, so apex label URLs open the browser
+// instead of the app.
+const WEB_BASE = process.env.EXPO_PUBLIC_WEB_URL || 'https://www.tarantuverse.com'
 
 export default function QRSheet({
   visible,
@@ -111,9 +114,13 @@ export default function QRSheet({
         } catch { /* ignore */ }
       }, 3000)
 
-    } catch {
+    } catch (e: any) {
       setUploadState('idle')
-      Alert.alert('Error', 'Failed to generate QR code. Please try again.')
+      // 409 = a died or transferred animal takes no new photos; the server
+      // says which, so show that rather than "try again".
+      const detail = e?.response?.status === 409 ? e?.response?.data?.detail : null
+      if (typeof detail === 'string') Alert.alert("Can't add photos", detail)
+      else Alert.alert('Error', 'Failed to generate QR code. Please try again.')
     }
   }
 

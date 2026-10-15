@@ -34,6 +34,7 @@ import { apiClient } from '../../src/services/api';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { MenuRow, MenuSection } from '../../src/components/YouMenu';
 import { TYPE } from '../../src/theme/tokens';
+import { openStorePage } from '../../src/lib/reviewPrompt';
 
 const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
 const DELETE_CONFIRM_WORD = 'DELETE';
@@ -292,6 +293,7 @@ function ProfileScreen() {
 
       <MenuSection title="Help & legal">
         <MenuRow icon="lifebuoy" label="Contact support" onPress={() => router.push('/support')} />
+        <MenuRow icon="star-outline" label="Rate the app" external onPress={() => { void openStorePage(); }} />
         <MenuRow icon="refresh" label="Check for updates" busy={checkingUpdate} onPress={handleCheckForUpdate} />
         <MenuRow
           icon="school-outline"

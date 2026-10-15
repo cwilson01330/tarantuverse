@@ -43,6 +43,11 @@ from app.services.feeding_reminder_service import get_user_feeding_reminders
 from app.services.inverts_dualwrite import invert_id_if_exists
 from app.utils.legacy_logs import tarantula_logs
 from app.routers.animals import refuse_if_closed
+from app.utils.closed_animals import (
+    refuse_if_closed_invert,
+    refuse_if_closed_legacy,
+    skip_reason,
+)
 
 router = APIRouter()
 
@@ -89,6 +94,7 @@ async def create_feeding_log(
 
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
+    refuse_if_closed_legacy(db, tarantula)  # no new logs on a died / transferred animal
 
     # Create feeding log. invert_id is set if the corresponding Invert
     # row exists (which it does for any tarantula created post-A2 or
@@ -304,6 +310,7 @@ async def create_scorpion_feeding_log(
 
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
+    refuse_if_closed_legacy(db, scorpion)
 
     # ADR-005 A2 — also set invert_id when the corresponding row exists.
     new_feeding = FeedingLog(
@@ -378,6 +385,7 @@ async def create_centipede_feeding_log(
     ).first()
     if not centipede:
         raise HTTPException(status_code=404, detail="Centipede not found")
+    refuse_if_closed_invert(centipede)
 
     new_feeding = FeedingLog(
         invert_id=centipede_id,
@@ -437,6 +445,7 @@ async def create_whip_spider_feeding_log(
     ).first()
     if not whip_spider:
         raise HTTPException(status_code=404, detail="Whip spider not found")
+    refuse_if_closed_invert(whip_spider)
 
     new_feeding = FeedingLog(
         invert_id=whip_spider_id,
@@ -489,6 +498,7 @@ async def create_invert_feeding_log(
     the legacy tarantula screens (utils/access.invert_log_fields).
     """
     invert, access = load_invert(db, current_user, invert_id, "logger")
+    refuse_if_closed_invert(invert)  # no new logs on a died / transferred animal
     new_feeding = FeedingLog(
         **invert_log_fields(db, invert),
         logged_by_user_id=access.logged_by_user_id,
@@ -573,8 +583,9 @@ async def bulk_create_invert_feedings(
     """Log one feeding event across many owned inverts at once (Feeding Day).
 
     The same fed_at / accepted / food_type / food_size / notes is applied to
-    each animal. Ids the caller doesn't own are skipped (reported in
-    `skipped`), never fatal. All writes commit together.
+    each animal. Ids the caller doesn't own, and died / transferred animals
+    (utils/closed_animals), are skipped (reported in `skipped`), never fatal.
+    All writes commit together.
 
     An ACCEPTED feeding also resumes any animal that was paused, reported in
     `resumed_ids` so the client can say so rather than silently changing state.
@@ -601,6 +612,12 @@ async def bulk_create_invert_feedings(
     for iid in requested:
         if iid not in owned_ids:
             skipped.append(BulkFeedingSkip(invert_id=iid, reason="Not found or not yours"))
+            continue
+        # A died / transferred animal takes no new logs — skipped and
+        # reported, never fatal to the rest of the batch (stale tab).
+        closed = skip_reason(owned_by_id[iid])
+        if closed:
+            skipped.append(BulkFeedingSkip(invert_id=iid, reason=closed))
             continue
         db.add(
             FeedingLog(

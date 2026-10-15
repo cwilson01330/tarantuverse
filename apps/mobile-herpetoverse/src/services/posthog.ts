@@ -10,6 +10,7 @@
  * and every capture / identify is a no-op. This lets us ship the plumbing
  * before a PostHog key is wired to the Expo build environment.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PostHog from 'posthog-react-native';
 
 const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY;
@@ -31,6 +32,11 @@ export async function initPostHog(): Promise<PostHog | null> {
     captureNativeAppLifecycleEvents: true,
     // No autocapture — only events we explicitly send.
     enableSessionReplay: false,
+    // Persist through AsyncStorage. Left to itself posthog-react-native 3.16
+    // prefers expo-file-system, whose legacy read/write calls throw on SDK 54
+    // (expo-file-system 19): every persist became an unhandled rejection and
+    // the anonymous id / event queue never survived a restart. Same fix as TV.
+    customStorage: AsyncStorage,
   });
   await posthog.ready;
   return posthog;

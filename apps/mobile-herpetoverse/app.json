@@ -16,7 +16,8 @@
       "bundleIdentifier": "com.herpetoverse.app",
       "usesAppleSignIn": true,
       "associatedDomains": [
-        "applinks:herpetoverse.com"
+        "applinks:herpetoverse.com",
+        "applinks:www.herpetoverse.com"
       ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -27,6 +28,10 @@
     "android": {
       "package": "com.herpetoverse.app",
       "googleServicesFile": "./google-services.json",
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.herpetoverse.app",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0B0B"
@@ -36,8 +41,8 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "herpetoverse.com", "pathPrefix": "/a" },
-            { "scheme": "https", "host": "herpetoverse.com", "pathPrefix": "/claim" }
+            { "scheme": "https", "host": "herpetoverse.com", "pathPrefix": "/a/" },
+            { "scheme": "https", "host": "herpetoverse.com", "pathPrefix": "/claim/" }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
@@ -67,6 +72,14 @@
       "expo-notifications",
       "expo-apple-authentication",
       "expo-iap",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Herpetoverse needs access to your photo library so you can attach photos to your reptile profiles — sheds, feedings, and growth over time.",
+          "cameraPermission": "Herpetoverse needs access to your camera so you can photograph your reptiles, sheds, and enclosure setups directly within the app.",
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-media-library",
         {

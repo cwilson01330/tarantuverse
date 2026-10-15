@@ -253,6 +253,43 @@ def _coerce_enums(data: dict) -> dict:
     return data
 
 
+def _taxon_phrase(taxon: str) -> str:
+    return 'under "other"' if taxon == "other" else f"as a {taxon}"
+
+
+def species_for_taxon(db: Session, species_id, taxon: str) -> ReptileSpecies:
+    """The species a keeper picked for an animal of `taxon` — 404 if it
+    doesn't exist, 400 unless the catalog files it under that same taxon.
+
+    One rule for every place a keeper picks a species (create, edit,
+    change-taxon). A species with no group set (`taxon` NULL — the catalog
+    column is nullable) is refused like any other mismatch: nothing says it
+    belongs to this group, and the pickers only offer species of the
+    animal's group. Paths that COPY an existing link instead of picking one
+    (transfer claim, import auto-match) use `species_taxon_conflict` and drop
+    a mismatched link rather than fail."""
+    species = db.query(ReptileSpecies).filter(ReptileSpecies.id == species_id).first()
+    if species is None:
+        raise HTTPException(status_code=404, detail="Species not found")
+    if species.taxon != taxon:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{species.scientific_name} isn't listed {_taxon_phrase(taxon)}. "
+                "Pick a species from that group, or leave it blank."
+            ),
+        )
+    return species
+
+
+def species_taxon_conflict(species, taxon: str) -> bool:
+    """True when `species` is filed under a DIFFERENT group than `taxon`.
+    Used where a link is copied rather than picked: an unset group is not
+    known to be wrong, so it isn't a conflict here."""
+    species_taxon = getattr(species, "taxon", None) if species is not None else None
+    return species_taxon is not None and species_taxon != taxon
+
+
 @router.get("/", response_model=List[AnimalResponse])
 @policy("viewer")
 async def get_animals(
@@ -325,6 +362,8 @@ async def create_animal(
     access = scope_collection(db, current_user, "herpetoverse", collection, need="keeper")
     enforce_animal_limit(db, access.owner)
     require_own_enclosure(db, animal_data.enclosure_id, access.owner)
+    if animal_data.herp_species_id is not None:
+        species_for_taxon(db, animal_data.herp_species_id, animal_data.taxon)
 
     animal_dict = _coerce_enums(strip_owner_only(access, animal_data.model_dump()))
     # One spelling per place per keeper — see utils/locations. Herpetoverse
@@ -684,6 +723,14 @@ async def update_animal(
     update_data = _coerce_enums(strip_owner_only(access, animal_data.model_dump(exclude_unset=True)))
     if "enclosure_id" in update_data:
         require_own_enclosure(db, update_data["enclosure_id"], access.owner)
+    # Species must be filed under the animal's taxon — checked only when the
+    # link is being SET to a different species. Edit forms echo the stored id
+    # on every save, so an untouched link (even an old mismatched or
+    # group-less one) never starts failing an unrelated edit; clearing it
+    # (None) is always allowed.
+    new_species_id = update_data.get("herp_species_id")
+    if new_species_id is not None and new_species_id != animal.herp_species_id:
+        species_for_taxon(db, new_species_id, animal.taxon)
     if "location" in update_data:
         update_data["location"] = canonical_location(
             db, access.owner.id, update_data["location"], SCOPE_HERPETOVERSE
@@ -958,21 +1005,7 @@ async def change_animal_taxon(
     # Resolve the species before mutating anything, so a bad id fails clean.
     species = None
     if payload.herp_species_id is not None:
-        species = (
-            db.query(ReptileSpecies)
-            .filter(ReptileSpecies.id == payload.herp_species_id)
-            .first()
-        )
-        if species is None:
-            raise HTTPException(status_code=404, detail="Species not found")
-        if species.taxon != new_taxon:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"{species.scientific_name} isn't listed as a {new_taxon}. "
-                    "Pick a species from that group, or leave it blank."
-                ),
-            )
+        species = species_for_taxon(db, payload.herp_species_id, new_taxon)
 
     animal.taxon = new_taxon
 

@@ -32,6 +32,7 @@ from app.utils.limits import enforce_photo_cap
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.utils.legacy_logs import tarantula_logs
 from app.routers.animals import refuse_if_closed
+from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_legacy
 
 
 class PhotoUpdate(BaseModel):
@@ -84,6 +85,7 @@ async def upload_photo(
 
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
+    refuse_if_closed_legacy(db, tarantula)  # no new photos on a died / transferred animal
 
     # Free-plan photo limit — one shared check for every TV upload route.
     enforce_photo_cap(db, current_user, tarantula_id)
@@ -325,6 +327,7 @@ async def upload_scorpion_photo(
 
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
+    refuse_if_closed_legacy(db, scorpion)
     enforce_photo_cap(db, current_user, scorpion_id)
 
     try:
@@ -449,6 +452,7 @@ async def upload_centipede_photo(
     ).first()
     if not centipede:
         raise HTTPException(status_code=404, detail="Centipede not found")
+    refuse_if_closed_invert(centipede)
     enforce_photo_cap(db, current_user, centipede_id)
 
     try:
@@ -563,6 +567,7 @@ async def upload_whip_spider_photo(
     ).first()
     if not whip_spider:
         raise HTTPException(status_code=404, detail="Whip spider not found")
+    refuse_if_closed_invert(whip_spider)
     enforce_photo_cap(db, current_user, whip_spider_id)
 
     try:
@@ -673,6 +678,7 @@ async def upload_invert_photo(
 ):
     """Upload a photo for any invert the caller owns. Sets only invert_id."""
     invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
+    refuse_if_closed_invert(invert)  # no new photos on a died / transferred animal
     # The mobile app uploads here — where the free limit mattered most, and
     # was missing. The owner's plan decides, whoever uploads.
     enforce_photo_cap(db, access.owner, invert_id)

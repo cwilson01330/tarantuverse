@@ -47,6 +47,7 @@ import {
   type AnimalFeedingStatus,
 } from '../src/lib/animals';
 import { LocationSheet } from '../src/components/LocationPicker';
+import { maybeRequestReview, noteReviewBlockingError } from '../src/lib/reviewPrompt';
 import {
   UNASSIGNED_KEY,
   bulkSetLocation,
@@ -275,7 +276,10 @@ function FeedingDayScreen() {
       setNotes('');
       setLoadError('');
       await fetchStatus();
+      // Success moment: a whole batch logged. Gated + rate-limited inside.
+      void maybeRequestReview('feeding_day');
     } catch (e: any) {
+      noteReviewBlockingError();
       setLoadError(
         e?.response?.data?.detail || e?.message || 'Failed to log feeding',
       );

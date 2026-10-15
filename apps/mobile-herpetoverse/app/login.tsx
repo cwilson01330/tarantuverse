@@ -31,6 +31,7 @@ import {
 } from '../src/services/google-signin';
 import { apiClient } from '../src/services/api';
 import { HV_WEB_ORIGIN } from '../src/lib/web-origin';
+import { takePostAuthRoute } from '../src/lib/claim';
 
 type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -100,7 +101,8 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
       captureEvent('login_success', { method: 'email' });
-      router.replace('/(tabs)/dashboard');
+      // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
+      router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
     } catch (err: any) {
       if (err?.code === 'email_not_verified') {
         captureEvent('login_failed', { method: 'email', reason: 'unverified' });
@@ -126,7 +128,8 @@ export default function LoginScreen() {
         await loginWithApple();
       }
       captureEvent('login_success', { method: provider });
-      router.replace('/(tabs)/dashboard');
+      // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
+      router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
     } catch (err: any) {
       const msg = err?.message || '';
       // Swallow user-cancelled flows quietly.

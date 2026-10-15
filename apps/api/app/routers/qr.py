@@ -52,6 +52,7 @@ from app.config import settings
 from app.utils.access import policy
 from app.utils.legacy_logs import tarantula_logs
 from app.routers.animals import refuse_if_closed
+from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_legacy
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,8 @@ async def create_upload_session(
     ).first()
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
+    # A died or handed-off animal takes no new photos (utils/closed_animals).
+    refuse_if_closed_legacy(db, tarantula)
 
     # Deactivate any existing sessions for this tarantula
     db.query(QRUploadSession).filter(
@@ -328,6 +331,8 @@ async def create_invert_upload_session(
     ).first()
     if not invert:
         raise HTTPException(status_code=404, detail="Animal not found")
+    # A died or handed-off animal takes no new photos (utils/closed_animals).
+    refuse_if_closed_invert(invert)
 
     # A newly-generated QR supersedes the old one, same as every sibling route.
     db.query(QRUploadSession).filter(
@@ -435,6 +440,7 @@ async def create_scorpion_upload_session(
     ).first()
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
+    refuse_if_closed_legacy(db, scorpion)
 
     # Deactivate any existing active session for this scorpion so a
     # newly-generated QR supersedes the old one — same UX as tarantulas.
@@ -493,6 +499,7 @@ async def create_centipede_upload_session(
     ).first()
     if not centipede:
         raise HTTPException(status_code=404, detail="Centipede not found")
+    refuse_if_closed_invert(centipede)
 
     # Deactivate any existing active session for this centipede so a
     # newly-generated QR supersedes the old one — same UX as the other
@@ -636,10 +643,14 @@ async def upload_photo_via_token(
     # aren't capped (by design) — they fall outside the tuple below.
     qr_kind, qr_parent = _session_parent(session)
     # The session was opened while the animal was live; it may have been
-    # marked died or transferred in the 20 minutes since. Herpetoverse
-    # animals only — the TV invert routes don't refuse closed records.
+    # marked died or transferred in the 20 minutes since — both products
+    # refuse (HV: routers/animals.py, TV: utils/closed_animals.py).
     if qr_kind == "animal" and qr_parent is not None:
         refuse_if_closed(qr_parent)
+    elif qr_kind in ("tarantula", "scorpion") and qr_parent is not None:
+        refuse_if_closed_legacy(db, qr_parent)
+    elif qr_kind == "invert" and qr_parent is not None:
+        refuse_if_closed_invert(qr_parent)
     if qr_kind in ("tarantula", "scorpion", "invert") and session.user is not None:
         from app.utils.limits import enforce_photo_cap
         enforce_photo_cap(

@@ -127,6 +127,9 @@ export async function signInWithApple(): Promise<OAuthResult> {
     // Raw signed token — backend verifies against Apple's JWKS and reads the
     // `sub`/`email` from the verified claims.
     identity_token: credential.identityToken,
+    // One-time code the server exchanges for a refresh token, so deleting
+    // the account can revoke Sign in with Apple (App Store 5.1.1(v)).
+    authorization_code: credential.authorizationCode ?? undefined,
     // Cosmetic only. Apple omits the name from the token and sends it just
     // once, on first consent.
     name: name || 'Apple User',

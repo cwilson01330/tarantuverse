@@ -161,33 +161,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Launch must never wait on the network. The old flow awaited GET /auth/me
+  // (30 s axios timeout, cold Render starts) before releasing the root render,
+  // so a slow API meant a blank screen at launch — the kind of thing App Review
+  // reports. Now the cached session is enough to render; /auth/me revalidates
+  // in the background, and a slow or failed network never signs anyone out
+  // (only a 401 does, via the api interceptor).
   async function loadStoredAuth() {
+    // Belt and braces: even if storage itself stalls, stop gating the root
+    // render after a few seconds (the keeper lands on login and can sign in).
+    const cap = setTimeout(() => setIsLoading(false), 4000);
+    let storedToken: string | null = null;
     try {
-      const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+      storedToken = await AsyncStorage.getItem(TOKEN_KEY);
       const storedUser = await AsyncStorage.getItem(USER_KEY);
-
-      if (!storedToken || !storedUser) {
-        return;
+      if (storedToken && storedUser) {
+        // Hydrate cached auth first so the app shell renders without a
+        // login flash and the request interceptor has a token to attach.
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } else {
+        storedToken = null;
       }
-
-      // Hydrate cached auth first so the app shell renders without a
-      // login flash and the request interceptor has a token to attach.
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-
-      // Revalidate in the background. 401 → interceptor clears storage
-      // and emits AUTH_EXPIRED (handled above). Network/5xx → keep the
-      // cached session for offline-friendly reopens.
-      try {
-        const response = await apiClient.get('/auth/me');
-        const freshUser = response.data;
-        await AsyncStorage.setItem(USER_KEY, JSON.stringify(freshUser));
-        setUser(freshUser);
-      } catch {
-        // swallow — either handled above or transient
-      }
+    } catch {
+      storedToken = null;
     } finally {
+      clearTimeout(cap);
       setIsLoading(false);
+    }
+
+    if (!storedToken) return;
+    // Revalidate in the background. 401 → interceptor clears storage and
+    // emits AUTH_EXPIRED (handled above). Network/5xx → keep the cached
+    // session for offline-friendly reopens.
+    try {
+      const response = await apiClient.get('/auth/me');
+      const freshUser = response.data;
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(freshUser));
+      setUser(freshUser);
+    } catch {
+      // swallow — either handled above or transient
     }
   }
 

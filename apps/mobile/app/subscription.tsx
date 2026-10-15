@@ -35,6 +35,9 @@ import {
   restorePurchases,
   isIAPAvailable,
   endIAP,
+  getStorefrontCountry,
+  isUSStorefront,
+  formatProductPrice,
   ALL_ACCESS_SKUS,
   YEARLY_SKUS,
 } from '../src/services/iap';
@@ -62,6 +65,11 @@ export default function SubscriptionScreen() {
   const [iapAvailable, setIapAvailable] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  // App Store / Play storefront country (null until known or when unknown).
+  const [storefront, setStorefront] = useState<string | null>(null);
+  // Internal test control (revoke premium) — staff only, never shown to
+  // keepers or reviewers. The API endpoint ends ANY active subscription.
+  const isStaff = !!(user?.is_admin || user?.is_superuser);
   // Which provider the active subscription was bought through
   // ('stripe' | 'apple' | 'google' | 'admin_grant' | null for free).
   // Drives the Manage button: Stripe subs are managed via the Stripe
@@ -147,6 +155,9 @@ export default function SubscriptionScreen() {
   const loadProducts = async () => {
     try {
       await initializeIAP();
+      // Read the storefront before products so the web-checkout gate below
+      // never relies on a currency guess. Never throws.
+      setStorefront(await getStorefrontCountry());
       const availableProducts = await getSubscriptionProducts();
       setProducts(availableProducts);
       // Lifetime (one-time) products are fetched separately (type 'in-app').
@@ -289,28 +300,23 @@ export default function SubscriptionScreen() {
     Linking.openURL(MANAGE_SUBSCRIPTIONS_URL!);
   };
 
-  // Only offer the web-checkout link-out where it's compliant. The
-  // post-Epic rulings allow external purchase links on the US App
-  // Store / Play Store only, so gate on the storefront currency that
-  // came back with the IAP products (USD ⇒ US storefront). In Expo Go
-  // (no IAP) we always show it so the flow is testable in dev.
-  const storefrontCurrency =
-    products[0]?.currency || products[0]?.currencyCode || null;
-  // Show the web (Stripe) link-out whenever the user otherwise has NO working
-  // purchase path, so we never strand them on a dead "coming soon":
-  //   - Expo Go / no IAP at all
-  //   - IAP available but the store returned zero products (misconfig, region,
-  //     sandbox) — the bug Cory caught: previously this hid BOTH paths
-  //   - Android always (Google permits external purchase links)
-  //   - US App Store (post-Epic external-link entitlement)
-  // When real IAP products ARE shown on a non-US iOS storefront, we still keep
-  // the link hidden to respect Apple's entitlement scope.
-  const noIapProducts = products.length === 0;
+  // Web (Stripe) checkout link-out — only where the store rules allow it:
+  //   - iOS: ONLY when StoreKit says the storefront is the United States
+  //     (the US-only external purchase link allowance). Not while products
+  //     are loading, not as a fallback when products fail, and not on a
+  //     USD-priced non-US storefront — the old currency check let those in.
+  //     The link sits NEXT TO in-app purchase, never in place of it.
+  //   - Android: never. Play's payments policy doesn't allow steering to an
+  //     outside checkout without enrolling in an external-offers program;
+  //     Android keepers buy through Play billing.
+  //   - Expo Go / dev only: shown so the flow stays testable without IAP.
   const showWebCheckout =
-    !iapAvailable ||
-    noIapProducts ||
-    Platform.OS === 'android' ||
-    storefrontCurrency === 'USD';
+    (Platform.OS === 'ios' &&
+      iapAvailable &&
+      productsLoaded &&
+      products.length > 0 &&
+      isUSStorefront(storefront)) ||
+    (__DEV__ && !iapAvailable);
 
   const handleWebCheckout = () => {
     trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'web_checkout' });
@@ -319,6 +325,7 @@ export default function SubscriptionScreen() {
   };
 
   const handleRevokePremium = () => {
+    if (!isStaff) return;
     Alert.alert(
       'Revoke Premium',
       'Are you sure you want to revoke your premium subscription? This is for testing purposes.',
@@ -344,47 +351,8 @@ export default function SubscriptionScreen() {
     );
   };
 
-  const formatPrice = (product: any) => {
-    // expo-iap exposes a pre-localized price string under different
-    // field names depending on platform + SDK version:
-    //   - iOS (expo-iap 2.7+): `displayPrice` → "$4.99"
-    //   - Android / legacy:    `localizedPrice` → "$4.99"
-    //   - Some shapes:         `priceString`
-    // Prefer the formatted string; only fall back to the raw number if
-    // none of those fields are populated. The previous version went
-    // straight to `product.price` on iOS, which is a float — JS would
-    // stringify it as "4.990000000001" or similar precision artifact
-    // and render that into the UI.
-    const localized =
-      product?.displayPrice ||
-      product?.localizedPrice ||
-      product?.priceString;
-    if (typeof localized === 'string' && localized.trim().length > 0) {
-      return localized;
-    }
-
-    // Raw-number fallback — coerce to number (iOS returns a number,
-    // Android sometimes returns a string), then format with the
-    // product's currency code so rounding + symbol are right.
-    const rawNumber =
-      typeof product?.price === 'number'
-        ? product.price
-        : typeof product?.price === 'string'
-          ? Number(product.price)
-          : NaN;
-    if (!Number.isFinite(rawNumber)) return 'N/A';
-
-    const currency = product?.currency || product?.currencyCode || 'USD';
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency,
-      }).format(rawNumber);
-    } catch {
-      // Unknown currency code — last-resort plain dollar formatting.
-      return `$${rawNumber.toFixed(2)}`;
-    }
-  };
+  // The store's own localized price string; never a guessed currency.
+  const formatPrice = (product: any) => formatProductPrice(product) ?? '';
 
   // ---- Product-aware labels (Premium vs All-Access, monthly vs yearly) ----
   // Derive everything from the product id so cards are labeled correctly
@@ -761,7 +729,7 @@ export default function SubscriptionScreen() {
             <Text style={styles.limitValue}>
               {(() => {
                 const cap = limits?.max_animals ?? limits?.max_tarantulas;
-                return cap === -1 ? 'Unlimited' : `${cap ?? 20} max`;
+                return cap === -1 ? 'Unlimited' : `${cap ?? 15} max`;
               })()}
             </Text>
           </View>
@@ -826,18 +794,20 @@ export default function SubscriptionScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Revoke Premium Button (for testing) */}
-            <TouchableOpacity
-              style={styles.revokeButton}
-              onPress={handleRevokePremium}
-              disabled={revoking}
-            >
-              {revoking ? (
-                <ActivityIndicator color={colors.error} size="small" />
-              ) : (
-                <Text style={styles.revokeButtonText}>Revoke Premium (Testing)</Text>
-              )}
-            </TouchableOpacity>
+            {/* Revoke premium — internal staff test control only. */}
+            {isStaff && (
+              <TouchableOpacity
+                style={styles.revokeButton}
+                onPress={handleRevokePremium}
+                disabled={revoking}
+              >
+                {revoking ? (
+                  <ActivityIndicator color={colors.error} size="small" />
+                ) : (
+                  <Text style={styles.revokeButtonText}>Revoke Premium (Staff)</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <>
@@ -888,7 +858,7 @@ export default function SubscriptionScreen() {
                     In-app purchases are not available in Expo Go.
                   </Text>
                   <Text style={styles.noProductsText}>
-                    Use promo codes below or build a development version.
+                    Build a development version to test purchases.
                   </Text>
                 </View>
               ) : sortedProducts.length > 0 ? (
@@ -924,12 +894,20 @@ export default function SubscriptionScreen() {
               ) : productsLoaded ? (
                 <View style={styles.productCard}>
                   <Text style={styles.noProductsText}>
-                    In-app subscriptions aren’t available on this device right now.
+                    Subscription options couldn’t be loaded right now.
                   </Text>
                   <Text style={styles.noProductsText}>
-                    You can subscribe by card below — it unlocks premium on this
-                    same account.
+                    Check your connection and try again.
                   </Text>
+                  <TouchableOpacity
+                    style={styles.restoreButton}
+                    onPress={() => {
+                      setProductsLoaded(false);
+                      loadProducts();
+                    }}
+                  >
+                    <Text style={styles.restoreButtonText}>Try again</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.productCard}>
@@ -996,7 +974,7 @@ export default function SubscriptionScreen() {
               )}
             </LinearGradient>
 
-            {/* Web checkout link-out (US storefronts only — see
+            {/* Web checkout link-out (iOS US storefront only — see
                 showWebCheckout). Stripe checkout on the website
                 activates premium on this same account via webhook;
                 the AppState listener picks it up on return. */}

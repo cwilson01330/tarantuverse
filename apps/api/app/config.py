@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_CLIENT_IDS: str = ""
     APPLE_OAUTH_CLIENT_IDS: str = ""
 
+    # Sign in with Apple token revocation (guideline 5.1.1(v); see
+    # services/apple_siwa.py). A "Sign in with Apple" key from Certificates,
+    # Identifiers & Profiles → Keys. Unset = no code exchange at sign-in and
+    # no revoke at account deletion (logged as a warning).
+    APPLE_SIWA_TEAM_ID: str = ""
+    APPLE_SIWA_KEY_ID: str = ""
+    APPLE_SIWA_PRIVATE_KEY: str = ""  # full contents of the .p8 file
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):

@@ -25,6 +25,7 @@ from app.utils.access import (
 )
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.utils.legacy_logs import tarantula_logs
+from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_legacy
 
 router = APIRouter()
 
@@ -70,6 +71,7 @@ async def create_substrate_change(
 
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
+    refuse_if_closed_legacy(db, tarantula)  # no new logs on a died / transferred animal
 
     new_change = SubstrateChange(
         tarantula_id=tarantula_id,
@@ -140,6 +142,7 @@ async def create_scorpion_substrate_change(
     ).first()
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
+    refuse_if_closed_legacy(db, scorpion)
 
     new_change = SubstrateChange(
         scorpion_id=scorpion_id,
@@ -218,6 +221,7 @@ async def create_centipede_substrate_change(
     ).first()
     if not centipede:
         raise HTTPException(status_code=404, detail="Centipede not found")
+    refuse_if_closed_invert(centipede)
 
     new_change = SubstrateChange(
         invert_id=centipede_id,
@@ -289,6 +293,7 @@ async def create_whip_spider_substrate_change(
     ).first()
     if not whip_spider:
         raise HTTPException(status_code=404, detail="Whip spider not found")
+    refuse_if_closed_invert(whip_spider)
 
     new_change = SubstrateChange(
         invert_id=whip_spider_id,
@@ -350,6 +355,7 @@ async def create_invert_substrate_change(
     """Log a substrate change for any invert the caller owns. Forward-only
     denorm of date + type + depth onto the parent Invert."""
     invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
+    refuse_if_closed_invert(invert)  # no new logs on a died / transferred animal
 
     new_change = SubstrateChange(**invert_log_fields(db, invert), logged_by_user_id=access.logged_by_user_id, **change_data.model_dump())
     db.add(new_change)

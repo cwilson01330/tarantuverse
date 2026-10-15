@@ -371,6 +371,10 @@ export function EditReptileScreen() {
             <ReptileSpeciesAutocomplete
               speciesId={speciesId}
               scientificName={scientificName}
+              // Only species of this animal's type — the API refuses a
+              // species from another group. Changing the type is the
+              // Change row above (ChangeTaxonSheet).
+              taxon={animal && isAnimalTaxon(animal.taxon) ? animal.taxon : null}
               onChange={({ id, scientificName: sci }) => {
                 setSpeciesId(id);
                 setScientificName(sci);

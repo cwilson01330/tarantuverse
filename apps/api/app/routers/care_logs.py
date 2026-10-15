@@ -21,6 +21,7 @@ from app.models.user import User
 from app.schemas.care_log import CareLogCreate, CareLogResponse, CareLogUpdate
 from app.utils.dependencies import get_current_user
 from app.utils.access import access_helper, load_colony, load_invert, load_log_parent, policy, require_can_change
+from app.utils.closed_animals import refuse_if_closed_invert
 
 router = APIRouter()
 
@@ -76,7 +77,8 @@ async def create_care_log(
     "days since", which invites an overdue threshold, which is the schedule
     this feature deliberately doesn't have.
     """
-    _invert, access = load_invert(db, current_user, invert_id, "logger")
+    invert, access = load_invert(db, current_user, invert_id, "logger")
+    refuse_if_closed_invert(invert)  # no new logs on a died / transferred animal
     log = CareLog(
         invert_id=invert_id,
         user_id=access.owner.id,  # the collection's owner, whoever logged it

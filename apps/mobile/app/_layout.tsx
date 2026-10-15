@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
-import { ThemeProvider } from '../src/contexts/ThemeContext';
+import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { UpdateBanner } from '../src/components/UpdateBanner';
 import { ONBOARDING_COMPLETED } from '../src/lib/onboarding';
@@ -82,6 +83,7 @@ function QuickActionsBridge() {
 
 function RootLayoutContent() {
   const { user, isLoading } = useAuth();
+  const { colors } = useTheme();
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
@@ -106,9 +108,17 @@ function RootLayoutContent() {
     }
   };
 
-  // Don't render until both auth and onboarding check are complete
+  // Hold on a themed loading view (not a blank screen) until both the auth
+  // and onboarding checks finish. AuthContext caps the auth wait.
   if (isLoading || checkingOnboarding) {
-    return null;
+    return (
+      <View
+        style={[launchStyles.loading, { backgroundColor: colors.background }]}
+        accessibilityLabel="Loading"
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   return (
@@ -147,3 +157,7 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+const launchStyles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+});

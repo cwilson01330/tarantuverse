@@ -250,4 +250,11 @@ def verify_apple_identity_token(identity_token: str) -> Dict[str, Any]:
         # returning user resolves to their existing account.
         email = f"{subject}@privaterelay.appleid.com"
 
-    return {"provider_account_id": subject, "email": email}
+    # The client id that minted this token (the app's bundle id for native
+    # sign-in). Needed to exchange / revoke that app's authorization code —
+    # Tarantuverse and Herpetoverse are different clients.
+    raw_aud = claims.get("aud")
+    token_auds = raw_aud if isinstance(raw_aud, list) else [raw_aud]
+    client_id = next((a for a in token_auds if a in audiences), None)
+
+    return {"provider_account_id": subject, "email": email, "client_id": client_id}

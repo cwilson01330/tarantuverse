@@ -17,6 +17,7 @@ import { requestMarkDied } from '../../src/lib/pending-intent';
 import { finalMoltCopy, growthLengthLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 import { useUnitField } from '../../src/hooks/useUnitField';
+import { maybeRequestReview } from '../../src/lib/reviewPrompt';
 
 /** successful / stuck / lost_limb / fatal — the backend vocabulary. Finer
  *  gradations would be guesses about a process the keeper mostly didn't watch. */
@@ -164,7 +165,12 @@ export default function AddInvertMoltScreen() {
         const molt = created;
         // Same post-save navigation as the fatal offer: back to the detail
         // screen we came from, else open it in this screen's place.
-        const leave = () => { if (from === 'detail') router.back(); else router.replace(`/invert/${id}` as any); };
+        // Declining the card ends the flow — a success moment, so the store
+        // review prompt may follow (it's rate-limited and fire-and-forget).
+        const leave = () => {
+          if (from === 'detail') router.back(); else router.replace(`/invert/${id}` as any);
+          maybeRequestReview('molt_logged');
+        };
         Alert.alert('Molt saved', 'Make a card of it?', [
           { text: 'Not now', style: 'cancel', onPress: leave },
           { text: 'Make a card', onPress: () => router.replace(`/share/${id}?kind=molt&moltId=${molt.id}` as any) },
@@ -172,6 +178,7 @@ export default function AddInvertMoltScreen() {
         return;
       }
       router.back();
+      if (!isEdit && created && outcome !== 'fatal') maybeRequestReview('molt_logged');
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setSaving(false); }
   };

@@ -127,6 +127,11 @@ export const initializeIAP = async (): Promise<void> => {
     await iap.initConnection();
     console.log('[IAP] Connection initialized successfully');
 
+    // initializeIAP runs every time a paywall screen mounts. Drop the
+    // previous listeners first so they don't pile up across visits.
+    purchaseUpdateSubscription?.remove();
+    purchaseErrorSubscription?.remove();
+
     // Set up purchase update listener
     purchaseUpdateSubscription = iap.purchaseUpdatedListener((purchase) => {
       console.log('[IAP] ===== PURCHASE UPDATE =====');
@@ -434,4 +439,65 @@ export const checkSubscriptionStatus = async (): Promise<boolean> => {
     console.error('[IAP] Failed to check subscription status:', error);
     return false;
   }
+};
+
+/**
+ * The store's country for this account (ISO code), or null when unknown.
+ * iOS returns alpha-3 ("USA"), Play returns alpha-2 ("US"). Call after
+ * initializeIAP(). Never throws.
+ */
+export const getStorefrontCountry = async (): Promise<string | null> => {
+  const iap = await getIAP();
+  if (!iap) return null;
+  try {
+    const code = await iap.getStorefront();
+    return typeof code === 'string' && code.trim() ? code.trim().toUpperCase() : null;
+  } catch (error) {
+    console.warn('[IAP] Failed to read storefront:', error);
+    return null;
+  }
+};
+
+/** True only for the United States storefront (the only place Apple allows
+ *  a link to an outside purchase). Unknown counts as NOT US. */
+export const isUSStorefront = (code: string | null | undefined): boolean =>
+  code === 'US' || code === 'USA';
+
+/**
+ * The store's own localized price string for a product ("4,99 €", "$4.99"),
+ * or null when the store didn't give one. Never invents a currency.
+ */
+export const formatProductPrice = (product: any): string | null => {
+  // expo-iap exposes the localized string under different names by
+  // platform/version: displayPrice (iOS), localizedPrice (Android/legacy),
+  // priceString (some shapes).
+  const localized =
+    product?.displayPrice || product?.localizedPrice || product?.priceString;
+  if (typeof localized === 'string' && localized.trim().length > 0) {
+    return localized;
+  }
+  const raw =
+    typeof product?.price === 'number'
+      ? product.price
+      : typeof product?.price === 'string'
+        ? Number(product.price)
+        : NaN;
+  const currency = product?.currency || product?.currencyCode;
+  if (!Number.isFinite(raw) || typeof currency !== 'string' || !currency) return null;
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(raw);
+  } catch {
+    return null;
+  }
+};
+
+/** Raw numeric price, for comparisons (e.g. yearly savings). */
+export const productPriceNumber = (product: any): number | null => {
+  const raw =
+    typeof product?.price === 'number'
+      ? product.price
+      : typeof product?.price === 'string'
+        ? Number(product.price)
+        : NaN;
+  return Number.isFinite(raw) && raw > 0 ? raw : null;
 };

@@ -648,11 +648,22 @@ async def _claim_animal_transfer(
     snap_for_record = {**snap, "transferred_at": _now().isoformat()}
 
     from app.models.tarantula import Source as SourceEnum
+    # The buyer's copy keeps the species link only when the catalog doesn't
+    # file that species under a different group than the animal (an old
+    # mismatched link on the seller's record). Dropped, never refused — the
+    # claim itself must not fail over it. See animals.species_taxon_conflict.
+    herp_species_id = source.herp_species_id
+    if herp_species_id is not None:
+        from app.models.reptile_species import ReptileSpecies
+        from app.routers.animals import species_taxon_conflict
+        linked = db.query(ReptileSpecies).filter(ReptileSpecies.id == herp_species_id).first()
+        if linked is None or species_taxon_conflict(linked, source.taxon):
+            herp_species_id = None
     new_animal = Animal(
         id=uuidlib.uuid4(),
         user_id=current_user.id,
         taxon=source.taxon,
-        herp_species_id=source.herp_species_id,
+        herp_species_id=herp_species_id,
         name=source.name,
         common_name=source.common_name,
         scientific_name=source.scientific_name,

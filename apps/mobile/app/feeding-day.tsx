@@ -27,6 +27,7 @@ import { INVERT_TAXA, type InvertTaxon } from '../src/lib/inverts';
 import { LocationSheet } from '../src/components/LocationPicker';
 import PremiumIntroCard, { shouldShowPremiumIntro } from '../src/components/PremiumIntroCard';
 import { bulkSetLocation, groupByLocation, listLocations, type LocationItem } from '../src/lib/locations';
+import { maybeRequestReview } from '../src/lib/reviewPrompt';
 
 interface FeedingStatus {
   id: string;
@@ -275,7 +276,12 @@ export default function FeedingDayScreen() {
       // After a keeper's FIRST completed batch, and only then, show what
       // stays free and what premium adds. The server says whether this is
       // that moment; a failed check means no card.
-      if (n > 0 && (await shouldShowPremiumIntro())) setIntroOpen(true);
+      // Otherwise a completed batch is a success moment for the store review
+      // prompt (never both on the same batch).
+      if (n > 0) {
+        if (await shouldShowPremiumIntro()) setIntroOpen(true);
+        else maybeRequestReview('feeding_day');
+      }
     } catch (e: any) {
       setLoadError(e?.response?.data?.detail || e?.message || 'Failed to log feeding');
     } finally {

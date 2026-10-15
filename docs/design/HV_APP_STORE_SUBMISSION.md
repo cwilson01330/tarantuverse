@@ -7,17 +7,27 @@ claims a user base, a track record, or a feature that isn't in the build.
 
 ## App Review notes
 
+Updated 2026-10-12 for 1.2.0 (runtime 1.3.0). Everything that used to live on
+a separate Settings screen is now on the **You** tab (`/settings` only
+redirects there), so the paths below changed.
+
 Paste into **App Review Information → Notes**. Fill the two credential lines
 before submitting — the app is fully gated behind login and a reviewer with no
 account cannot see anything past the sign-in screen.
+
+**Use a NON-premium demo account.** On a premium account the Premium row reads
+"active" and the plans sheet never opens, so the reviewer can't see the
+paywall or the subscription terms — a 2.1 / 3.1.2 bounce.
+Keep it at or under 5 animals with a few feeding and shed logs.
 
 ```
 DEMO ACCOUNT
 Email:    <fill in>
 Password: <fill in>
 
-This account already contains several animals, feeding and shed logs, so the
-main screens are populated on first launch.
+This account contains a few animals with feeding and shed logs, so the main
+screens are populated on first launch. It is on the free plan so the
+subscription screen is visible.
 
 ABOUT THE APP
 Herpetoverse is a husbandry tracker for reptile and amphibian keepers. Keepers
@@ -26,26 +36,27 @@ and track breeding projects. It shares an account system with our existing app,
 Tarantuverse (App Store ID <fill in>) — the same login works on both.
 
 FREE TIER AND IN-APP PURCHASE
-The app is free. Every tracking feature is available on the free plan; the only
-limit is the number of animals in a collection (5). Adding a 6th animal shows an
-upgrade sheet. Premium is an auto-renewing subscription purchased through
-In-App Purchase — there is no external purchase path on iOS.
+The app is free to use. Feeding, weight, shed, photo and health logs are free
+on every plan. Herpetoverse Premium (In-App Purchase only) adds: more than 5 animals, breeding
+(pairings, clutches, offspring), feeder inventory, co-keepers, and sitter
+logging. There is no external purchase path or link in the app.
 
-To review the paywall without hitting the cap: Settings → Subscription → View
-plans.
+To review the plans and subscription terms: You tab → Premium. The same sheet
+opens when a free keeper tries to add a 6th animal, start a pairing, or add a
+feeder. Restore purchases: You tab → Premium section → Restore purchases.
 
 SIGN IN
 Email/password, Sign in with Apple, and Google are all offered. Sign in with
-Apple is available and does not collect data beyond name and email.
+Apple does not collect data beyond name and email.
 
 ACCOUNT DELETION
-Settings → Account → Delete account. Requires typing DELETE to confirm, then
-permanently removes the account and all associated records.
+You tab → Delete account (bottom of the screen). Requires typing DELETE to
+confirm, then permanently removes the account and all associated records.
 
 NOTIFICATIONS
-Optional feeding reminders and a daily digest. Permission is requested in
-context, and all notification types can be turned off in
-Settings → Reminders.
+An optional daily feeding digest. Permission is requested in context, and it
+can be turned off (or its hour and quiet hours changed) in
+You tab → Notification settings.
 ```
 
 ---
@@ -144,7 +155,7 @@ reptile,herp,snake,gecko,lizard,husbandry,feeding,shed,tracker,breeding,morph,to
 - Terms of Use: https://herpetoverse.com/terms
 
 **Verify all four load before submitting.** A dead legal link is a soft
-rejection, and Terms is linked from both Settings and the registration screen.
+rejection, and Terms is linked from the You tab, the plans sheet and the registration screen.
 
 ---
 
@@ -159,10 +170,10 @@ mobile at v1.0.0.
 
 ## Pre-submit checklist
 
-- [ ] Demo credentials filled into the review notes above, account populated
+- [ ] Demo credentials filled into the review notes above, account populated, account is NOT premium
 - [ ] Apple sign-in button renders and completes a sign-in on the new build
 - [ ] Terms checkbox blocks "Create account" until ticked
-- [ ] Settings profile header + avatar upload work
+- [ ] You tab profile header + avatar upload work
 - [ ] All four URLs above load
 - [ ] Screenshots for 6.7" and 6.5"
-- [ ] Subscription disclosure visible on the paywall (Settings → View plans)
+- [ ] Subscription disclosure visible on the paywall (You → Premium) — only renders when the store returns products, so the IAPs must be attached to this version

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { useStorePrices } from '../src/hooks/useStorePrices';
 
 // Tarantuverse's free cap — mirrors FREE_TIER_MAX_ANIMALS (apps/api
 // models/user.py) and the `free` plan row. One constant for both places this
@@ -17,16 +18,29 @@ export default function PricingScreen() {
   // token map; reaching it via `colors` is the current convention.
   const { colors, theme } = useTheme();
   const isDark = theme === 'dark';
+  // Store-localized prices for this account's storefront. Null when the
+  // store can't be reached — then no amount is shown rather than a USD
+  // figure that would be wrong outside the US.
+  const prices = useStorePrices();
 
   const handleChoosePlan = () => {
     router.push('/subscription');
   };
 
-  const plans = [
+  const plans: {
+    name: string;
+    price: string | null;
+    period: string;
+    description: string;
+    savings?: string | null;
+    features: string[];
+    cta: string;
+    popular: boolean;
+  }[] = [
     {
       name: 'Free',
-      price: '$0',
-      period: '/forever',
+      price: null,
+      period: 'Free forever',
       description: 'Perfect for casual keepers with small collections',
       features: [
         `Up to ${FREE_ANIMAL_CAP} animals`,
@@ -44,8 +58,8 @@ export default function PricingScreen() {
     },
     {
       name: 'Monthly',
-      price: '$4.99',
-      period: '/month',
+      price: prices.monthly,
+      period: prices.monthly ? '/month' : 'Billed monthly',
       description: 'Perfect for trying premium features',
       features: [
         'Everything in Free, plus:',
@@ -63,14 +77,13 @@ export default function PricingScreen() {
     },
     {
       name: 'Yearly',
-      price: '$44.99',
-      period: '/year',
-      description: 'Best value - Save 25%',
-      savings: 'Save $15/year',
+      price: prices.yearly,
+      period: prices.yearly ? '/year' : 'Billed yearly',
+      description: 'Best value',
+      savings: prices.yearlySavingsPct ? `Save ${prices.yearlySavingsPct}% vs monthly` : null,
       features: [
         'Everything in Monthly, plus:',
-        '2 months FREE',
-        'Save $15 per year',
+        'One payment a year',
         'All premium features',
       ],
       cta: 'Choose Yearly',
@@ -80,7 +93,7 @@ export default function PricingScreen() {
 
   const lifetimePlan = {
     name: 'Lifetime Access',
-    price: '$149.99',
+    price: prices.lifetime,
     description: 'Pay once, own forever',
     subtitle: 'No recurring fees. All future features included.',
     features: [
@@ -143,7 +156,9 @@ export default function PricingScreen() {
 
             <Text style={[styles.planName, { color: colors.textPrimary }]}>{plan.name}</Text>
             <View style={styles.priceRow}>
-              <Text style={[styles.price, { color: colors.textPrimary }]}>{plan.price}</Text>
+              {plan.price ? (
+                <Text style={[styles.price, { color: colors.textPrimary }]}>{plan.price}</Text>
+              ) : null}
               <Text style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</Text>
             </View>
             {plan.savings && (
@@ -192,7 +207,9 @@ export default function PricingScreen() {
           <Text style={styles.bestDealBadgeText}>BEST DEAL</Text>
         </View>
         <Text style={styles.lifetimeName}>{lifetimePlan.name}</Text>
-        <Text style={styles.lifetimePrice}>{lifetimePlan.price}</Text>
+        {lifetimePlan.price ? (
+          <Text style={styles.lifetimePrice}>{lifetimePlan.price}</Text>
+        ) : null}
         <Text style={styles.lifetimeDescription}>{lifetimePlan.description}</Text>
         <Text style={styles.lifetimeSubtitle}>{lifetimePlan.subtitle}</Text>
 
@@ -250,7 +267,7 @@ export default function PricingScreen() {
             Can I change plans later?
           </Text>
           <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-            Yes! You can upgrade at any time. If you have a promo code, you can redeem it in your settings.
+            Yes! You can upgrade at any time from the Premium screen in the app.
           </Text>
         </View>
 
@@ -265,19 +282,12 @@ export default function PricingScreen() {
 
         <View style={styles.faqItem}>
           <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>
-            Do you offer promo codes?
-          </Text>
-          <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-            Yes! Early adopters may receive promo codes for free premium access. If you have a code, you can redeem it in your account settings.
-          </Text>
-        </View>
-
-        <View style={styles.faqItem}>
-          <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>
             Can I cancel my monthly subscription?
           </Text>
           <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-            Absolutely! Monthly plans can be canceled anytime from your account settings. No long-term contracts.
+            {Platform.OS === 'ios'
+              ? 'Absolutely! Cancel anytime in your App Store subscription settings. No long-term contracts.'
+              : 'Absolutely! Cancel anytime in your Google Play subscription settings. No long-term contracts.'}
           </Text>
         </View>
       </View>

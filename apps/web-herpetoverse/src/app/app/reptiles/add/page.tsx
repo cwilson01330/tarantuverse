@@ -206,6 +206,22 @@ function AddReptileForm() {
   const [taxonPicked, setTaxonPicked] = useState<boolean>(
     () => !(searchParams.get('species_id') && !isAnimalTaxon(searchParams.get('taxon'))),
   )
+  // The group the linked species is filed under, when known. A species from
+  // a care sheet carries its taxon in the link; a picked one carries it on
+  // the search result. The API refuses a species from another group, so
+  // switching the taxon away from it clears the link (below).
+  const [speciesTaxon, setSpeciesTaxon] = useState<Taxon | null>(() => {
+    const taxonParam = searchParams.get('taxon')
+    return searchParams.get('species_id') && isAnimalTaxon(taxonParam) ? taxonParam : null
+  })
+  // Whether the taxon was CHOSEN (toggle, or a care-sheet link) rather than
+  // left on the snake default. Once chosen, species search is limited to
+  // that group. Until then it searches everything and a picked species sets
+  // the taxon — a keeper who types "leopard gecko" first shouldn't get an
+  // empty list because the toggle still says Snake.
+  const [taxonChosen, setTaxonChosen] = useState<boolean>(() =>
+    isAnimalTaxon(searchParams.get('taxon')),
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Genes picked before the animal exists — attached after create (H2).
@@ -368,8 +384,22 @@ function AddReptileForm() {
         <TaxonToggle
           value={taxonPicked ? form.taxon : null}
           onChange={(next) => {
-            update('taxon', next)
+            // A linked species from another group (or of unknown group) no
+            // longer fits — clear it, as change-taxon does on the server.
+            const incompatible = form.speciesId !== null && speciesTaxon !== next
+            setForm((prev) => ({
+              ...prev,
+              taxon: next,
+              ...(incompatible
+                ? { speciesId: null, scientificName: '', cgdOverride: 'auto' as const }
+                : {}),
+            }))
+            if (incompatible) {
+              setSpeciesTaxon(null)
+              setSpeciesFeedsOnCgd(false)
+            }
             setTaxonPicked(true)
+            setTaxonChosen(true)
           }}
           prompt={
             taxonPicked
@@ -421,6 +451,8 @@ function AddReptileForm() {
                 <ReptileSpeciesAutocomplete
                   speciesId={form.speciesId}
                   scientificName={form.scientificName}
+                  // Only species of the chosen group (none chosen yet → all).
+                  taxon={taxonChosen && taxonPicked ? form.taxon : null}
                   onChange={({ id, scientificName }) => {
                     setForm((prev) => ({
                       ...prev,
@@ -429,13 +461,22 @@ function AddReptileForm() {
                       // A species that can't eat CGD can't carry an override.
                       cgdOverride: id ? prev.cgdOverride : 'auto',
                     }))
-                    if (!id) setSpeciesFeedsOnCgd(false)
+                    if (!id) {
+                      setSpeciesFeedsOnCgd(false)
+                      setSpeciesTaxon(null)
+                    }
                   }}
                   onPick={(species) => {
                     setSpeciesFeedsOnCgd(species.feeds_on_cgd)
+                    setSpeciesTaxon(species.taxon)
+                    // No group chosen yet: the species decides it, so the
+                    // record can't be saved under a group it isn't in.
+                    const adopt = !taxonChosen && isAnimalTaxon(species.taxon)
+                    if (adopt) setTaxonPicked(true)
                     // Auto-fill common name only if the keeper hasn't typed one.
                     setForm((prev) => ({
                       ...prev,
+                      ...(adopt ? { taxon: species.taxon } : {}),
                       cgdOverride: species.feeds_on_cgd ? prev.cgdOverride : 'auto',
                       commonName:
                         prev.commonName.trim() === ''

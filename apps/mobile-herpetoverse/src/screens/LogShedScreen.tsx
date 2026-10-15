@@ -47,6 +47,7 @@ import {
   getShed,
   updateShed,
 } from '../lib/animals';
+import { maybeRequestReview, noteReviewBlockingError } from '../lib/reviewPrompt';
 
 const COMPLETE_OPTIONS = [
   { value: 'yes' as const, label: 'One piece' },
@@ -141,7 +142,10 @@ export function LogShedScreen() {
         await createShed(id as string, payload);
       }
       router.back();
+      // Success moment: a NEW shed logged (not an edit). Gated inside.
+      if (!isEdit) void maybeRequestReview('shed_logged');
     } catch (err) {
+      noteReviewBlockingError();
       setError(extractErrorMessage(err, 'Could not save shed.'));
       setSubmitting(false);
     }

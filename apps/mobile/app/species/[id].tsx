@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useUnits } from '../../src/hooks/useUnits';
@@ -449,7 +449,9 @@ export default function SpeciesDetailScreen() {
               <Text
                 style={[styles.sourceLink, { color: colors.primary }]}
                 onPress={() => {
-                  import('expo-linking').then(Linking => Linking.default.openURL(species.source_url!));
+                  // expo-linking has no default export — the old
+                  // `Linking.default.openURL` threw and the link did nothing.
+                  Linking.openURL(species.source_url!).catch(() => {});
                 }}
               >
                 {species.source_url}

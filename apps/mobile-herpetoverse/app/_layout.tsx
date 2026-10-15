@@ -9,6 +9,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -66,10 +67,18 @@ function RootLayoutContent() {
     };
   }, []);
 
-  // Don't render screens until we've resolved cached auth — prevents a
-  // flash of the login screen for keepers who are already signed in.
+  // Don't render screens until we've read the cached session — prevents a
+  // flash of the login screen for keepers who are already signed in. This is
+  // a local storage read only (AuthContext never waits on the network here,
+  // and caps the wait), and it shows a themed loader rather than a blank
+  // screen.
   if (isLoading) {
-    return null;
+    return (
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   return (
@@ -107,3 +116,7 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+});

@@ -24,7 +24,6 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -41,6 +40,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { AppHeader } from '../src/components/AppHeader';
 import { HeaderBackButton } from '../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../src/components/ErrorBoundary';
+import UpgradeModal from '../src/components/UpgradeModal';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { ANIMAL_TAXA, ANIMAL_TAXON_ORDER, type AnimalTaxon } from '../src/lib/animals';
@@ -173,6 +173,7 @@ function ImportScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState('');
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const backAction =
     step === 'source' ? (
@@ -640,23 +641,18 @@ function ImportScreen() {
                       You hit the free plan&apos;s 5-animal limit — the remaining rows weren&apos;t
                       imported. Premium keepers get unlimited animals.
                     </Text>
-                    {/* Guideline 3.1.1: iOS must never be pointed at a web
-                        checkout for digital goods. Android may link out. */}
-                    {Platform.OS !== 'ios' && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          Linking.openURL('https://herpetoverse.com/pricing').catch(() => {
-                            /* keep the screen up if the browser can't open */
-                          });
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel="Learn more about premium on the web"
-                      >
-                        <Text style={[styles.capLink, { color: colors.warning }]}>
-                          Learn more about premium →
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    {/* In-app only. iOS (3.1.1) and Google Play (Payments
+                        policy) both forbid steering to a web checkout, so this
+                        opens the same store-backed sheet as every other gate. */}
+                    <TouchableOpacity
+                      onPress={() => setUpgradeOpen(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="See what Herpetoverse Premium includes"
+                    >
+                      <Text style={[styles.capLink, { color: colors.warning }]}>
+                        See Premium →
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -876,6 +872,12 @@ function ImportScreen() {
           </View>
         </View>
       </Modal>
+
+      <UpgradeModal
+        source="collection_cap"
+        visible={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+      />
     </View>
   );
 }

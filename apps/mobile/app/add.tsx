@@ -63,6 +63,7 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { formatTempRange } from '../src/lib/units';
 import { SPACING, TYPE } from '../src/theme/tokens';
 import { LocationPicker } from '../src/components/LocationPicker';
+import { maybeRequestReview } from '../src/lib/reviewPrompt';
 import { MEMBER_APP, loadSharedWithMe } from '../src/lib/co-keepers';
 import {
   loadSpeciesCatalog,
@@ -374,6 +375,13 @@ function AddScreen() {
           ...husbandry,
         });
         await seedFirstFeeding(`/inverts/${created.data?.id}/feedings`);
+      }
+
+      // An animal (not a colony) landed in the keeper's OWN collection — a
+      // success moment. The prompt only asks from the 3rd add on, and never
+      // mid-batch ("add another" just counts the add).
+      if (mode !== 'colony' && !collection) {
+        maybeRequestReview('animal_added', { countOnly: addAnother });
       }
 
       if (addAnother) {

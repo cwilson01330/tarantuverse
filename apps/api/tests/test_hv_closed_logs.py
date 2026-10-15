@@ -6,14 +6,14 @@ routers/animals.py::refuse_if_closed). Events and genotype already answered
 photo routes: feeding, quick-feed, shed, weight, photo upload and the QR
 photo upload.
 
-The rule chosen for EXISTING entries is the TV one. Tarantuverse's invert log
-routes (feedings / molts / substrate / care logs / photos) refuse nothing on a
-died or transferred invert, and the TV clients only hide "add" on a died
-invert — editing or deleting a mistaken entry stays possible. So on HV:
+The rule chosen for EXISTING entries is the TV one: editing or deleting a
+mistaken entry stays possible. So on HV:
 
 * NEW logs / photos on a closed animal -> 409.
 * Editing or deleting an existing log, and photo caption edits -> still open.
-* TV invert events keep TV log-route parity -> still open (not refused).
+
+Tarantuverse follows the same rule since 2026-10-12 (utils/closed_animals.py;
+its tests, incl. TV invert events, are in tests/test_tv_closed_inverts.py).
 
 Also pinned: revive reopens logging; a hold-back linking an offspring to a
 closed animal saves the link but copies no genotype rows.
@@ -32,7 +32,6 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.animal import Animal
-from app.models.animal_event import AnimalEvent
 from app.models.animal_genotype import AnimalGenotype
 from app.models.feeding_log import FeedingLog
 from app.models.gene import Gene
@@ -49,7 +48,6 @@ from app.routers import qr
 from app.routers import reptile_offspring as ro
 from app.routers import sheds as sh
 from app.routers import weight_logs as wl
-from app.schemas.animal_event import AnimalEventCreate, AnimalEventUpdate
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate
 from app.schemas.reptile_breeding import ReptileOffspringUpdate
 from app.schemas.shed_log import ShedLogCreate, ShedLogUpdate
@@ -345,38 +343,8 @@ def test_qr_upload_onto_a_living_animal_still_works(owner):
     assert str(photo.animal_id) == str(a.id)
 
 
-# ── TV invert events keep TV invert log-route parity ───────────────────────
-
-@CLOSED
-def test_invert_events_on_a_closed_invert_are_not_refused(monkeypatch, owner, field, value):
-    """TV's invert log routes don't refuse a died/transferred invert, so
-    neither do invert events. Change both together if TV gets the rule."""
-    inv = NS(id=uuid.uuid4(), **{"died_at": None, "transferred_out_at": None, field: value})
-    monkeypatch.setattr(ae, "load_invert", lambda db, user, iid, need, **k: (inv, _access(owner)))
-    monkeypatch.setattr(ae, "load_log_parent", lambda db, user, row, need, **k: (inv, _access(owner)))
-    db = DB()
-    run(ae.create_invert_event, invert_id=inv.id, payload=AnimalEventCreate(event_type="observation"),
-        db=db, current_user=owner)
-    assert len(db.of(AnimalEvent)) == 1
-
-    ev = NS(id=uuid.uuid4(), animal_id=None, invert_id=inv.id, severity="minor", logged_by_user_id=None)
-    db = DB({AnimalEvent: Q(first=ev)})
-    run(ae.update_animal_event, event_id=ev.id, payload=AnimalEventUpdate(severity="severe"),
-        db=db, current_user=owner)
-    assert ev.severity == "severe"
-    run(ae.delete_animal_event, event_id=ev.id, db=db, current_user=owner)
-    assert db.deleted == [ev]
-
-
-def test_tv_invert_log_routes_have_no_closed_rule():
-    """The parity above rests on this. If a TV invert log route starts
-    refusing closed inverts, revisit create_invert_event too."""
-    from app.routers import care_logs, molts, substrate_changes
-    for fn in (fr.create_invert_feeding_log, molts.create_invert_molt_log, ph.upload_invert_photo):
-        src = inspect.getsource(fn)
-        assert "refuse_if_closed" not in src and "died_at" not in src
-    for mod in (care_logs, substrate_changes, molts):
-        assert "refuse_if_closed" not in inspect.getsource(mod)
+# TV invert events and TV invert log routes: tests/test_tv_closed_inverts.py
+# (TV refuses new entries on a closed invert too, since 2026-10-12).
 
 
 # ── hold-back genotype copy skips a closed animal ──────────────────────────

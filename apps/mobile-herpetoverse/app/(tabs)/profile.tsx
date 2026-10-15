@@ -47,6 +47,7 @@ import { captureEvent } from '../../src/services/posthog';
 import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { MenuRow, MenuSection } from '../../src/components/YouMenu';
+import { getStorePageUrl } from '../../src/lib/reviewPrompt';
 import { TYPE } from '../../src/theme/type';
 
 // HV-owned legal pages, served from herpetoverse.com.
@@ -81,6 +82,9 @@ function YouScreen() {
   const [sub, setSub] = useState<SubStatus | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  // Store page for "Rate the app"; null hides the row (e.g. iOS before
+  // ios.appStoreUrl is set in app.json) rather than showing a dead control.
+  const [storePageUrl, setStorePageUrl] = useState<string | null>(null);
 
   const appVersion = Constants.expoConfig?.version ?? '';
   const canConfirmDelete = confirmText.trim().toUpperCase() === DELETE_CONFIRM_WORD && !deleting;
@@ -94,6 +98,14 @@ function YouScreen() {
   useEffect(() => {
     void loadSub();
   }, [token]);
+
+  useEffect(() => {
+    let active = true;
+    getStorePageUrl()
+      .then((u) => { if (active) setStorePageUrl(u); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   // ── handlers ──────────────────────────────────────────────────────────────
 
@@ -230,17 +242,20 @@ function YouScreen() {
     }
   }
 
-  const sourceLabel =
-    sub?.source === 'apple' ? 'the App Store'
-      : sub?.source === 'google' ? 'Google Play'
-        : sub?.source === 'stripe' ? 'the web'
+  // Only ever name this device's own store. iOS must never show another
+  // platform's name (what got TV 1.8.0 rejected), and neither store build
+  // should point at the web; a purchase made elsewhere reads neutrally.
+  const managedNote =
+    Platform.OS === 'ios' && sub?.source === 'apple' ? 'Managed through the App Store.'
+      : Platform.OS === 'android' && sub?.source === 'google' ? 'Managed through Google Play.'
+        : sub?.source ? 'Managed where you subscribed.'
           : null;
 
   const planDetail = sub?.is_premium
     ? [
         sub.tier === 'all_access' ? 'Covers Herpetoverse and Tarantuverse.' : null,
         sub.expires_at ? `Renews or expires ${new Date(sub.expires_at).toLocaleDateString()}.` : null,
-        sourceLabel ? `Managed through ${sourceLabel}.` : null,
+        managedNote,
       ].filter(Boolean).join(' ')
     : 'Free plan · up to 5 animals.';
 
@@ -351,6 +366,10 @@ function YouScreen() {
         <MenuSection title="Help & legal">
           <MenuRow icon="lifebuoy" label="Contact support" external
             onPress={() => openLink(`mailto:${SUPPORT_EMAIL}?subject=Herpetoverse%20support`)} />
+          {storePageUrl ? (
+            <MenuRow icon="star-outline" label="Rate the app" external onPress={() => openLink(storePageUrl)}
+              accessibilityHint="Opens Herpetoverse in the app store" />
+          ) : null}
           <MenuRow icon="refresh" label="Check for updates" busy={checkingUpdate} onPress={handleCheckForUpdate} />
           <MenuRow icon="shield-lock-outline" label="Privacy policy" external onPress={() => openLink(PRIVACY_URL)} />
           <MenuRow icon="file-document-outline" label="Terms of service" external onPress={() => openLink(TERMS_URL)} />
@@ -382,7 +401,7 @@ function YouScreen() {
           void loadSub(); // a purchase may have just completed in the sheet
         }}
         title="Herpetoverse Premium"
-        message="Unlimited animals, breeding, feeder tracking, and detailed analytics."
+        message="Unlimited animals, breeding, feeder tracking, co-keepers and sitter logging."
       />
 
       {/* Delete-account confirmation — typed DELETE so a stray tap can't do it. */}

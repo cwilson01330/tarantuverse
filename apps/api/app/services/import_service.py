@@ -727,6 +727,12 @@ def normalize_animal_row(
     else:
         taxon, taxon_source = default_taxon, "default"
     payload["taxon"] = taxon
+    # An auto-matched species is linked only when the catalog doesn't file it
+    # under a different group than the row's taxon (e.g. a "frog" row whose
+    # name matched a lizard). Dropped rather than failing the row; the name
+    # the keeper typed is kept. Same rule as animals.species_taxon_conflict.
+    if species is not None and species.taxon and species.taxon != taxon:
+        species = None
     if species is not None:
         payload["herp_species_id"] = str(species.id)
 
@@ -743,6 +749,7 @@ def normalize_animal_row(
         "taxon_source": taxon_source,
         "species_matched": species is not None,
         "species_name": species.scientific_name if species else None,
+        "species_taxon": getattr(species, "taxon", None) if species else None,
         "display_name": display,
         "errors": errors,
     }

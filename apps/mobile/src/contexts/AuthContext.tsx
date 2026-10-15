@@ -75,6 +75,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Longest launch waits on GET /auth/me before opening on the cached user. */
+const AUTH_CHECK_MAX_WAIT_MS = 8000;
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -182,16 +185,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // clear storage + emit AUTH_EXPIRED, and handleAuthExpired below will
       // reset state cleanly. If the network is down, we keep the cached
       // session (offline-friendly).
-      try {
-        const response = await apiClient.get('/auth/me');
-        const freshUser = response.data;
-        await AsyncStorage.setItem('user', JSON.stringify(freshUser));
-        setUser(freshUser);
-      } catch (error: any) {
-        // 401 → interceptor already cleared storage and emitted the event;
-        // state will be reset by handleAuthExpired. Any other error (network,
-        // 5xx) → leave the cached session in place so offline-reopen works.
-      }
+      const validate = (async () => {
+        try {
+          const response = await apiClient.get('/auth/me');
+          const freshUser = response.data;
+          await AsyncStorage.setItem('user', JSON.stringify(freshUser));
+          setUser(freshUser);
+        } catch (error: any) {
+          // 401 → interceptor already cleared storage and emitted the event;
+          // state will be reset by handleAuthExpired. Any other error (network,
+          // 5xx) → leave the cached session in place so offline-reopen works.
+        }
+      })();
+      // Cap the wait: a cold or slow API used to hold launch on a loading
+      // screen for up to the 30 s axios timeout. After AUTH_CHECK_MAX_WAIT_MS
+      // the app opens on the cached user; the check keeps running and still
+      // updates the user (or signs out on a real 401) when it lands. A slow
+      // network never signs anyone out.
+      await Promise.race([
+        validate,
+        new Promise<void>((resolve) => setTimeout(resolve, AUTH_CHECK_MAX_WAIT_MS)),
+      ]);
     } catch (error) {
       // AsyncStorage read failed — show login screen.
     } finally {

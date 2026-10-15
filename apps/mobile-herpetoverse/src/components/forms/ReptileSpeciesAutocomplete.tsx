@@ -48,9 +48,10 @@ export interface ReptileSpeciesAutocompleteProps {
    */
   onPick?: (species: ReptileSpeciesSearchResult) => void;
   placeholder?: string;
-  /** Restrict matches to one herp group (the change-type sheet). Omitted,
-   *  the whole catalog is searched, as the add/edit forms always have. */
-  taxon?: HerpTaxon;
+  /** Restrict matches to one herp group — the animal's taxon on the add and
+   *  edit forms, the picked one on the change-type sheet. The API refuses a
+   *  species from another group. Omitted/null, the whole catalog is searched. */
+  taxon?: HerpTaxon | null;
 }
 
 export function ReptileSpeciesAutocomplete({
@@ -72,12 +73,22 @@ export function ReptileSpeciesAutocomplete({
   // outside (e.g. EditReptileScreen pre-fill). We don't want to fire a
   // search the moment a screen mounts.
   const userTyped = useRef(false);
+  // The last value this component reported through onChange. A parent that
+  // mirrors onChange hands the same value back, which must not reset the
+  // input mid-type; any OTHER value is a change from outside — a pre-fill,
+  // or a parent clearing the link (EditReptileScreen after ChangeTaxonSheet,
+  // the add form after a taxon switch) — and the input must show it, even
+  // if the keeper had typed in it before.
+  const lastEmitted = useRef(scientificName);
 
-  // Sync external scientificName changes (pre-fill).
+  // Sync external scientificName changes (pre-fill, clear).
   useEffect(() => {
-    if (!userTyped.current) {
-      setQuery(scientificName);
-    }
+    if (scientificName === lastEmitted.current) return;
+    lastEmitted.current = scientificName;
+    userTyped.current = false;
+    setQuery(scientificName);
+    setResults([]);
+    setOpen(false);
   }, [scientificName]);
 
   // Debounced search.
@@ -95,7 +106,7 @@ export function ReptileSpeciesAutocomplete({
     setLoading(true);
     const handle = setTimeout(async () => {
       try {
-        const data = await searchReptileSpecies(trimmed, 8, taxon);
+        const data = await searchReptileSpecies(trimmed, 8, taxon ?? undefined);
         setResults(data);
       } catch {
         // Network errors during typing are noisy; swallow + keep last
@@ -113,6 +124,7 @@ export function ReptileSpeciesAutocomplete({
     setQuery(next);
     setOpen(true);
     // Once the user edits, the prior selection is stale.
+    lastEmitted.current = next;
     onChange({ id: null, scientificName: next });
   }
 
@@ -120,6 +132,7 @@ export function ReptileSpeciesAutocomplete({
     setQuery(species.scientific_name);
     setOpen(false);
     setResults([]);
+    lastEmitted.current = species.scientific_name;
     onChange({
       id: species.id,
       scientificName: species.scientific_name,

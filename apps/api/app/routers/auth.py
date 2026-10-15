@@ -34,6 +34,7 @@ from app.services.oauth_verification import (
     verify_google_id_token,
     verify_apple_identity_token,
 )
+from app.services import apple_siwa
 from app.config import settings
 from app.utils.username_validation import validate_username
 from app.utils.rate_limit import limiter
@@ -777,6 +778,16 @@ async def oauth_login(
         if user and not user.avatar_url and picture:
             user.avatar_url = picture
 
+        # Sign in with Apple: exchange the optional one-time authorization
+        # code for a refresh token so account deletion can revoke it (App
+        # Store 5.1.1(v)). Never blocks sign-in — failures are logged.
+        if provider == "apple":
+            await apple_siwa.store_from_authorization_code(
+                oauth_account,
+                oauth_data.get("authorization_code") or oauth_data.get("authorizationCode"),
+                verified,
+            )
+
         db.commit()
         if user:
             db.refresh(user)
@@ -1304,6 +1315,14 @@ async def link_account_direct(
     )
     db.add(oauth_account)
 
+    # Apple: keep a revocable refresh token (see oauth_login). Never blocks.
+    if provider == "apple":
+        await apple_siwa.store_from_authorization_code(
+            oauth_account,
+            link_data.authorization_code or link_data.authorizationCode,
+            verified,
+        )
+
     # Backfill legacy columns if the user had none (keeps old lookups working).
     if not current_user.oauth_provider:
         current_user.oauth_provider = provider
@@ -1361,6 +1380,11 @@ async def unlink_account(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot unlink the only authentication method. Set a password first or link another account."
         )
+
+    # Unlinking Apple ends our use of the Apple ID: revoke its token while we
+    # still have it. Best-effort — a failed revoke never blocks the unlink.
+    if provider == "apple" and oauth_account.refresh_token:
+        await apple_siwa.revoke_stored_tokens([oauth_account.refresh_token])
 
     # Delete the linked account
     db.delete(oauth_account)
@@ -1596,6 +1620,17 @@ async def delete_account(
     from app.models.reptile_species import ReptileSpecies
 
     uid = current_user.id
+
+    # Sign in with Apple (guideline 5.1.1(v)): revoke the user's Apple tokens
+    # BEFORE the oauth rows holding them cascade away. Best-effort — config
+    # missing, an Apple outage or an unreadable token is logged, and the
+    # deletion always goes ahead.
+    try:
+        await apple_siwa.revoke_stored_tokens(apple_siwa.stored_tokens_for_user(db, uid))
+    except Exception:
+        logger.exception("Apple token revocation failed for %s", uid)
+        db.rollback()  # nothing written yet; clears a failed read for the delete
+
     try:
         db.query(Gene).filter(Gene.submitted_by == uid).update(
             {Gene.submitted_by: None}, synchronize_session=False)

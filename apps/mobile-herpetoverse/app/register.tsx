@@ -32,6 +32,7 @@ import {
   isGoogleSignInAvailable,
   isAppleSignInAvailable,
 } from '../src/services/google-signin';
+import { takePostAuthRoute } from '../src/lib/claim';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -87,7 +88,8 @@ export default function RegisterScreen() {
       } else {
         // Auto-sign-in if email verification is off (feature flag).
         await login(email.trim(), password);
-        router.replace('/(tabs)/dashboard');
+        // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
+        router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
       }
     } catch (err: any) {
       captureEvent('signup_failed');
@@ -110,7 +112,8 @@ export default function RegisterScreen() {
         await loginWithApple();
       }
       captureEvent('signup_success', { method: provider });
-      router.replace('/(tabs)/dashboard');
+      // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
+      router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
     } catch (err: any) {
       const msg = err?.message || '';
       if (!/cancel/i.test(msg)) {

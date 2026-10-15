@@ -3,6 +3,7 @@ import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'rea
 import { useRouter } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
 import { trackUpgrade, UPGRADE_EVENTS, type UpgradeSource } from '../lib/upgrade-tracking';
+import { useStorePrices } from '../hooks/useStorePrices';
 
 interface UpgradeModalProps {
   visible: boolean;
@@ -27,6 +28,9 @@ export default function UpgradeModal({
   // Set when the keeper taps upgrade, so the close that follows isn't also
   // counted as a dismissal (which would make every conversion look like one).
   const acted = useRef(false);
+  // Store-localized prices (null until/unless the store answers — then the
+  // cards show no amount rather than a USD figure that may be wrong here).
+  const prices = useStorePrices(visible);
 
   useEffect(() => {
     if (visible) {
@@ -48,28 +52,37 @@ export default function UpgradeModal({
     router.push({ pathname: '/subscription', params: { source } } as never);
   };
 
-  const plans = [
+  const plans: {
+    name: string;
+    price: string | null;
+    period: string;
+    description: string;
+    features: string[];
+    popular: boolean;
+    savings?: string | null;
+    badge?: string;
+  }[] = [
     {
       name: 'Monthly',
-      price: '$4.99',
-      period: '/month',
+      price: prices.monthly,
+      period: prices.monthly ? '/month' : 'Billed monthly',
       description: 'Perfect for trying premium',
       features: ['Cancel anytime', 'All premium features'],
       popular: false,
     },
     {
       name: 'Yearly',
-      price: '$44.99',
-      period: '/year',
-      description: 'Best value - Save 25%',
-      features: ['2 months free', 'All premium features'],
+      price: prices.yearly,
+      period: prices.yearly ? '/year' : 'Billed yearly',
+      description: 'Best value',
+      features: ['All premium features', 'One payment a year'],
       popular: true,
-      savings: 'Save $15/year',
+      savings: prices.yearlySavingsPct ? `Save ${prices.yearlySavingsPct}% vs monthly` : null,
     },
     {
       name: 'Lifetime',
-      price: '$149.99',
-      period: 'one-time',
+      price: prices.lifetime,
+      period: prices.lifetime ? 'one-time' : 'One-time purchase',
       description: 'Never pay again',
       features: ['Pay once, own forever', 'All future features included'],
       popular: false,
@@ -153,7 +166,9 @@ export default function UpgradeModal({
                       {plan.description}
                     </Text>
                     <View style={styles.priceContainer}>
-                      <Text style={[styles.price, { color: colors.textPrimary }]}>{plan.price}</Text>
+                      {plan.price ? (
+                        <Text style={[styles.price, { color: colors.textPrimary }]}>{plan.price}</Text>
+                      ) : null}
                       <Text style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</Text>
                     </View>
                     {plan.savings && (
@@ -216,10 +231,6 @@ export default function UpgradeModal({
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-                Have a promo code?{' '}
-                <Text style={styles.footerLink}>Redeem in settings</Text>
-              </Text>
               <TouchableOpacity onPress={handleDismiss} style={styles.maybeLaterButton}>
                 <Text style={[styles.maybeLaterText, { color: colors.textSecondary }]}>
                   Maybe Later
@@ -421,16 +432,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 16,
-  },
-  footerText: {
-    fontSize: 14,
-  },
-  footerLink: {
-    color: '#a855f7',
-    fontWeight: '600',
   },
   maybeLaterButton: {
     paddingHorizontal: 16,

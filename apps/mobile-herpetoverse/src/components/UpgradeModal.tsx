@@ -8,9 +8,12 @@
  * after first approval (yearly, lifetime) appear automatically with no
  * app update. Purchase → validate-receipt → refreshUser().
  *
- * Honesty-first fallback: in Expo Go (no native module) or before any
- * product is live, there's no fake purchase button — it shows the web
- * "Learn more" link instead. We never imply a charge that can't happen.
+ * Store builds (iOS AND Android) never link to a web checkout: Apple 3.1.1
+ * and Google Play's Payments policy both forbid steering to an outside
+ * purchase for digital goods. When the store returns no products (not live
+ * yet, sandbox hiccup, offline) the sheet says neutrally that this is part of
+ * Herpetoverse Premium — no link, no price, no "coming soon". Only Expo Go
+ * (dev, no native store module) shows the web "Learn more" link.
  *
  * Theme: dark-first via ThemeContext. HV has no `error` color — status
  * accents use `danger`/`warning`; on-primary text is #0B0B0B (matches
@@ -18,8 +21,7 @@
  * useSafeAreaInsets().bottom so the buttons clear the Android nav bar.
  *
  * `Linking.openURL` is a React Native core API — no native dependency,
- * OTA-safe. The pricing page (https://herpetoverse.com/pricing) is being
- * created by the web team.
+ * OTA-safe.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -126,9 +128,9 @@ export default function UpgradeModal({
   // isn't also counted as a dismissal.
   const acted = useRef(false);
   // One "shown" per open. Deferred until the store has answered, so the event
-  // can say whether this keeper had any way to pay: on iOS there are no HV
-  // store products yet, and "prompt shown with no purchase path" should be a
-  // number in PostHog rather than something nobody can see.
+  // can say whether this keeper had any way to pay: "prompt shown with no
+  // purchase path" (store returned no products) should be a number in PostHog
+  // rather than something nobody can see.
   const shownLogged = useRef(false);
   useEffect(() => {
     if (!visible) {
@@ -138,7 +140,7 @@ export default function UpgradeModal({
     if (!shownLogged.current && !(iapOn && !productsResolved)) {
       shownLogged.current = true;
       acted.current = false;
-      const webLinkAllowed = Platform.OS !== 'ios' || !iapOn; // mirrors canLinkToWebCheckout
+      const webLinkAllowed = !iapOn; // mirrors canLinkToWebCheckout
       trackUpgrade(UPGRADE_EVENTS.shown, source, {
         platform: Platform.OS,
         purchase_path: showStore ? 'store' : webLinkAllowed ? 'web_link' : 'none',
@@ -152,20 +154,16 @@ export default function UpgradeModal({
   };
 
   // ---------------------------------------------------------------------
-  // App Store Guideline 3.1.1 — never point iOS users at a web checkout.
+  // Store policy — never point a store build at a web checkout.
   //
-  // NOTE: this is deliberately STRICTER than Tarantuverse's equivalent gate
-  // (apps/mobile/app/subscription.tsx). TV also reveals the web link when the
-  // store returns zero products, which is safe there only because TV's
-  // products exist — that branch never fires in review. Herpetoverse has no
-  // App Store products yet, so on iOS that fallback is the DEFAULT state and
-  // would show a reviewer a Stripe checkout link. That's the textbook 3.1.1
-  // rejection.
+  // iOS: Guideline 3.1.1. Android: Google Play's Payments policy (an external
+  // purchase link for digital goods is only allowed inside Google's regional
+  // programmes, which this app isn't enrolled in). So in an installed build
+  // the ONLY purchase path is the native store. If the store returns no
+  // products, the sheet shows no purchase path at all — never an external one.
   //
-  // Rule here: on iOS the ONLY purchase path is native IAP. If there are no
-  // products, we show no purchase path at all rather than an external one.
-  // Android may link out (Google permits it), as may Expo Go for dev testing.
-  const canLinkToWebCheckout = Platform.OS !== 'ios' || !iapOn;
+  // Expo Go has no store module, so dev testing may still link to the web.
+  const canLinkToWebCheckout = !iapOn;
   // ---------------------------------------------------------------------
 
   // Product-aware labels derived from the product id (Premium vs All-Access,
@@ -352,8 +350,9 @@ export default function UpgradeModal({
               ))}
             </View>
 
-            {/* Purchase options — real store plans when available; honest web
-                fallback in Expo Go or before any products are live. */}
+            {/* Purchase options — real store plans when the store returns them.
+                Otherwise a neutral line (store builds) or the web link (Expo
+                Go only). */}
             {iapOn && loadingProducts ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color={colors.primary} />
@@ -410,9 +409,7 @@ export default function UpgradeModal({
             ) : canLinkToWebCheckout ? (
               <>
                 <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
-                  {iapOn
-                    ? "Plans aren't available right now — you can also manage premium on the web."
-                    : 'The in-app purchase option appears in the installed app. Learn more on the web.'}
+                  The in-app purchase option appears in the installed app. Learn more on the web.
                 </Text>
                 <TouchableOpacity
                   onPress={handleLearnMore}
@@ -428,12 +425,26 @@ export default function UpgradeModal({
                 </TouchableOpacity>
               </>
             ) : (
-              // iOS with no store products: say so plainly. No external link
-              // (3.1.1), and no fake "coming soon" that implies a path exists.
-              <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
-                Premium isn&apos;t available for purchase in the app just yet.
-                Everything you&apos;re already tracking stays exactly as it is.
-              </Text>
+              // Installed build, store returned no products. Neutral: no
+              // external link, no price, no "coming soon". Restore stays
+              // available so an earlier store purchase can still be brought
+              // back to this account.
+              <>
+                <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
+                  Available with Herpetoverse Premium. Everything you&apos;re
+                  already tracking stays exactly as it is.
+                </Text>
+                <TouchableOpacity
+                  onPress={handleRestore}
+                  style={styles.dismissBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restore purchases"
+                >
+                  <Text style={[styles.dismissText, { color: colors.textSecondary }]}>
+                    Restore purchases
+                  </Text>
+                </TouchableOpacity>
+              </>
             )}
 
             {/* Guideline 3.1.2 — auto-renew terms plus Terms/Privacy must be

@@ -201,6 +201,11 @@ export default function InvertDetailPage() {
   const isOwner = viewerRole === 'owner'
   const canKeep = can(viewerRole, 'keeper')
   const canLog = can(viewerRole, 'logger')
+  // A died or transferred animal is history: no NEW logs, photos or events
+  // (the API answers 409 — utils/closed_animals). Editing and deleting
+  // existing entries stays open, so those keep using canLog / canChange.
+  const isClosed = !!invert?.died_at || !!invert?.transferred_out_at
+  const canAdd = canLog && !isClosed
   // Loggers change only their own entries; keepers and the owner, any.
   const canChange = (x: Attributed) => canKeep || (canLog && !!user?.id && x.logged_by_user_id === user.id)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
@@ -709,7 +714,7 @@ export default function InvertDetailPage() {
                 {/* ADR-017 — an offer, not a setting. Once set it reports the
                     value, so the control doubles as the indicator. Only for
                     taxa with a feeding cadence — a grazer has none to set. */}
-                {taxonHasModule(invert.taxon, 'feedingStats') && <button
+                {taxonHasModule(invert.taxon, 'feedingStats') && !isClosed && <button
                   onClick={() => setCadenceOpen(true)}
                   className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
                 >
@@ -740,8 +745,9 @@ export default function InvertDetailPage() {
 
             {/* Feeding status. Registry-gated, so the detritivores that graze
                 rather than take prey on a cadence don't get a countdown that
-                would mean nothing for them. */}
-            {taxonHasModule(invert.taxon, 'feedingStats') && (
+                would mean nothing for them. A died or transferred animal
+                has no next feeding, so no countdown or "overdue" either. */}
+            {taxonHasModule(invert.taxon, 'feedingStats') && !isClosed && (
               <InvertFeedingStatus
                 stats={feedingStats}
                 onSetCadence={canKeep ? () => setCadenceOpen(true) : undefined}
@@ -859,8 +865,8 @@ export default function InvertDetailPage() {
             {/* Logs */}
             <LogSection
               title="Feedings"
-              cta={canLog ? 'Log feeding' : undefined}
-              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-feeding`) : undefined}
+              cta={canAdd ? 'Log feeding' : undefined}
+              onCta={canAdd ? () => router.push(`/dashboard/inverts/${id}/add-feeding`) : undefined}
               empty="No feedings logged yet."
               state={logState.feedings}
               onRetry={fetchAll}
@@ -884,8 +890,8 @@ export default function InvertDetailPage() {
             )}
             <LogSection
               title="Molts"
-              cta={canLog ? 'Log molt' : undefined}
-              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-molt`) : undefined}
+              cta={canAdd ? 'Log molt' : undefined}
+              onCta={canAdd ? () => router.push(`/dashboard/inverts/${id}/add-molt`) : undefined}
               empty="No molts logged yet."
               state={logState.molts}
               onRetry={fetchAll}
@@ -903,8 +909,8 @@ export default function InvertDetailPage() {
                 only their own entries. Logging closes once an animal died. */}
             <LogSection
               title="Health & events"
-              cta={canLog && !invert.died_at ? 'Log event' : undefined}
-              onCta={canLog && !invert.died_at ? () => { setEditingEvent(null); setEventOpen(true) } : undefined}
+              cta={canAdd ? 'Log event' : undefined}
+              onCta={canAdd ? () => { setEditingEvent(null); setEventOpen(true) } : undefined}
               empty="No events recorded. Injuries, illnesses, escapes and recoveries go here."
               state={logState.events}
               onRetry={fetchAll}
@@ -1110,8 +1116,8 @@ export default function InvertDetailPage() {
                 derived deadline would be a fabricated number. */}
             <LogSection
               title="Water"
-              cta={canLog ? 'Log water' : undefined}
-              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-care-log`) : undefined}
+              cta={canAdd ? 'Log water' : undefined}
+              onCta={canAdd ? () => router.push(`/dashboard/inverts/${id}/add-care-log`) : undefined}
               empty="No watering logged yet."
               state={logState.care}
               onRetry={fetchAll}
@@ -1127,8 +1133,8 @@ export default function InvertDetailPage() {
 
             <LogSection
               title="Substrate changes"
-              cta={canLog ? 'Log substrate change' : undefined}
-              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-substrate-change`) : undefined}
+              cta={canAdd ? 'Log substrate change' : undefined}
+              onCta={canAdd ? () => router.push(`/dashboard/inverts/${id}/add-substrate-change`) : undefined}
               empty="No substrate changes logged yet."
               state={logState.substrate}
               onRetry={fetchAll}
@@ -1142,7 +1148,7 @@ export default function InvertDetailPage() {
             {/* Photos */}
             <Section
               title="Photos"
-              action={canLog ? { label: 'Add photo', onClick: () => router.push(`/dashboard/inverts/${id}/add-photo`) } : undefined}
+              action={canAdd ? { label: 'Add photo', onClick: () => router.push(`/dashboard/inverts/${id}/add-photo`) } : undefined}
             >
               {photos.length === 0 ? (
                 <p className="text-sm text-theme-tertiary italic">No photos yet.</p>
@@ -1237,7 +1243,7 @@ export default function InvertDetailPage() {
       )}
 
       <Suspense fallback={null}>
-        <LogDeepLink id={id} canLog={canLog && !invert?.died_at} ready={!!invert && !loading && viewerRole !== null} />
+        <LogDeepLink id={id} canLog={canAdd} ready={!!invert && !loading && viewerRole !== null} />
       </Suspense>
 
       {/* `resource="inverts"` is the whole point — the default tarantula

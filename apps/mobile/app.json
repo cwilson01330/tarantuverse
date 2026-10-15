@@ -14,6 +14,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tarantuverse.app",
+      "appStoreUrl": "https://apps.apple.com/app/id6756224640",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Tarantuverse needs access to your photo library to let you add photos to your tarantula profiles. For example, when your tarantula molts, you can select a photo from your library to document its new size and coloration. You can also add photos of enclosure setups, feeding responses, or other care-related images to track your collection over time.",
@@ -27,22 +28,26 @@
     },
     "android": {
       "package": "com.tarantuverse.app",
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.tarantuverse.app",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/t" },
-            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/t" },
-            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/i" },
-            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/i" },
-            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/col" },
-            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/col" }
+            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/t/" },
+            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/t/" },
+            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/i/" },
+            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/i/" },
+            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/col/" },
+            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/col/" }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }
@@ -76,6 +81,14 @@
         }
       ],
       "expo-iap",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tarantuverse needs access to your photo library to let you add photos to your tarantula profiles. For example, when your tarantula molts, you can select a photo from your library to document its new size and coloration. You can also add photos of enclosure setups, feeding responses, or other care-related images to track your collection over time.",
+          "cameraPermission": "Tarantuverse needs access to your camera so you can take photos of your tarantulas directly within the app to document molts, track growth, and maintain a visual record of your collection.",
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-media-library",
         {

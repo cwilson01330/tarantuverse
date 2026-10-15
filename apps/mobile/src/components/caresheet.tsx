@@ -47,8 +47,8 @@ export async function shareSpecies(scientificName: string, commonName: string | 
   try {
     await Share.share({
       message: commonName
-        ? `${commonName} (${scientificName}) — care sheet on Tarantuverse\nhttps://tarantuverse.com/species/${id}`
-        : `${scientificName} — care sheet on Tarantuverse\nhttps://tarantuverse.com/species/${id}`,
+        ? `${commonName} (${scientificName}) — care sheet on Tarantuverse\nhttps://www.tarantuverse.com/species/${id}`
+        : `${scientificName} — care sheet on Tarantuverse\nhttps://www.tarantuverse.com/species/${id}`,
     });
   } catch {
     // Dismissed, or the platform refused. Nothing to recover from and nothing

@@ -98,6 +98,9 @@ export default function LinkedAccountsScreen() {
         provider: identity.provider,
         id_token: identity.idToken,
         name: identity.name,
+        // Apple only: lets the server store a refresh token it can revoke
+        // when the account is deleted (App Store guideline 5.1.1(v)).
+        authorization_code: identity.authorizationCode ?? undefined,
       });
       await fetchAccounts();
       Alert.alert('Linked', `You can now sign in with ${key === 'google' ? 'Google' : 'Apple'}.`);

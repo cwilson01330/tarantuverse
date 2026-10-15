@@ -15,7 +15,7 @@ from app.schemas.promo_code import (
     PromoCodeBulkCreate,
     SubscriptionLimitsResponse
 )
-from app.utils.dependencies import get_current_user, get_current_superuser
+from app.utils.dependencies import get_current_user, get_current_superuser, get_current_admin
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -376,46 +376,78 @@ async def debug_my_subscription(
     }
 
 
+# Subscriptions /me/revoke may cancel: ones WE granted, where cancelling our
+# row is the whole story. Anything a store bills (apple / google / stripe) is
+# left alone — cancelling the row does not stop the store charging, so the
+# keeper would lose access and keep paying (App Store review, 2026-10-12).
+LOCALLY_REVOCABLE_PROVIDERS = frozenset({"promo_code", "admin_grant"})
+
+
+def _is_locally_revocable(sub: UserSubscription) -> bool:
+    """True only for promo / admin-comp grants. Legacy promo rows written
+    before payment_provider existed (provider NULL, source 'promo') count."""
+    provider = sub.payment_provider
+    if provider in LOCALLY_REVOCABLE_PROVIDERS:
+        return True
+    if provider is None and (sub.granted_by_admin or sub.subscription_source == "promo"):
+        return True
+    return False
+
+
 @router.post("/me/revoke", status_code=status.HTTP_200_OK)
 async def revoke_my_premium(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """
-    Revoke your own premium subscription (for testing purposes)
+    Revoke your own promo/comp premium (admin testing tool only).
+
+    Admin-only (`is_admin` or `is_superuser`). Only promo-code and admin-grant
+    subscriptions are cancelled; a store- or Stripe-billed subscription is
+    never cancelled here — cancel those at the store / Customer Portal.
     """
-    # Find active subscription
-    active_sub = db.query(UserSubscription).filter(
+    active_subs = db.query(UserSubscription).filter(
         UserSubscription.user_id == current_user.id,
         UserSubscription.status == "active"
-    ).first()
+    ).all()
 
-    if not active_sub:
+    revoked = []
+    store_billed = []
+    for sub in active_subs:
+        plan = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == sub.plan_id
+        ).first()
+        if plan and plan.name == "free":
+            continue
+        if not _is_locally_revocable(sub):
+            store_billed.append(f"{plan.name if plan else 'unknown'} via {sub.payment_provider}")
+            continue
+        sub.status = "cancelled"
+        sub.cancelled_at = datetime.now(timezone.utc)
+        revoked.append(plan.name if plan else "unknown")
+
+    if not revoked:
+        if store_billed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Only promo or admin-granted premium can be revoked here. "
+                    "Cancel store or card subscriptions from the App Store, "
+                    "Google Play or the billing portal."
+                ),
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No active subscription found"
+            detail="No active promo or admin-granted subscription found"
         )
-
-    # Check if it's the free plan
-    plan = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.id == active_sub.plan_id
-    ).first()
-
-    if plan and plan.name == "free":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You're already on the free plan"
-        )
-
-    # Cancel the subscription
-    active_sub.status = "cancelled"
-    active_sub.cancelled_at = datetime.now(timezone.utc)
 
     db.commit()
 
     return {
         "message": "Premium subscription revoked successfully",
-        "previous_plan": plan.name if plan else "unknown"
+        "previous_plan": revoked[0],  # kept for older callers
+        "revoked_plans": revoked,
+        "still_billing": store_billed,
     }
 
 

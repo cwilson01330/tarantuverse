@@ -56,8 +56,10 @@ import {
   type Sex,
   type Source,
   createAnimal,
+  getAnimalLimits,
   isAnimalTaxon,
 } from '../../src/lib/animals';
+import { maybeRequestReview } from '../../src/lib/reviewPrompt';
 
 // Taxon chips sourced from the registry (ADR-011) — glyph + label per
 // entry, in display order. Adding a herp group in lib/animals.ts makes
@@ -170,6 +172,19 @@ function AddReptileScreen() {
   // never asked a question whose answer would rewrite their feeding
   // schedule. Resets with the species.
   const [speciesFeedsOnCgd, setSpeciesFeedsOnCgd] = useState(false);
+  // The group the linked species is filed under, when known (a care-sheet
+  // link carries it; a picked result has it). The API refuses a species
+  // from another group, so switching the taxon away from it clears the link.
+  const [speciesTaxon, setSpeciesTaxon] = useState<AnimalTaxon | null>(() =>
+    typeof params.species_id === 'string' && params.species_id && isAnimalTaxon(params.taxon)
+      ? params.taxon
+      : null,
+  );
+  // Whether the taxon was CHOSEN (chip, or a care-sheet link) rather than
+  // left on the snake default. Species leads this form, so until a taxon is
+  // chosen the search covers every group and a picked species sets the
+  // taxon; once chosen, only that group's species are offered.
+  const [taxonChosen, setTaxonChosen] = useState<boolean>(() => isAnimalTaxon(params.taxon));
   const [notes, setNotes] = useState('');
   // Genes picked before the animal exists. Held locally and attached
   // after createAnimal returns an id — see handleSubmit.
@@ -269,6 +284,16 @@ function AddReptileScreen() {
       // ADR-003: one detail route for every taxon.
       router.replace(`/reptile/${created.id}` as never);
 
+      // Success moment: the keeper's 3rd+ animal, in their own collection,
+      // with nothing half-failed. Fire-and-forget; gated inside.
+      if (genesFailed === 0 && !collection) {
+        getAnimalLimits()
+          .then((l) => {
+            if (l.current_count >= 3) void maybeRequestReview('animal_added');
+          })
+          .catch(() => {});
+      }
+
       if (genesFailed > 0) {
         Alert.alert(
           'Saved, but some genes did not attach',
@@ -340,9 +365,11 @@ function AddReptileScreen() {
             <ReptileSpeciesAutocomplete
               speciesId={speciesId}
               scientificName={scientificName}
+              taxon={taxonChosen && taxonPicked ? taxon : null}
               onChange={({ id, scientificName: sci }) => {
                 setSpeciesId(id);
                 setScientificName(sci);
+                if (!id) setSpeciesTaxon(null);
                 // Genes are species-scoped, so a species change
                 // invalidates anything already picked. Clearing is the
                 // honest move — silently keeping Pastel on a corn snake
@@ -356,6 +383,12 @@ function AddReptileScreen() {
                 }
               }}
               onPick={(species) => {
+                setSpeciesTaxon(species.taxon);
+                // No taxon chosen yet: the species decides it.
+                if (!taxonChosen && isAnimalTaxon(species.taxon)) {
+                  setTaxon(species.taxon);
+                  setTaxonPicked(true);
+                }
                 setSpeciesFeedsOnCgd(species.feeds_on_cgd);
                 // A species that doesn't eat CGD can't carry an override.
                 if (!species.feeds_on_cgd) setCgdOverride('auto');
@@ -384,8 +417,19 @@ function AddReptileScreen() {
               value={taxonPicked ? taxon : ''}
               onChange={(v) => {
                 if (!v) return;
+                // A linked species from another (or an unknown) group no
+                // longer fits — clear it, as change-taxon does on the server.
+                if (speciesId && speciesTaxon !== v) {
+                  setSpeciesId(null);
+                  setScientificName('');
+                  setSpeciesTaxon(null);
+                  setSpeciesFeedsOnCgd(false);
+                  setCgdOverride('auto');
+                  setGenes([]);
+                }
                 setTaxon(v);
                 setTaxonPicked(true);
+                setTaxonChosen(true);
               }}
             />
           </Field>

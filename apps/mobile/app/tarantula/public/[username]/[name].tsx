@@ -133,7 +133,7 @@ export default function PublicTarantulaProfile() {
 
   const handleShare = async () => {
     try {
-      const url = `https://tarantuverse.com/keeper/${username}/${name}`
+      const url = `https://www.tarantuverse.com/keeper/${username}/${name}`
       await Share.share({
         message: `Check out ${profile?.tarantula.name || profile?.tarantula.common_name} on Tarantuverse!`,
         url: url,

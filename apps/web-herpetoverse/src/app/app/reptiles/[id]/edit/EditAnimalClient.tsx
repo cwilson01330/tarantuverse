@@ -394,6 +394,10 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
                 <ReptileSpeciesAutocomplete
                   speciesId={form.speciesId}
                   scientificName={form.scientificName}
+                  // Only species of this animal's type — the API refuses a
+                  // species from another group. Changing the type is the
+                  // Change button above.
+                  taxon={isAnimalTaxon(animal.taxon) ? animal.taxon : null}
                   onChange={({ id, scientificName }) => {
                     setForm((prev) => ({
                       ...prev,

@@ -75,6 +75,12 @@ class LinkAccountDirectRequest(BaseModel):
     identity_token: Optional[str] = None  # alias used by expo-apple-authentication
     credential: Optional[str] = None      # alias used by Google Identity Services (web)
 
+    # Apple only, optional: the one-time authorizationCode from
+    # expo-apple-authentication. Exchanged for a refresh token so account
+    # deletion can revoke it (services/apple_siwa.py).
+    authorization_code: Optional[str] = None
+    authorizationCode: Optional[str] = None
+
     # Ignored — retained so old clients don't 422 before they see the 401.
     id: Optional[str] = None
     email: Optional[str] = None

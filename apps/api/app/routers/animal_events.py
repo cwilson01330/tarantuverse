@@ -28,6 +28,7 @@ from app.schemas.animal_event import (
     AnimalEventUpdate,
 )
 from app.routers.animals import refuse_if_closed
+from app.utils.closed_animals import refuse_if_closed_invert
 from app.utils.dependencies import get_current_user
 from app.utils.access import access_helper, load_animal, load_invert, load_log_parent, policy, require_can_change
 
@@ -47,12 +48,12 @@ def _event_for(event_id: uuid.UUID, db: Session, user: User, need: str):
 def _refuse_if_closed_hv(event: AnimalEvent, parent) -> None:
     """A Herpetoverse animal that died or was transferred is history: its
     event log is frozen like the rest of the record (routers/animals.py::
-    refuse_if_closed). TV inverts are not covered here — this rule is HV's.
+    refuse_if_closed) — edits and deletes included.
 
-    Invert events follow the TV invert log routes (feedings / molts /
-    substrate changes / care logs / photos), which don't refuse a died or
-    transferred invert server-side; the TV clients hide "add" on a died
-    invert. Pinned by tests/test_hv_closed_logs.py — change both together."""
+    TV invert events follow the TV invert log routes instead: a NEW event on
+    a died or transferred invert is refused in create_invert_event
+    (utils/closed_animals), but editing or deleting an existing one stays
+    open, like every TV log. Pinned by tests/test_tv_closed_inverts.py."""
     if event.animal_id:
         refuse_if_closed(parent)
 
@@ -102,7 +103,10 @@ async def create_invert_event(
     Inferring it from a log would mean a single edited row could bring a dead
     animal back into the collection.
     """
-    _invert, access = load_invert(db, current_user, invert_id, "logger")
+    invert, access = load_invert(db, current_user, invert_id, "logger")
+    # 409 for a died or transferred invert — its record is history. Editing
+    # or deleting an existing event stays open (TV log-route rule).
+    refuse_if_closed_invert(invert)
     event = AnimalEvent(
         invert_id=invert_id,
         user_id=access.owner.id,  # the collection's owner, whoever logged it

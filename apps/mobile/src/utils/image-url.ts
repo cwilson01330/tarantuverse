@@ -33,7 +33,7 @@ export const API_BASE_URL =
 /** Web app host (Next.js, Vercel). Serves the species catalog static
  * images plus the public profile pages at `/t/{id}` and `/s/{id}`. */
 export const WEB_BASE_URL =
-  process.env.EXPO_PUBLIC_WEB_URL || 'https://tarantuverse.com';
+  process.env.EXPO_PUBLIC_WEB_URL || 'https://www.tarantuverse.com';
 
 export function getImageUrl(url: string | null | undefined): string {
   if (!url) return '';

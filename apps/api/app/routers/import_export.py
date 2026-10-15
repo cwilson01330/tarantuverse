@@ -181,6 +181,15 @@ async def _import_commit_animals(
                 for fld, val in payload.items():
                     if fld == "taxon":  # taxon is immutable
                         continue
+                    # The matched species must not be filed under another
+                    # group than the EXISTING animal (whose taxon the row
+                    # can't change) — leave its link alone if it is.
+                    if (
+                        fld == "herp_species_id"
+                        and norm.get("species_taxon")
+                        and norm["species_taxon"] != existing.taxon
+                    ):
+                        continue
                     if fld == "sex" and val:
                         try:
                             val = Sex(val)
