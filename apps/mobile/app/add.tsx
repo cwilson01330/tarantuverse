@@ -57,6 +57,7 @@ import DateInput from '../src/components/DateInput';
 import { parseLocalDate, toISODateLocal } from '../src/utils/date';
 import { getImageUrl } from '../src/utils/image-url';
 import { INVERT_TAXA, INVERT_TAXON_ORDER, type InvertTaxon } from '../src/lib/inverts';
+import { lifeStageOptions } from '../src/lib/taxon-modules';
 import { SpeciesSuggestion, taxonLabel, useSpeciesMatch } from '../src/components/SpeciesSuggestion';
 import { careLevelMeta } from '../src/components/caresheet';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -723,10 +724,12 @@ function AddScreen() {
 
               <Text style={styles.miniLabel}>Life stage</Text>
               <View style={styles.segment}>
-                {(['sling', 'juvenile', 'adult'] as LifeStage[]).map((s) => (
+                {/* Stored values never change; the words are per taxon
+                    (a millipede's "sling" is a "Baby"). */}
+                {lifeStageOptions(picked?.taxon ?? effectiveManualTaxon).map(({ value: s, label }) => (
                   <SegmentButton
                     key={s}
-                    label={s.charAt(0).toUpperCase() + s.slice(1)}
+                    label={label}
                     active={lifeStage === s}
                     onPress={() => setLifeStage(s)}
                     colors={colors}

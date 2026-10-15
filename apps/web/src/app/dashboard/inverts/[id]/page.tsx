@@ -37,6 +37,7 @@ import {
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
 import SpeciesLinkBanner from '@/components/SpeciesLinkBanner'
+import MoltNote from '@/components/MoltNote'
 import InvertFeedingStatus, {
   type InvertFeedingStats,
 } from '@/components/InvertFeedingStatus'
@@ -893,6 +894,7 @@ export default function InvertDetailPage() {
               cta={canAdd ? 'Log molt' : undefined}
               onCta={canAdd ? () => router.push(`/dashboard/inverts/${id}/add-molt`) : undefined}
               empty="No molts logged yet."
+              note={<MoltNote taxon={invert.taxon} className="mb-3" />}
               state={logState.molts}
               onRetry={fetchAll}
               rows={molts.map((x) => ({
@@ -1592,8 +1594,11 @@ function LogSection({
   rows,
   state = 'ok',
   onRetry,
+  note,
 }: {
   title: string
+  /** Shown above the rows whatever their state (e.g. the per-taxon MoltNote). */
+  note?: React.ReactNode
   /** Omitted when the viewer can't log here (a co-keeper viewer). */
   cta?: string
   onCta?: () => void
@@ -1610,6 +1615,7 @@ function LogSection({
   const shown = expanded ? rows : rows.slice(0, LOG_PREVIEW)
   return (
     <Section title={title} action={cta && onCta ? { label: cta, onClick: onCta } : undefined}>
+      {note}
       {state === 'loading' ? (
         // No text and no count. We don't know yet, so we say nothing.
         <div className="space-y-2" aria-busy="true">

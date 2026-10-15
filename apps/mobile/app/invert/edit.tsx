@@ -20,7 +20,7 @@ import {
   INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, getInvert, updateInvert,
   type Invert, type InvertTaxon, type InvertUpdate, type Sex, type Source,
 } from '../../src/lib/inverts';
-import { stageCountLabel } from '../../src/lib/taxon-modules';
+import { stageCountLabel, lifeStageOptions } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import { useUnitField } from '../../src/hooks/useUnitField';
@@ -190,11 +190,7 @@ export default function EditInvertScreen() {
               produces a wrong schedule rather than a missing one. */}
           <Field label="Life stage">
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                { value: 'sling', label: 'Sling' },
-                { value: 'juvenile', label: 'Juvenile' },
-                { value: 'adult', label: 'Adult' },
-              ].map((o) => {
+              {lifeStageOptions(form.taxon).map((o) => {
                 const selected = form.life_stage === o.value;
                 return (
                   <TouchableOpacity

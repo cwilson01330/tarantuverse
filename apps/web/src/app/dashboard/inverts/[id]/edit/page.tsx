@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import ChangeTaxonDialog, { describeTaxonChangeFailure } from '@/components/ChangeTaxonDialog'
-import { INVERT_TAXA, isInvertTaxon, stageCountLabel, type InvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, stageCountLabel, lifeStageOptions, LIFE_STAGE_VALUES, type InvertTaxon } from '@/lib/inverts'
 import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
 import { useUnitField } from '@/hooks/useUnitField'
 import { useUnits } from '@/components/UnitsProvider'
@@ -252,15 +252,15 @@ export default function EditInvertPage() {
                   stage to clear it: a guess gives a wrong schedule. */}
               <Field label="Life stage">
                 <div className="flex gap-2 flex-wrap">
-                  {LIFE_STAGES.map((st) => (
+                  {lifeStageOptions(form.taxon).map(({ value: st, label }) => (
                     <button
                       key={st}
                       type="button"
                       onClick={() => set('life_stage', lifeStageValue(form.life_stage) === st ? null : st)}
                       aria-pressed={lifeStageValue(form.life_stage) === st}
-                      className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${lifeStageValue(form.life_stage) === st ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold ${lifeStageValue(form.life_stage) === st ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}
                     >
-                      {st}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -473,11 +473,9 @@ function SpeciesField({
   )
 }
 
-const LIFE_STAGES = ['sling', 'juvenile', 'adult'] as const
-
 function lifeStageValue(v: unknown): string | null {
   const s = typeof v === 'string' ? v.toLowerCase() : ''
-  return (LIFE_STAGES as readonly string[]).includes(s) ? s : null
+  return (LIFE_STAGE_VALUES as readonly string[]).includes(s) ? s : null
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

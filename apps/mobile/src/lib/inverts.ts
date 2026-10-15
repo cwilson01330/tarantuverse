@@ -170,6 +170,24 @@ export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
   return t != null && t in INVERT_TAXA;
 }
 
+/**
+ * The feeding mode to act on — same rule as the API's effective_feeding_mode
+ * (apps/api/app/utils/feeding_mode.py): a species that says it grazes wins;
+ * otherwise the taxon's `feedingMode` above decides. A species 'predator'
+ * never overrides a grazing taxon (it's the column's default, so it is more
+ * likely unset than a claim). Web copy: apps/web/src/lib/inverts.ts.
+ */
+export function effectiveFeedingMode(taxon: string | null | undefined, speciesMode?: string | null): FeedingMode {
+  const m = (speciesMode ?? '').trim().toLowerCase();
+  if (m === 'detritivore' || m === 'omnivore') return m;
+  return isInvertTaxon(taxon) ? INVERT_TAXA[taxon].feedingMode : 'predator';
+}
+
+/** True when "prey size" and a feeding cadence mean nothing for this animal. */
+export function isGrazer(taxon: string | null | undefined, speciesMode?: string | null): boolean {
+  return effectiveFeedingMode(taxon, speciesMode) !== 'predator';
+}
+
 export const FEEDING_MODE_LABELS: Record<FeedingMode, string> = {
   predator: 'Predator (live prey)',
   detritivore: 'Detritivore (decaying matter)',

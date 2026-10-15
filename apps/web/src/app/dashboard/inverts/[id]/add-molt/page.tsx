@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import MoltNote from '@/components/MoltNote'
 import { INVERT_TAXA, isInvertTaxon, growthLengthLabel, finalMoltCopy } from '@/lib/inverts'
 import { useUnitField } from '@/hooks/useUnitField'
 
@@ -144,6 +145,7 @@ export default function AddInvertMoltPage() {
       <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button onClick={() => router.back()} className="text-sm text-primary-600 hover:underline mb-4">← Back</button>
         <h1 className="text-2xl font-bold text-theme-primary mb-6">{isEdit ? 'Edit molt' : 'Log molt'}</h1>
+        <MoltNote taxon={taxon} className="mb-5" />
         <div className="space-y-5">
           <div><label className={labelCls}>Date molted</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Molt number (optional)</label><input value={moltNum} onChange={(e) => setMoltNum(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></div>

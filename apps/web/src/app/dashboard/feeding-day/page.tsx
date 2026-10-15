@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, isGrazer, lifeStageLabel } from '@/lib/inverts'
 import DashboardLayout from '@/components/DashboardLayout'
 import { LocationDialog } from '@/components/LocationPicker'
 import PremiumIntroCard, { shouldShowPremiumIntro } from '@/components/PremiumIntroCard'
@@ -67,9 +67,7 @@ function displayName(a: FeedingStatus): string {
  * Returns null when there's nothing to show.
  */
 function lifeStageMeta(a: FeedingStatus): string | null {
-  const stage = a.life_stage
-    ? a.life_stage.charAt(0).toUpperCase() + a.life_stage.slice(1)
-    : null
+  const stage = a.life_stage ? lifeStageLabel(a.taxon, a.life_stage) : null
   // "every ~7d" is a claim about this species. Only make it when the number
   // actually came from a care sheet — otherwise say it's a default, so a
   // keeper doesn't read our guess as researched guidance.
@@ -77,7 +75,7 @@ function lifeStageMeta(a: FeedingStatus): string | null {
     ? a.interval_source === 'species'
       ? `every ~${a.interval_days}d`
       : `~${a.interval_days}d (default)`
-    : a.taxon === 'millipede'
+    : isGrazer(a.taxon)
       ? 'grazer'
       : null
   const parts = [stage, cadence].filter((p): p is string => Boolean(p))

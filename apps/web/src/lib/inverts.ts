@@ -341,12 +341,62 @@ export function finalMoltCopy(taxon: string): { offered: boolean; label: string;
       done: 'Recorded as mature — no further molts expected. You can untick this later.',
     }
   }
+  if (taxon === 'millipede') {
+    return {
+      offered: true,
+      label: 'This was the final molt (now adult)',
+      hint: 'Reached adulthood — mature males have gonopods (modified legs just behind the head).',
+      done: 'Recorded as adult — no further molts expected. You can untick this later.',
+    }
+  }
   return {
     offered: true,
     label: 'This was the final molt (now adult)',
     hint: 'Use when the animal has reached adulthood and won’t molt again.',
     done: 'Recorded as adult — no further molts expected. You can untick this later.',
   }
+}
+
+/**
+ * A molting fact the keeper needs before they go looking for the animal.
+ * Shown on the detail page, the molt form and the care sheet; nothing renders
+ * for a taxon without one. Only add a note for something well established —
+ * this is safety copy, not flavour.
+ *
+ * KEEP IN LOCKSTEP with apps/mobile/src/lib/taxon-modules.ts::MOLT_NOTES.
+ */
+const MOLT_NOTES: Record<string, string> = {
+  millipede:
+    'Millipedes molt underground in a small chamber and can stay buried for weeks. If yours has disappeared into the substrate, leave it be — digging it up mid-molt can kill it.',
+}
+
+export function moltNote(taxon: string | null | undefined): string | null {
+  return (taxon && MOLT_NOTES[taxon]) || null
+}
+
+/**
+ * Life-stage picker. The STORED values are always sling | juvenile | adult —
+ * the API reads them for the species feeding cadence — so only the words a
+ * keeper sees change per taxon. "Sling" is a tarantula word; nobody calls a
+ * baby millipede one.
+ *
+ * KEEP IN LOCKSTEP with apps/mobile/src/lib/taxon-modules.ts::STAGE_LABELS.
+ */
+export type LifeStageValue = 'sling' | 'juvenile' | 'adult'
+export const LIFE_STAGE_VALUES: LifeStageValue[] = ['sling', 'juvenile', 'adult']
+const DEFAULT_STAGE_LABELS: Record<LifeStageValue, string> = { sling: 'Sling', juvenile: 'Juvenile', adult: 'Adult' }
+const STAGE_LABELS: Record<string, Partial<Record<LifeStageValue, string>>> = {
+  millipede: { sling: 'Baby' },
+}
+
+/** Label for a stored life_stage ("sling" → "Baby" for a millipede). */
+export function lifeStageLabel(taxon: string | null | undefined, value: string): string {
+  const own = taxon ? STAGE_LABELS[taxon]?.[value as LifeStageValue] : undefined
+  return own ?? DEFAULT_STAGE_LABELS[value as LifeStageValue] ?? value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+export function lifeStageOptions(taxon: string | null | undefined): { value: LifeStageValue; label: string }[] {
+  return LIFE_STAGE_VALUES.map((value) => ({ value, label: lifeStageLabel(taxon, value) }))
 }
 
 /** "Usually adult after about 7 molts (around L8)". `moltsToAdult` is the
@@ -426,6 +476,39 @@ export function elapsedSince(iso: string): string {
   if (days < 63) return `${Math.round(days / 7)} weeks`
   const months = Math.round(days / 30.4)
   return `${months} ${months === 1 ? 'month' : 'months'}`
+}
+
+// ── Feeding mode (predator vs grazer) ────────────────────────────────────────
+
+export type FeedingMode = 'predator' | 'detritivore' | 'omnivore'
+
+/**
+ * Taxa that graze standing food instead of taking live prey on a cadence.
+ * Every taxon not listed is a predator. Mirrors TAXON_FEEDING_MODE in
+ * apps/api/app/utils/feeding_mode.py and `feedingMode` in the mobile
+ * INVERT_TAXA (test_taxon_lists_in_sync.py pins all three).
+ */
+const GRAZING_TAXA: Record<string, FeedingMode> = {
+  millipede: 'detritivore',
+  isopod: 'detritivore',
+  roach: 'omnivore',
+}
+
+/**
+ * The feeding mode to act on — same rule as the API's effective_feeding_mode:
+ * a species that says it grazes wins; otherwise the taxon decides. A species
+ * 'predator' never overrides a grazing taxon (it's the column's default, so
+ * it is more likely unset than a claim).
+ */
+export function effectiveFeedingMode(taxon: string | null | undefined, speciesMode?: string | null): FeedingMode {
+  const m = (speciesMode ?? '').trim().toLowerCase()
+  if (m === 'detritivore' || m === 'omnivore') return m
+  return (taxon && GRAZING_TAXA[taxon]) || 'predator'
+}
+
+/** True when "prey size" and a feeding cadence mean nothing for this animal. */
+export function isGrazer(taxon: string | null | undefined, speciesMode?: string | null): boolean {
+  return effectiveFeedingMode(taxon, speciesMode) !== 'predator'
 }
 
 // ── Food vocabulary (audit-2 M6) ─────────────────────────────────────────────

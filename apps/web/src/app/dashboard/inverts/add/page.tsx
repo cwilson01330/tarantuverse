@@ -33,7 +33,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
-import { INVERT_TAXA, PICKER_TAXA, isInvertTaxon, stageCountLabel, type InvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, PICKER_TAXA, isInvertTaxon, stageCountLabel, lifeStageOptions, type InvertTaxon, type LifeStageValue } from '@/lib/inverts'
 import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
 import { useUnitField } from '@/hooks/useUnitField'
 import { formatTempRange, withMmUnit } from '@/lib/units'
@@ -42,8 +42,8 @@ import { useUnits } from '@/components/UnitsProvider'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 type EnclosureType = 'terrestrial' | 'arboreal' | 'fossorial'
-type LifeStage = 'sling' | 'juvenile' | 'adult'
-const LIFE_STAGES: LifeStage[] = ['sling', 'juvenile', 'adult']
+// Stored values; the words come from the registry (a millipede's "sling" is a "Baby").
+type LifeStage = LifeStageValue
 
 /**
  * Starting enclosure orientation per taxon. Mirrors `defaultEnclosureType` in
@@ -551,15 +551,15 @@ function AddInvertFields() {
 
           <Field label="Life stage">
             <div className="flex gap-2 flex-wrap">
-              {LIFE_STAGES.map((st) => (
+              {lifeStageOptions(taxon).map(({ value: st, label }) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => chooseLifeStage(st)}
                   aria-pressed={lifeStage === st}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${lifeStage === st ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold ${lifeStage === st ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}
                 >
-                  {st}
+                  {label}
                 </button>
               ))}
             </div>

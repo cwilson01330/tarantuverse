@@ -18,7 +18,8 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
 import ShortlistButton from '@/components/ShortlistButton'
-import { growthLengthLabel } from '@/lib/inverts'
+import { growthLengthLabel, isGrazer, lifeStageLabel, lifeStageOptions } from '@/lib/inverts'
+import MoltNote from '@/components/MoltNote'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatLengthMmRange, formatTempRange } from '@/lib/units'
 
@@ -183,9 +184,25 @@ const SECRETION_COPY: Record<
 }
 
 const STAGE_SCHEME_LABELS: Record<string, string> = {
-  sling_juvenile_adult: 'Sling → juvenile → adult',
   instar: 'Numbered instars',
   none: 'No distinct stages',
+}
+
+/** The three-stage scheme in this taxon's own words ("Baby → juvenile →
+ *  adult" for a millipede), from the same registry as the life-stage picker. */
+function stageSchemeLabel(scheme: string, taxon: string): string {
+  if (scheme === 'sling_juvenile_adult') {
+    const words = lifeStageOptions(taxon).map((o) => o.label)
+    return words.map((w, i) => (i === 0 ? w : w.toLowerCase())).join(' → ')
+  }
+  return STAGE_SCHEME_LABELS[scheme] ?? scheme
+}
+
+/** Grazer catalog rows often say "n/a (detritivore)" for prey size — that's
+ *  a placeholder, not a diet, so it renders nothing. */
+function dietValue(v: string | null | undefined): string | null {
+  if (!v || /^\s*n\/?a\b/i.test(v)) return null
+  return v
 }
 
 const DEVELOPMENTAL_CLASS_LABELS: Record<string, string> = {
@@ -426,7 +443,7 @@ export default function InvertCareSheetClient({
                 label="Life stages"
                 value={
                   species.stage_scheme
-                    ? STAGE_SCHEME_LABELS[species.stage_scheme] ?? species.stage_scheme
+                    ? stageSchemeLabel(species.stage_scheme, species.taxon)
                     : null
                 }
               />
@@ -447,6 +464,7 @@ export default function InvertCareSheetClient({
                     : null
                 }
               />
+              <MoltNote taxon={species.taxon} className="mt-3" />
             </Section>
 
             {/* Climate */}
@@ -467,7 +485,7 @@ export default function InvertCareSheetClient({
 
             {/* Enclosure */}
             <Section title="Enclosure">
-              <Fact label="Sling size" value={species.enclosure_size_sling} />
+              <Fact label={`${lifeStageLabel(species.taxon, 'sling')} size`} value={species.enclosure_size_sling} />
               <Fact label="Juvenile size" value={species.enclosure_size_juvenile} />
               <Fact label="Adult size" value={species.enclosure_size_adult} />
               <Fact label="Substrate" value={species.substrate_type} />
@@ -510,10 +528,30 @@ export default function InvertCareSheetClient({
                     : null
                 }
               />
-              <Fact label="Prey size" value={species.prey_size} />
-              <Fact label="Sling cadence" value={species.feeding_frequency_sling} />
-              <Fact label="Juvenile cadence" value={species.feeding_frequency_juvenile} />
-              <Fact label="Adult cadence" value={species.feeding_frequency_adult} />
+              {/* Grazers have no prey and no live-prey cadence. Their catalog
+                  rows still carry real diet text in the same columns ("leaf
+                  litter always available; protein weekly"), so it's relabelled
+                  rather than hidden; "n/a" placeholders render nothing. */}
+              {isGrazer(species.taxon, species.feeding_mode) ? (
+                <>
+                  <Fact label="Diet" value={dietValue(species.prey_size)} />
+                  <Fact
+                    label="Food & schedule"
+                    value={
+                      species.feeding_frequency_adult ??
+                      species.feeding_frequency_juvenile ??
+                      species.feeding_frequency_sling
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  <Fact label="Prey size" value={species.prey_size} />
+                  <Fact label="Sling cadence" value={species.feeding_frequency_sling} />
+                  <Fact label="Juvenile cadence" value={species.feeding_frequency_juvenile} />
+                  <Fact label="Adult cadence" value={species.feeding_frequency_adult} />
+                </>
+              )}
               {/* Calcium deficiency kills isopod and millipede cultures
                   slowly enough that keepers usually blame something else. */}
               <Fact

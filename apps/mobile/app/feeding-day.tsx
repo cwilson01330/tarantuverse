@@ -23,7 +23,8 @@ import { PrimaryButton } from '../src/components/PrimaryButton';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { TYPE } from '../src/theme/tokens';
-import { INVERT_TAXA, type InvertTaxon } from '../src/lib/inverts';
+import { INVERT_TAXA, isGrazer, type InvertTaxon } from '../src/lib/inverts';
+import { lifeStageLabel } from '../src/lib/taxon-modules';
 import { LocationSheet } from '../src/components/LocationPicker';
 import PremiumIntroCard, { shouldShowPremiumIntro } from '../src/components/PremiumIntroCard';
 import { bulkSetLocation, groupByLocation, listLocations, type LocationItem } from '../src/lib/locations';
@@ -331,9 +332,7 @@ export default function FeedingDayScreen() {
                   </Text>
                 ) : null}
                 {(() => {
-                  const stageLabel = a.life_stage
-                    ? a.life_stage.charAt(0).toUpperCase() + a.life_stage.slice(1)
-                    : null;
+                  const stageLabel = a.life_stage ? lifeStageLabel(a.taxon, a.life_stage) : null;
                   // "every ~7d" is a claim about this species. Only make it
                   // when the number came from a care sheet — otherwise label
                   // it a default so our guess doesn't read as guidance.
@@ -341,7 +340,7 @@ export default function FeedingDayScreen() {
                     ? a.interval_source === 'species'
                       ? `every ~${a.interval_days}d`
                       : `~${a.interval_days}d (default)`
-                    : a.taxon === 'millipede'
+                    : isGrazer(a.taxon)
                       ? 'grazer'
                       : null;
                   const meta = [stageLabel, cadence].filter(Boolean).join(' · ');

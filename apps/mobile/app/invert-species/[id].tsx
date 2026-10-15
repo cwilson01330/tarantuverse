@@ -20,9 +20,13 @@ import {
   getInvertSpecies,
   FEEDING_MODE_LABELS,
   INVERT_TAXA,
+  isGrazer,
   taxonMdiIcon,
   type InvertSpecies,
 } from '../../src/lib/inverts';
+import { lifeStageLabel, lifeStageOptions } from '../../src/lib/taxon-modules';
+import { MoltNote } from '../../src/components/MoltNote';
+import { SPACING } from '../../src/theme/tokens';
 import {
   CareSheetHero,
   QuickStatsRow,
@@ -88,10 +92,26 @@ const SECRETION_COPY: Record<string, { title: string; body: string; accent: stri
 };
 
 const STAGE_SCHEME_LABELS: Record<string, string> = {
-  sling_juvenile_adult: 'Sling → juvenile → adult',
   instar: 'Numbered instars',
   none: 'No distinct stages',
 };
+
+/** The three-stage scheme in this taxon's own words ("Baby → juvenile →
+ *  adult" for a millipede), from the same registry as the life-stage picker. */
+function stageSchemeLabel(scheme: string, taxon: string): string {
+  if (scheme === 'sling_juvenile_adult') {
+    const words = lifeStageOptions(taxon).map((o) => o.label);
+    return words.map((w, i) => (i === 0 ? w : w.toLowerCase())).join(' → ');
+  }
+  return STAGE_SCHEME_LABELS[scheme] ?? scheme;
+}
+
+/** Grazer catalog rows often say "n/a (detritivore)" for prey size — that's
+ *  a placeholder, not a diet, so it renders nothing. */
+function dietValue(v: string | null | undefined): string | null {
+  if (!v || /^\s*n\/?a\b/i.test(v)) return null;
+  return v;
+}
 
 const DEVELOPMENTAL_CLASS_LABELS: Record<string, string> = {
   anamorphic: 'Anamorphic — gains segments with each moult',
@@ -199,6 +219,7 @@ function InvertSpeciesCareSheetScreen() {
   const harmlessCopy = HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS;
   // Per-taxon labelling: "Leg span" for whip spiders, "Length" for the rest.
   const meta = INVERT_TAXA[species.taxon];
+  const grazer = isGrazer(species.taxon, species.feeding_mode);
 
   return (
     <View style={styles.flex}>
@@ -330,7 +351,7 @@ function InvertSpeciesCareSheetScreen() {
             preview={previewOf(species.enclosure_size_adult, species.substrate_depth)}
             colors={colors}
           >
-            <CareFact label="Sling size" value={species.enclosure_size_sling} colors={colors} />
+            <CareFact label={`${lifeStageLabel(species.taxon, 'sling')} size`} value={species.enclosure_size_sling} colors={colors} />
             <CareFact label="Juvenile size" value={species.enclosure_size_juvenile} colors={colors} />
             <CareFact label="Adult size" value={species.enclosure_size_adult} colors={colors} />
             <CareFact label="Substrate" value={species.substrate_type} colors={colors} />
@@ -372,7 +393,9 @@ function InvertSpeciesCareSheetScreen() {
             isExpanded={!!expanded.feeding}
             onToggle={() => toggle('feeding')}
             preview={previewOf(
-              species.feeding_frequency_adult ? `Adult ${species.feeding_frequency_adult}` : null,
+              species.feeding_frequency_adult
+                ? grazer ? species.feeding_frequency_adult : `Adult ${species.feeding_frequency_adult}`
+                : null,
               species.feeding_mode ? FEEDING_MODE_LABELS[species.feeding_mode] : null,
             )}
             colors={colors}
@@ -382,10 +405,31 @@ function InvertSpeciesCareSheetScreen() {
               value={species.feeding_mode ? FEEDING_MODE_LABELS[species.feeding_mode] : null}
               colors={colors}
             />
-            <CareFact label="Prey size" value={species.prey_size} colors={colors} />
-            <CareFact label="Sling cadence" value={species.feeding_frequency_sling} colors={colors} />
-            <CareFact label="Juvenile cadence" value={species.feeding_frequency_juvenile} colors={colors} />
-            <CareFact label="Adult cadence" value={species.feeding_frequency_adult} colors={colors} />
+            {/* Grazers have no prey and no live-prey cadence. Their catalog
+                rows still carry real diet text in the same columns ("leaf
+                litter always available; protein weekly"), so it's relabelled
+                rather than hidden; "n/a" placeholders render nothing. */}
+            {grazer ? (
+              <>
+                <CareFact label="Diet" value={dietValue(species.prey_size)} colors={colors} />
+                <CareFact
+                  label="Food & schedule"
+                  value={
+                    species.feeding_frequency_adult ??
+                    species.feeding_frequency_juvenile ??
+                    species.feeding_frequency_sling
+                  }
+                  colors={colors}
+                />
+              </>
+            ) : (
+              <>
+                <CareFact label="Prey size" value={species.prey_size} colors={colors} />
+                <CareFact label="Sling cadence" value={species.feeding_frequency_sling} colors={colors} />
+                <CareFact label="Juvenile cadence" value={species.feeding_frequency_juvenile} colors={colors} />
+                <CareFact label="Adult cadence" value={species.feeding_frequency_adult} colors={colors} />
+              </>
+            )}
             {/* Calcium deficiency kills isopod and millipede cultures slowly
                 enough that keepers usually blame something else. */}
             <CareFact
@@ -425,7 +469,7 @@ function InvertSpeciesCareSheetScreen() {
               label="Life stages"
               value={
                 species.stage_scheme
-                  ? STAGE_SCHEME_LABELS[species.stage_scheme] ?? species.stage_scheme
+                  ? stageSchemeLabel(species.stage_scheme, species.taxon)
                   : null
               }
               colors={colors}
@@ -449,6 +493,7 @@ function InvertSpeciesCareSheetScreen() {
               }
               colors={colors}
             />
+            <MoltNote taxon={species.taxon} style={{ marginTop: SPACING.sm }} />
           </CareAccordion>
 
           <CareAccordion

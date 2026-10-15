@@ -386,6 +386,14 @@ def _ts_subsets():
         ("GROWTH_NEEDS_MEASUREMENT", I, lambda: ts_str_list(I, r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\["),
          "taxa that rarely get measured: the growth chart waits for a measurement"),
         ("GROWTH_NEEDS_MEASUREMENT", TM, lambda: ts_str_list(TM, r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\["), "same, mobile copy"),
+        ("MOLT_NOTES", I, lambda: ts_obj_keys(I, r"const MOLT_NOTES: Record<string, string> = \{"),
+         "taxa with a well-established molting fact a keeper must know (millipede: buried molt chamber); the rest show nothing"),
+        ("MOLT_NOTES", TM, lambda: ts_obj_keys(TM, r"const MOLT_NOTES: Record<string, string> = \{"), "same, mobile copy"),
+        ("STAGE_LABELS", I, lambda: ts_obj_keys(I, r"const STAGE_LABELS: Record<string, Partial<Record<LifeStageValue, string>>> = \{"),
+         "taxa whose life-stage picker words differ from Sling/Juvenile/Adult (stored values never change)"),
+        ("STAGE_LABELS", TM, lambda: ts_obj_keys(TM, r"const STAGE_LABELS: Record<string, Partial<Record<LifeStageValue, string>>> = \{"), "same, mobile copy"),
+        ("GRAZING_TAXA", I, lambda: ts_obj_keys(I, r"const GRAZING_TAXA: Record<string, FeedingMode> = \{"),
+         "web taxon fallback for feeding mode; pinned to the non-predator feeding modes below"),
         ("GROWTH_LENGTH_LABELS", TM, lambda: ts_obj_keys(TM, r"const GROWTH_LENGTH_LABELS: Record<string, string> = \{"),
          "spider-shaped taxa measured by leg span; everything else is body length"),
         ("growthLengthLabel", I, lambda: ts_equals(I, r"export function growthLengthLabel\([^)]*\)[^{]*\{"),
@@ -438,12 +446,16 @@ def test_web_and_mobile_module_registries_agree():
 @pytest.mark.parametrize("name,anchor_web,anchor_mob", [
     ("INSTAR_TAXA", r"const INSTAR_TAXA = new Set<string>\(\[", r"const INSTAR_TAXA = new Set<string>\(\["),
     ("GROWTH_NEEDS_MEASUREMENT", r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\[", r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\["),
+    ("MOLT_NOTES", r"const MOLT_NOTES: Record<string, string> = \{", r"const MOLT_NOTES: Record<string, string> = \{"),
+    ("STAGE_LABELS",
+     r"const STAGE_LABELS: Record<string, Partial<Record<LifeStageValue, string>>> = \{",
+     r"const STAGE_LABELS: Record<string, Partial<Record<LifeStageValue, string>>> = \{"),
     ("BREEDING_VOCABULARY",
      r"export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = \{",
      r"export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = \{"),
 ])
 def test_web_and_mobile_copies_agree(name, anchor_web, anchor_mob):
-    fn = ts_obj_keys if name == "BREEDING_VOCABULARY" else ts_str_list
+    fn = ts_obj_keys if name in ("BREEDING_VOCABULARY", "MOLT_NOTES", "STAGE_LABELS") else ts_str_list
     web, mob = fn(WEB_MODULES, anchor_web), fn(MOB_MODULES, anchor_mob)
     assert web == mob, (
         f"{name} differs between {WEB_MODULES} and {MOB_MODULES}: "
@@ -487,6 +499,11 @@ def test_non_predator_taxa_agree_across_api_and_colony_feeding_forms():
     assert mob == non_predator, (
         f"apps/mobile/app/colony/add-feeding.tsx foodTypesFor treats {sorted(mob)} as detritivores but the "
         f"non-predator taxa are {sorted(non_predator)}"
+    )
+    grazing = ts_obj_keys(WEB_INVERTS, r"const GRAZING_TAXA: Record<string, FeedingMode> = \{")
+    assert grazing == non_predator, (
+        f"{WEB_INVERTS} GRAZING_TAXA {sorted(grazing)} != non-predator taxa {sorted(non_predator)}: web would "
+        f"show prey size / a cadence (or 'grazer') for a different set of taxa than the API and mobile"
     )
 
 

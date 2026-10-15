@@ -41,6 +41,7 @@ import {
   tracksInstars, formatStage, stageSummary, elapsedSince, adultStageHint,
 } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
+import { MoltNote } from '../../src/components/MoltNote';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import QRSheet from '../../src/components/QRSheet';
@@ -1121,6 +1122,12 @@ function InvertDetailScreen() {
           })}
         </View>
 
+        {/* Mobile merges molts into History, so the per-taxon molt note
+            (a millipede buried for weeks is molting — leave it) sits here,
+            on the All and Molt views. Nothing renders for other taxa. */}
+        {(timelineFilter === 'all' || timelineFilter === 'molt') && (
+          <MoltNote taxon={invert.taxon} style={{ marginBottom: SPACING.md }} />
+        )}
         {visibleTimeline.length === 0 ? (
           <Text style={[s.empty, { color: colors.textTertiary }]}>
             Nothing logged yet. Use the bar at the bottom to record a feeding, watering, molt or
