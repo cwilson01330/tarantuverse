@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import SafeAppleButton from '../src/components/SafeAppleButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth, isGoogleSignInAvailable } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
@@ -558,13 +558,9 @@ export default function RegisterScreen() {
 
             {/* Apple Sign In (iOS only) - Use BLACK on light backgrounds, WHITE on dark (per Apple HIG) */}
             {Platform.OS === 'ios' && (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={
-                  theme === 'dark'
-                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                }
+              <SafeAppleButton
+                kind="continue"
+                variant={theme === 'dark' ? 'white' : 'black'}
                 cornerRadius={8}
                 style={styles.appleButton}
                 onPress={handleAppleRegister}

@@ -20,7 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import SafeAppleButton from '../src/components/SafeAppleButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -355,13 +355,9 @@ export default function RegisterScreen() {
                   {/* Apple's native control — see login.tsx. Requires the
                       view manager present from build 17 onward. */}
                   {appleAvailable && Platform.OS === 'ios' && (
-                    <AppleAuthentication.AppleAuthenticationButton
-                      buttonType={
-                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
-                      }
-                      buttonStyle={
-                        AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                      }
+                    <SafeAppleButton
+                      kind="signup"
+                      variant="white"
                       cornerRadius={layout.radius.md}
                       style={styles.appleButton}
                       onPress={() => handleOAuth('apple')}

@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import SafeAppleButton from '../src/components/SafeAppleButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -359,13 +359,9 @@ export default function LoginScreen() {
                   cuts a fresh native build, and runtimeVersion is bumped to
                   1.1.0 so this JS can never reach build 16. */}
               {appleAvailable && Platform.OS === 'ios' && (
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={
-                    AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
-                  }
-                  buttonStyle={
-                    AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                  }
+                <SafeAppleButton
+                  kind="continue"
+                  variant="white"
                   cornerRadius={layout.radius.md}
                   style={styles.appleButton}
                   onPress={() => handleOAuth('apple')}
