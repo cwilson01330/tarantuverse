@@ -16,6 +16,16 @@ effect in the next binary. At submission time bump:
   **1.2.0**, `runtimeVersion` 1.2.0 → **1.3.0**. Create version 1.2.0.
   **Done 2026-10-19** (HV submitting first, with its first IAP products).
 
+**EAS builds ignore our lockfile.** The root `.easignore` excludes
+`pnpm-lock.yaml`, so the builder sees no lockfile, falls back to yarn, and
+resolves the newest versions in range. On 2026-10-19 that pulled
+`eslint-plugin-expo@1.2.1`, which needs Node ≥22.13, and the build failed on
+Node 20.19.4 — both `eas.json` files now pin Node **22.14.0**. The same
+behaviour means the store binary can carry newer native module patches than
+the ones our local OTA bundles are built against (a likely cause of the HV
+Apple-button view-manager crash). Fixing it properly (ship the lockfile, build
+with pnpm) is its own job — not mid-submission.
+
 The review-prompt code checks for the `ExpoStoreReview` native module before
 loading it, so on today's binaries it simply does nothing.
 
