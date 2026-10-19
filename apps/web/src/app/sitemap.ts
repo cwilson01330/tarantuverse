@@ -110,11 +110,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/species`, changeFrequency: 'daily', priority: 0.9, lastModified: now },
     { url: `${SITE}/features`, changeFrequency: 'monthly', priority: 0.7, lastModified: now },
     { url: `${SITE}/pricing`, changeFrequency: 'monthly', priority: 0.7, lastModified: now },
+    // Plain A-Z list of every care guide, server-rendered (the /species
+    // browser only puts its first page of tarantulas in the HTML).
+    { url: `${SITE}/species/all`, changeFrequency: 'weekly', priority: 0.8, lastModified: now },
     { url: `${SITE}/community`, changeFrequency: 'weekly', priority: 0.6, lastModified: now },
-    { url: `${SITE}/blog`, changeFrequency: 'weekly', priority: 0.5, lastModified: now },
+    // /blog is left out on purpose: its posts are placeholders with no body
+    // (links go to "#"), and the page is noindexed until real posts exist.
     { url: `${SITE}/help`, changeFrequency: 'monthly', priority: 0.4, lastModified: now },
     { url: `${SITE}/contact`, changeFrequency: 'yearly', priority: 0.3, lastModified: now },
-    { url: `${SITE}/privacy`, changeFrequency: 'yearly', priority: 0.2, lastModified: now },
+    // /privacy is a redirect; list the page it lands on.
+    { url: `${SITE}/privacy-policy`, changeFrequency: 'yearly', priority: 0.2, lastModified: now },
+    { url: `${SITE}/terms`, changeFrequency: 'yearly', priority: 0.2, lastModified: now },
   ]
 
   const [tarantulas, inverts] = await Promise.all([getTarantulas(), getInverts()])

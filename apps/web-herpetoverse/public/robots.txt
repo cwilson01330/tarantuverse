@@ -1,4 +1,33 @@
+# Herpetoverse robots.txt
+#
+# Everything public is open to search engines and AI assistants. The named
+# groups below repeat the same rule on purpose: a crawler that finds a group
+# naming it ignores the `*` group, and naming them records that letting
+# assistants read and quote the care sheets is a deliberate choice
+# (2026-10-19). Delete a group to opt that crawler out.
+
 User-agent: *
+Allow: /
+
+# OpenAI (training, ChatGPT search, live fetches for a user)
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+# Anthropic
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+# Perplexity
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+# Google AI (Gemini) and Apple Intelligence opt-in tokens
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+# Search engines (Bing also feeds ChatGPT search and Copilot)
+User-agent: Bingbot
+User-agent: Googlebot
+User-agent: Applebot
+User-agent: DuckDuckBot
 Allow: /
 
 Sitemap: https://herpetoverse.com/sitemap.xml

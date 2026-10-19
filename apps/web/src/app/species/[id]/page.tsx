@@ -134,14 +134,28 @@ export default async function SpeciesDetailPage({
 
   // JSON-LD for rich results. Article is the safest fit for a care guide;
   // rendered server-side so crawlers see it without executing JS.
+  // Every field here is something the page visibly shows (names, genus,
+  // family, the "Source:" link) — never add a fact the page doesn't carry.
+  const updatedAt = (s as (Species & { updated_at?: string }) | null)?.updated_at
   const jsonLd = s
     ? {
         '@context': 'https://schema.org',
         '@type': 'Article',
         headline: `${s.scientific_name} Care Guide`,
-        about: s.scientific_name,
+        about: {
+          '@type': 'Taxon',
+          name: s.scientific_name,
+          ...(s.common_names?.length ? { alternateName: s.common_names } : {}),
+          ...(s.genus
+            ? { parentTaxon: { '@type': 'Taxon', name: s.genus, taxonRank: 'genus' } }
+            : {}),
+        },
         description: buildDescription(s),
         ...(s.image_url ? { image: s.image_url } : {}),
+        ...(s.source_url ? { isBasedOn: s.source_url } : {}),
+        ...(updatedAt ? { dateModified: updatedAt } : {}),
+        inLanguage: 'en',
+        isPartOf: { '@id': `${SITE}/#website` },
         publisher: {
           '@type': 'Organization',
           name: 'Tarantuverse',

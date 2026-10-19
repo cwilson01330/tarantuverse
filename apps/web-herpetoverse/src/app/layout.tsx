@@ -4,6 +4,8 @@ import SafeAnalytics from '@/components/SafeAnalytics'
 import './globals.css'
 import { PostHogProvider } from '@/components/PostHogProvider'
 import { UnitsProvider } from '@/components/UnitsProvider'
+import AppStructuredData from '@/components/AppStructuredData'
+import { SITE } from '@/lib/app-listing'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,22 +14,28 @@ const inter = Inter({
   weight: ['400', '500', '600', '700'],
 })
 
+// Site-wide defaults; pages with their own metadata override them.
+// No `openGraph.url` or `alternates.canonical` here: both are inherited by
+// every page that doesn't set its own, which told crawlers that /pricing
+// (and every other page) was the homepage. Set them per page instead.
+const SITE_TITLE = 'Herpetoverse — Reptile & Amphibian Husbandry Tracker'
+const SITE_DESCRIPTION =
+  'Log feedings, sheds and weights for snakes, lizards, turtles, frogs and salamanders, plus free care sheets. Free for 5 animals on iOS, Android and web.'
+
 export const metadata: Metadata = {
-  title: 'Herpetoverse — A husbandry platform for reptile keepers',
-  description:
-    'Track your reptiles with care. Built by the team behind Tarantuverse.',
+  metadataBase: new URL(SITE),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   openGraph: {
-    title: 'Herpetoverse',
-    description:
-      'A husbandry platform for reptile keepers. Built by the team behind Tarantuverse.',
-    url: 'https://herpetoverse.com',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     siteName: 'Herpetoverse',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Herpetoverse',
-    description: 'A husbandry platform for reptile keepers.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
   robots: {
     index: true,
@@ -53,6 +61,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
+        {/* Server-rendered JSON-LD (the landing page is a client component). */}
+        <AppStructuredData />
         <PostHogProvider>
           <UnitsProvider>{children}</UnitsProvider>
           <SafeAnalytics />

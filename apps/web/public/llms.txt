@@ -1,41 +1,74 @@
 # Tarantuverse
 
 > Husbandry tracker for invertebrate keepers on iOS, Android and the web.
-> Keepers log feedings, molts, substrate changes and water for each animal,
-> and look up species care guides. Operated by Appalachian Tarantulas, LLC.
+> Keepers log feedings, molts, substrate changes and growth for each animal,
+> track colonies and breeding projects, and read free species care guides.
+> Free for up to 15 animals. Published by Appalachian Tarantulas, LLC
+> (Tennessee, USA). Sibling app for reptiles and amphibians: Herpetoverse.
 
-## What it tracks
+## Who it is for
+- Hobby keepers of tarantulas and other invertebrates, from one animal to
+  large collections
+- Breeders tracking pairings, egg sacs and offspring
+- Keepers of colonies (isopods, roaches, communal setups) and feeder insects
+
+## Animals it tracks
 - Tarantulas, scorpions, centipedes, whip spiders, vinegaroons, true spiders
-  (including jumping spiders), millipedes, mantises, roaches and isopods
-- Feedings, including logging a whole feeding day at once
-- Molts, growth measurements, and instar or stage
-- Substrate changes and water
-- Colonies, tracked as populations with headcounts by life stage
-- Breeding: pairings, egg sacs and offspring
+  (including jumping spiders), millipedes, mantises, roaches and isopods,
+  plus an "other" group for anything else
+- Individual animals, or a colony as one entry with headcounts by life stage
 
-## Species care guides
-- Index: https://www.tarantuverse.com/species
-- Each guide lists temperature, humidity, enclosure sizes by life stage,
-  substrate, feeding frequency, temperament and safety notes, with its source.
+## What it does
+- Feeding logs, including logging a whole feeding day at once, with
+  reminders when an animal is due
+- Molt logs with leg span or body length and weight, growth charts, and
+  instar or stage counts
+- Premolt prediction for tarantulas, based on feeding refusals and molt
+  history
+- Substrate changes, water, husbandry settings and enclosure notes
+- Photos, and printable QR enclosure labels that open an upload page
+- Breeding: pairings, egg sacs and offspring (Premium)
+- Feeder colony inventory with low-stock alerts
+- Sitter links (a care card per animal, no account needed) and co-keepers
+  (shared collections)
+- Share cards for posting an animal to social media
+- Data export as JSON, CSV or a full ZIP with photos
 
-## Pricing (as listed at https://www.tarantuverse.com/pricing)
-- Free: up to 15 animals, 5 photos per animal
-- Premium: USD 4.99 per month, USD 44.99 per year, or USD 149.99 one-time lifetime
+## Species care guides (free, no account needed)
+- Browser with search and filters: https://www.tarantuverse.com/species
+- Every guide on one page, A-Z by group: https://www.tarantuverse.com/species/all
+- Tarantula guides live at https://www.tarantuverse.com/species/{id};
+  other groups at https://www.tarantuverse.com/species/inverts/{id}
+- Each guide lists temperature and humidity ranges, enclosure sizes by life
+  stage, substrate, feeding frequency by life stage, temperament, and safety
+  notes (urticating hairs, venom), with the source it is based on.
+
+## Pricing (USD, as listed at https://www.tarantuverse.com/pricing)
+- Free: up to 15 animals, 5 photos per animal, feeding and molt tracking,
+  colony tracking, 2 open sitter links, data export
+- Premium: USD 4.99 per month, USD 44.99 per year, or USD 149.99 once for
+  lifetime access. Adds unlimited animals and photos, the breeding module,
+  co-keeper invites (up to 10 people), sitter logging and advanced analytics.
+- Premium is per app. The All-Access plan covers Tarantuverse and
+  Herpetoverse together: https://herpetoverse.com/pricing
 
 ## Get the app
-- iOS: https://apps.apple.com/us/app/tarantuverse/id6756224640
-- Android: https://play.google.com/store/apps/details?id=com.tarantuverse.app
+- iOS (App Store): https://apps.apple.com/us/app/tarantuverse/id6756224640
+- Android (Google Play): https://play.google.com/store/apps/details?id=com.tarantuverse.app
 - Web: https://www.tarantuverse.com
 
 ## Key pages
 - Features: https://www.tarantuverse.com/features
 - Pricing: https://www.tarantuverse.com/pricing
 - Help: https://www.tarantuverse.com/help
-- Privacy: https://www.tarantuverse.com/privacy
+- Contact: https://www.tarantuverse.com/contact
+- Privacy policy: https://www.tarantuverse.com/privacy-policy
+- Terms: https://www.tarantuverse.com/terms
 
 ## Contact
-- cory@appalachiantarantulas.com
+- Support: support@tarantuverse.com
+- Publisher: Appalachian Tarantulas, LLC, cory@appalachiantarantulas.com
 
 ## Related
-- Herpetoverse, the sibling app for reptiles and amphibians from the same
-  company: https://herpetoverse.com
+- Herpetoverse, the same company's app for reptile and amphibian keepers.
+  One account works on both: https://herpetoverse.com

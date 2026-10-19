@@ -12,10 +12,21 @@ import SiteNav from '@/components/SiteNav'
  * UpgradeModal ("Learn more") and the cap-reached callouts.
  */
 
+const TITLE = 'Herpetoverse Pricing: Free for 5 Animals, Premium $4.99/mo'
+const DESCRIPTION =
+  'Free for up to 5 animals. Premium $4.99/month, $44.99/year or $149.99 lifetime: unlimited animals, breeding, feeder inventory. All-Access adds Tarantuverse.'
+
 export const metadata: Metadata = {
-  title: 'Pricing · Herpetoverse',
-  description:
-    'Herpetoverse is free to use. Go Premium for unlimited animals, feeder inventory, and breeding tracking — or get All-Access to unlock Tarantuverse too.',
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: 'https://herpetoverse.com/pricing' },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: 'https://herpetoverse.com/pricing',
+    siteName: 'Herpetoverse',
+    type: 'website',
+  },
 }
 
 export default function PricingPage() {

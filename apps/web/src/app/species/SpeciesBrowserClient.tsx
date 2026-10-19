@@ -182,6 +182,14 @@ export default function SpeciesBrowserClient({
             <p className="text-gray-600 dark:text-gray-400 text-lg">
               Browse comprehensive care guides for {species.length} {activeTaxon.noun} species
             </p>
+            {/* Plain server-rendered A–Z list of every guide in every group —
+                the crawlable path to guides this browser only loads via JS. */}
+            <Link
+              href="/species/all"
+              className="inline-block mt-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline"
+            >
+              See all care guides, A–Z →
+            </Link>
           </div>
 
           {/* Admin Buttons */}

@@ -1,5 +1,6 @@
 /**
- * SoftwareApplication + Organization JSON-LD for the Tarantuverse landing page.
+ * Organization + WebSite + SoftwareApplication JSON-LD, emitted on every page
+ * from the root layout.
  *
  * Server-rendered so crawlers see it without executing JavaScript.
  *
@@ -51,13 +52,17 @@ export default function AppStructuredData() {
     image: `${SITE}/logo.png`,
     installUrl: [APP_STORE_URL, PLAY_STORE_URL],
     publisher: { '@id': `${LEGAL_ENTITY.url}/#organization` },
-    // Free to use up to the collection cap; premium is a separate upgrade.
-    // price 0 is what Google expects for a free app, not an omitted offer.
-    offers: {
-      '@type': 'Offer',
-      price: 0,
-      priceCurrency: 'USD',
-    },
+    // The plans exactly as /pricing lists them (web checkout, USD). The free
+    // offer stays FIRST: price 0 is what Google expects for a free app.
+    // Change these together with the pricing page.
+    offers: [
+      { '@type': 'Offer', name: 'Free (up to 15 animals)', price: 0, priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Premium monthly', price: 4.99, priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Premium yearly', price: 44.99, priceCurrency: 'USD' },
+      { '@type': 'Offer', name: 'Premium lifetime', price: 149.99, priceCurrency: 'USD' },
+    ],
+    // The store listings are the same app, so assistants can join them up.
+    sameAs: [APP_STORE_URL, PLAY_STORE_URL],
     ...(APP_RATING
       ? {
           aggregateRating: {
@@ -72,9 +77,19 @@ export default function AppStructuredData() {
       : {}),
   }
 
+  // The site itself, so the name "Tarantuverse" resolves to this domain.
+  const website = {
+    '@type': 'WebSite',
+    '@id': `${SITE}/#website`,
+    name: 'Tarantuverse',
+    url: SITE,
+    publisher: { '@id': `${LEGAL_ENTITY.url}/#organization` },
+    about: { '@id': `${SITE}/#app` },
+  }
+
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@graph': [organization, application],
+    '@graph': [organization, website, application],
   }
 
   return (

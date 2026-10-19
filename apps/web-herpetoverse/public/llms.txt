@@ -1,0 +1,65 @@
+# Herpetoverse
+
+> Husbandry tracker for reptile and amphibian keepers on iOS, Android and the
+> web. Keepers log feedings, sheds, weights and growth for each animal, plan
+> breeding, track feeder stock, and read free species care sheets. Free for up
+> to 5 animals. Published by Appalachian Tarantulas, LLC (Tennessee, USA).
+> Sibling app for invertebrates: Tarantuverse.
+
+## Who it is for
+- Hobby keepers of snakes, lizards and geckos, turtles and tortoises, frogs,
+  and salamanders and newts
+- Breeders tracking pairings, clutches, incubation and offspring
+
+## What it does
+- Feeding logs, with refusals recorded as clearly as meals
+- Feeding Day: every animal that is due in one list, logged in one pass;
+  due dates follow species and life stage
+- Weight history and growth trends, shed records (including retained sheds)
+- Photos and notes for each animal, QR enclosure tags
+- Breeding: pairings, clutches, incubation and offspring (Premium)
+- Morph calculator for ball pythons and leopard geckos, including het and
+  possible-het odds
+- Feeder inventory for frozen stock and live colonies, with low-stock alerts
+  (Premium)
+- Sitter links (a care card per animal, no account needed) and co-keepers
+  (shared collections, Premium to invite up to 10 people)
+- Feeding reminders and a daily digest
+- Collection import, and export of all data
+
+## Species care sheets (free, no account needed)
+- Index: https://herpetoverse.com/species
+- Each sheet lives at https://herpetoverse.com/species/{slug}, for example
+  https://herpetoverse.com/species/leopard-gecko and
+  https://herpetoverse.com/species/ball-python
+- Each sheet lists temperature zones, humidity, UVB, enclosure size by life
+  stage, substrate, diet and prey size by life stage, feeding frequency,
+  lifespan and conservation status, with the published sources it is based on.
+
+## Pricing (USD, as listed at https://herpetoverse.com/pricing)
+- Free: up to 5 animals, unlimited feeding, weight and shed logs, care sheets,
+  Feeding Day, photos, import and export, reminders, 2 open sitter links
+- Herpetoverse Premium: USD 4.99 per month, USD 44.99 per year, or USD 149.99
+  once for lifetime. Adds unlimited animals, feeder inventory, breeding,
+  co-keeper invites and sitter logging.
+- All-Access: USD 6.99 per month, USD 69.99 per year, or USD 249 once.
+  Premium on both Herpetoverse and Tarantuverse.
+
+## Get the app
+- iOS (App Store): https://apps.apple.com/us/app/herpetoverse/id6765683901
+- Android (Google Play): https://play.google.com/store/apps/details?id=com.herpetoverse.app
+- Web: https://herpetoverse.com
+
+## Key pages
+- Pricing: https://herpetoverse.com/pricing
+- Privacy policy: https://herpetoverse.com/privacy-policy
+- Terms: https://herpetoverse.com/terms
+
+## Contact
+- Support: support@tarantuverse.com
+- Publisher: Appalachian Tarantulas, LLC, cory@appalachiantarantulas.com
+
+## Related
+- Tarantuverse, the same company's app for tarantulas, scorpions, centipedes,
+  mantises, isopods and other invertebrates. One account works on both:
+  https://www.tarantuverse.com

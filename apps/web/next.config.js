@@ -1,6 +1,31 @@
+// Crawlers that must get <title>/<meta>/<link rel=canonical> in <head>.
+// Next 15 streams generateMetadata output into <body> for any user agent not
+// on this list; parsers that only read <head> (and canonical, which is only
+// valid in <head>) then see a page with no description. The first half is
+// Next 15.5's own default list (shared/lib/router/utils/html-bots.js) — a
+// custom value REPLACES it, so it's copied here; the second half adds the AI
+// assistant and search crawlers. Keep in sync with web-herpetoverse.
+const HTML_LIMITED_BOTS = new RegExp(
+  [
+    // Next default
+    '[\\w-]+-Google', 'Google-[\\w-]+', 'Chrome-Lighthouse', 'Slurp', 'DuckDuckBot',
+    'baiduspider', 'yandex', 'sogou', 'bitlybot', 'tumblr', 'vkShare',
+    'quora link preview', 'redditbot', 'ia_archiver', 'Bingbot', 'BingPreview',
+    'applebot', 'facebookexternalhit', 'facebookcatalog', 'Twitterbot',
+    'LinkedInBot', 'Slackbot', 'Discordbot', 'WhatsApp', 'SkypeUriPreview',
+    'Yeti', 'googleweblight',
+    // AI assistants / AI search
+    'GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'Claude-User',
+    'Claude-SearchBot', 'PerplexityBot', 'Perplexity-User', 'DuckAssistBot',
+    'Amazonbot', 'meta-externalagent', 'MistralAI-User', 'CCBot',
+  ].join('|'),
+  'i',
+)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   images: {
     remotePatterns: [
       {

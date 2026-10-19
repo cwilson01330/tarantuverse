@@ -6,8 +6,31 @@
 // for host canonicalization — doing so duplicates the rule and, if the
 // direction disagrees with the Vercel domain, creates a redirect loop.
 //
+// Crawlers that must get <title>/<meta>/<link rel=canonical> in <head>.
+// Next 15 streams generateMetadata output into <body> for any user agent not
+// on this list. First half = Next 15.5's default list (a custom value
+// REPLACES it); second half = AI assistant / AI search crawlers. Keep in sync
+// with apps/web/next.config.js.
+const HTML_LIMITED_BOTS = new RegExp(
+  [
+    // Next default
+    '[\\w-]+-Google', 'Google-[\\w-]+', 'Chrome-Lighthouse', 'Slurp', 'DuckDuckBot',
+    'baiduspider', 'yandex', 'sogou', 'bitlybot', 'tumblr', 'vkShare',
+    'quora link preview', 'redditbot', 'ia_archiver', 'Bingbot', 'BingPreview',
+    'applebot', 'facebookexternalhit', 'facebookcatalog', 'Twitterbot',
+    'LinkedInBot', 'Slackbot', 'Discordbot', 'WhatsApp', 'SkypeUriPreview',
+    'Yeti', 'googleweblight',
+    // AI assistants / AI search
+    'GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'Claude-User',
+    'Claude-SearchBot', 'PerplexityBot', 'Perplexity-User', 'DuckAssistBot',
+    'Amazonbot', 'meta-externalagent', 'MistralAI-User', 'CCBot',
+  ].join('|'),
+  'i',
+)
+
 const nextConfig = {
   reactStrictMode: true,
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },

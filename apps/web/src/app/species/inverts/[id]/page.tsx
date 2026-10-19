@@ -120,9 +120,20 @@ export default async function InvertSpeciesDetailPage({
         '@context': 'https://schema.org',
         '@type': 'Article',
         headline: `${s.scientific_name} Care Guide`,
-        about: s.scientific_name,
+        // Only fields the page visibly shows — never add a fact it doesn't carry.
+        about: {
+          '@type': 'Taxon',
+          name: s.scientific_name,
+          // The page shows the first common name only.
+          ...(s.common_names?.[0] ? { alternateName: s.common_names[0] } : {}),
+          ...(s.genus
+            ? { parentTaxon: { '@type': 'Taxon', name: s.genus, taxonRank: 'genus' } }
+            : {}),
+        },
         description: buildDescription(s),
         ...(s.image_url ? { image: s.image_url } : {}),
+        inLanguage: 'en',
+        isPartOf: { '@id': `${SITE}/#website` },
         publisher: {
           '@type': 'Organization',
           name: 'Tarantuverse',

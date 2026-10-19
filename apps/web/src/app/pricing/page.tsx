@@ -446,7 +446,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* FAQ Section */}
+      {/* FAQ Section — mirrored as FAQPage JSON-LD in ./layout.tsx; edit both together. */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">Frequently Asked Questions</h2>
         <div className="space-y-6">

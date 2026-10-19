@@ -19,16 +19,16 @@ import { fetchReptileSpecies } from '@/lib/reptileSpecies'
 import SpeciesBrowser from '@/components/SpeciesBrowser'
 
 export const metadata: Metadata = {
-  title: 'Reptile care sheets — Herpetoverse',
+  title: 'Reptile & Amphibian Care Sheets — Herpetoverse',
   description:
-    'Free, keeper-verified care sheets for reptiles. Temperature, humidity, enclosure, diet, and lifespan — every parameter backed by published references.',
+    'Free care sheets for snakes, lizards, turtles, tortoises, frogs and salamanders: temperature, humidity, enclosure, diet and lifespan, each backed by published references.',
   alternates: {
     canonical: 'https://herpetoverse.com/species',
   },
   openGraph: {
-    title: 'Reptile care sheets — Herpetoverse',
+    title: 'Reptile & Amphibian Care Sheets — Herpetoverse',
     description:
-      'Keeper-verified husbandry parameters for common reptiles. Every species is backed by three or more independent sources.',
+      'Husbandry parameters for commonly kept reptiles and amphibians. Every species is backed by three or more independent sources.',
     url: 'https://herpetoverse.com/species',
     type: 'website',
   },

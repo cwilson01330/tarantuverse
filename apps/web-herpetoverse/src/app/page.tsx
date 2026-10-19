@@ -14,6 +14,7 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { APP_STORE_URL, PLAY_STORE_URL } from '@/lib/app-listing'
 
 const TAXA = [
   { emoji: '🐍', label: 'Snakes' },
@@ -82,6 +83,9 @@ export default function Home() {
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-4">
+            <Link href="/species" className="hidden sm:inline text-sm text-neutral-400 hover:text-white transition-colors">
+              Care sheets
+            </Link>
             <Link href="/pricing" className="hidden sm:inline text-sm text-neutral-400 hover:text-white transition-colors">
               Pricing
             </Link>
@@ -257,7 +261,12 @@ export default function Home() {
             <span className="text-sm font-semibold herp-gradient-text">Herpetoverse</span>
           </div>
           <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-neutral-400">
+            {/* Care sheets + store links: the homepage was the only page with no
+                path to /species, and nothing on the site linked to the apps. */}
+            <Link href="/species" className="hover:text-white transition-colors">Care sheets</Link>
             <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
+            <a href={APP_STORE_URL} className="hover:text-white transition-colors">iPhone app</a>
+            <a href={PLAY_STORE_URL} className="hover:text-white transition-colors">Android app</a>
             <Link href="/login" className="hover:text-white transition-colors">Sign in</Link>
             <Link href="/register" className="hover:text-white transition-colors">Create account</Link>
             <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy</Link>
