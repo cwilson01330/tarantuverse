@@ -14,6 +14,7 @@ effect in the next binary. At submission time bump:
   `runtimeVersion` 1.1.0 → **1.2.0**. Create version 1.9.0 in App Store Connect.
 - Herpetoverse `apps/mobile-herpetoverse/app.json`: `version` 1.1.0 →
   **1.2.0**, `runtimeVersion` 1.2.0 → **1.3.0**. Create version 1.2.0.
+  **Done 2026-10-19** (HV submitting first, with its first IAP products).
 
 The review-prompt code checks for the `ExpoStoreReview` native module before
 loading it, so on today's binaries it simply does nothing.
