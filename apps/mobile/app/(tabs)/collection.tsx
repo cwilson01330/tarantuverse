@@ -31,17 +31,14 @@ import { getImageUrl } from '../../src/utils/image-url';
 import { feedingStatusColor } from '../../src/utils/status-colors';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
-  listScorpions,
   scorpionDisplayName,
   type Scorpion,
 } from '../../src/lib/scorpions';
 import {
-  listCentipedes,
   centipedeDisplayName,
   type Centipede,
 } from '../../src/lib/centipedes';
 import {
-  listWhipSpiders,
   whipSpiderDisplayName,
   type WhipSpider,
 } from '../../src/lib/whip-spiders';
@@ -278,11 +275,7 @@ function CollectionScreen() {
   // Died archive. Mount-only fetching left both stale until a manual pull.
   useFocusEffect(
     useCallback(() => {
-      fetchTarantulas();
-      fetchScorpions();
-      fetchCentipedes();
-      fetchWhipSpiders();
-      fetchOtherInverts();
+      fetchInverts();
       fetchColonies();
       fetchArchivedColonies();
       fetchDeceased();
@@ -335,51 +328,34 @@ function CollectionScreen() {
   // mixed collection it was both redundant AND wrong. Total/species counts in
   // the header are computed from the loaded lists instead.
 
-  const fetchScorpions = async () => {
-    // Failure here is non-fatal — scorpions are an additive surface;
-    // a load error shouldn't blank the whole collection. Keep silent.
-    try {
-      const rows = await listScorpions();
-      setScorpions(rows);
-    } catch {
-      setScorpions([]);
-    }
-  };
-
-  const fetchCentipedes = async () => {
-    // Same non-fatal pattern as scorpions — centipedes are the third
-    // additive taxon (ADR-005 C2). Older mobile builds running pre-C2
-    // never hit this endpoint; this build silently handles a 404 if
-    // someone's API instance lags behind.
-    try {
-      const rows = await listCentipedes();
-      setCentipedes(rows);
-    } catch {
-      setCentipedes([]);
-    }
-  };
-
-  const fetchWhipSpiders = async () => {
-    // Same non-fatal pattern — whip spiders are the fourth additive
-    // taxon (ADR-006). A 404 on an API instance that lags behind is
-    // handled silently.
-    try {
-      const rows = await listWhipSpiders();
-      setWhipSpiders(rows);
-    } catch {
-      setWhipSpiders([]);
-    }
-  };
-
-  const fetchOtherInverts = async () => {
-    // The newer taxa (vinegaroon/true_spider/millipede/mantis/other) have no
-    // per-taxon list lib — pull the unified collection and keep just those.
+  /**
+   * The living collection, from ONE request (2026-10-20).
+   *
+   * This used to be five: /tarantulas/, /scorpions/, /centipedes/,
+   * /whip-spiders/ and /inverts/ (kept only for the newer taxa). The unified
+   * /inverts/ list already holds every one of those animals — same ids, same
+   * active-only rule — so the four legacy lists were repeat requests for rows
+   * we had, on the heavier legacy routes. Render logs showed them on every
+   * Collection visit. The per-taxon arrays stay so the row/card code is
+   * untouched; they're just filled from the one list. Every field the grid
+   * reads (id, name, common/scientific name, sex, photo_url, taxon) is on the
+   * unified row.
+   */
+  const fetchInverts = async () => {
     try {
       const all = await listInverts();
-      const others = all.filter((i) => GENERIC_TAXA.includes(i.taxon));
-      setOtherInverts(others);
+      const of = <T,>(taxon: string) => all.filter((i) => i.taxon === taxon) as unknown as T[];
+      const ts = of<Tarantula>('tarantula');
+      setTarantulas(ts);
+      setScorpions(of<Scorpion>('scorpion'));
+      setCentipedes(of<Centipede>('centipede'));
+      setWhipSpiders(of<WhipSpider>('whip_spider'));
+      setOtherInverts(all.filter((i) => GENERIC_TAXA.includes(i.taxon)));
+      await fetchAllPremoltPredictions(ts);
     } catch {
-      setOtherInverts([]);
+      Alert.alert('Error', 'Failed to load your collection');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -434,18 +410,6 @@ function CollectionScreen() {
       setColonies(rows);
     } catch {
       setColonies([]);
-    }
-  };
-
-  const fetchTarantulas = async () => {
-    try {
-      const response = await apiClient.get('/tarantulas/');
-      setTarantulas(response.data);
-      await fetchAllPremoltPredictions(response.data);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to load your collection');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -679,11 +643,7 @@ function CollectionScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
-      fetchTarantulas(),
-      fetchScorpions(),
-      fetchCentipedes(),
-      fetchWhipSpiders(),
-      fetchOtherInverts(),
+      fetchInverts(),
       fetchColonies(),
       fetchArchivedColonies(),
       fetchDeceased(),

@@ -210,6 +210,33 @@ function InvertDetailScreen() {
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
 
+  // Refresh only what an in-place action changed (2026-10-20). A quick "Fed"
+  // used to rerun fetchAll: all ~11 requests again, plus the full-screen
+  // spinner. Render logs showed it as every detail visit "loading twice".
+  // Focus still reloads everything (another screen may have changed anything);
+  // this is for actions taken ON this screen. A failed slice falls back to a
+  // full reload so nothing is left stale. Premolt reads feedings + molts, so
+  // its card is remounted (it fetches on mount) when either changes.
+  const [premoltKey, setPremoltKey] = useState(0);
+  const refreshSlices = useCallback(async (slices: DetailSlice[]) => {
+    if (!id || !invert) { await fetchAll(); return; }
+    const taxon = invert.taxon;
+    const want = new Set(slices);
+    const jobs: Promise<unknown>[] = [];
+    if (want.has('invert')) jobs.push(getInvert(id).then(setInvert));
+    if (want.has('feedings')) jobs.push(listInvertFeedings(taxon, id).then(setFeedings));
+    if (want.has('feedingStats') && taxonHasModule(taxon, 'feedingStats')) jobs.push(getInvertFeedingStats(id).then(setFeedingStats));
+    if (want.has('molts')) jobs.push(listInvertMolts(taxon, id).then(setMolts));
+    if (want.has('growth') && taxonHasModule(taxon, 'growth')) jobs.push(getInvertGrowth(id).then(setGrowth));
+    if (want.has('substrate')) jobs.push(listInvertSubstrateChanges(taxon, id).then(setSubstrate));
+    if (want.has('photos')) jobs.push(listInvertPhotos(taxon, id).then(setPhotos));
+    if (want.has('events')) jobs.push(listInvertEvents(id).then(setEvents));
+    if (want.has('care')) jobs.push(listInvertCareLogs(id).then(setCareLogs));
+    const results = await Promise.allSettled(jobs);
+    if (results.some((r) => r.status === 'rejected')) { await fetchAll(); return; }
+    if (want.has('feedings') || want.has('molts')) setPremoltKey((k) => k + 1);
+  }, [id, invert, fetchAll]);
+
   // Arriving from a molt logged as fatal whose keeper chose "Mark as died"
   // (handoff §14.9). Waits for the animal AND the viewer's role before acting
   // — consuming the note while either is still loading would drop it. The
@@ -281,11 +308,11 @@ function InvertDetailScreen() {
     ]);
   };
 
-  const confirmDeleteLog = (label: string, run: () => Promise<void>) => {
+  const confirmDeleteLog = (label: string, run: () => Promise<void>, slices: DetailSlice[]) => {
     Alert.alert('Delete this log?', `This removes the ${label} entry. This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await run(); await fetchAll(); }
+        try { await run(); await refreshSlices(slices); }
         catch (err) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete.'); }
       } },
     ]);
@@ -311,11 +338,11 @@ function InvertDetailScreen() {
     Alert.alert('Photo options', photo.caption || 'Manage this photo', [
       { text: 'Cancel', style: 'cancel' },
       ...(!isHero ? [{ text: 'Set as hero photo', onPress: async () => {
-        try { await setInvertMainPhoto(photo.id); await fetchAll(); }
+        try { await setInvertMainPhoto(photo.id); await refreshSlices(['invert', 'photos']); }
         catch (err) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not set hero photo.'); }
       } }] : []),
       { text: 'Delete photo', style: 'destructive' as const, onPress: () => {
-        confirmDeleteLog('photo', () => deleteInvertPhoto(photo.id));
+        confirmDeleteLog('photo', () => deleteInvertPhoto(photo.id), ['invert', 'photos']);
       } },
     ]);
   };
@@ -571,7 +598,7 @@ function InvertDetailScreen() {
         food_type: lastPrey,
         accepted: true,
       });
-      await fetchAll();
+      await refreshSlices(['invert', 'feedings', 'feedingStats']);
     } catch (err) {
       Alert.alert('Could not log feeding', getErrorMessage(err));
     } finally {
@@ -610,7 +637,7 @@ function InvertDetailScreen() {
       subtitle: attribution(f),
       canChange: mayChange(f),
       onEdit: () => editFeeding(f),
-      onDelete: () => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id)),
+      onDelete: () => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id), ['invert', 'feedings', 'feedingStats']),
     })),
     ...molts.map((m): TimelineEntry => ({
       id: `m-${m.id}`,
@@ -620,7 +647,7 @@ function InvertDetailScreen() {
       subtitle: attribution(m),
       canChange: mayChange(m),
       onEdit: () => editMolt(m),
-      onDelete: () => confirmDeleteLog('molt', () => deleteInvertMolt(m.id)),
+      onDelete: () => confirmDeleteLog('molt', () => deleteInvertMolt(m.id), ['invert', 'molts', 'growth']),
     })),
     ...events.map((e): TimelineEntry => ({
       id: `e-${e.id}`,
@@ -637,7 +664,7 @@ function InvertDetailScreen() {
       subtitle: joinLines(e.notes, attribution(e)),
       canChange: mayChange(e),
       onEdit: () => router.push(`/invert/add-event?id=${id}&logId=${e.id}` as any),
-      onDelete: () => confirmDeleteLog('event', () => deleteAnimalEvent(e.id)),
+      onDelete: () => confirmDeleteLog('event', () => deleteAnimalEvent(e.id), ['invert', 'events']),
     })),
     ...substrate.map((c): TimelineEntry => ({
       id: `s-${c.id}`,
@@ -649,7 +676,7 @@ function InvertDetailScreen() {
       subtitle: attribution(c),
       canChange: mayChange(c),
       onEdit: () => editSubstrate(c),
-      onDelete: () => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id)),
+      onDelete: () => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id), ['invert', 'substrate']),
     })),
     ...careLogs.map((c): TimelineEntry => ({
       id: `w-${c.id}`,
@@ -662,7 +689,7 @@ function InvertDetailScreen() {
       subtitle: joinLines(c.notes, attribution(c)),
       canChange: mayChange(c),
       onEdit: () => editCareLog(c),
-      onDelete: () => confirmDeleteLog('water log', () => deleteInvertCareLog(c.id)),
+      onDelete: () => confirmDeleteLog('water log', () => deleteInvertCareLog(c.id), ['care']),
     })),
   ].sort(timelineOrder);
 
@@ -1229,7 +1256,7 @@ function InvertDetailScreen() {
           tarantula screen is what makes that screen safe to retire. */}
       {taxonHasModule(invert.taxon, 'premolt') && (
         <View style={{ marginHorizontal: SPACING.lg, marginVertical: SPACING.xs }}>
-          <PremoltPredictionCard tarantulaId={id!} />
+          <PremoltPredictionCard key={premoltKey} tarantulaId={id!} />
         </View>
       )}
 
@@ -1577,6 +1604,8 @@ function fmtRelative(iso: string): string {
 // what stops three rows a year drowning in 38 feedings. Filtering, not
 // placement, is the answer on a merged screen.
 type TimelineKind = 'feeding' | 'molt' | 'substrate' | 'event' | 'care';
+/** What an in-place action can have changed — see refreshSlices. */
+type DetailSlice = 'invert' | 'feedings' | 'feedingStats' | 'molts' | 'growth' | 'substrate' | 'photos' | 'events' | 'care';
 interface TimelineEntry {
   id: string;
   kind: TimelineKind;

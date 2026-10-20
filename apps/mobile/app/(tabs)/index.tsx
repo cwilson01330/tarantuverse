@@ -312,8 +312,10 @@ function DashboardHubScreen() {
       // calendar-day metrics (days_since_last_feeding). Cheap to send
       // even to endpoints that ignore it.
       const tzOffset = new Date().getTimezoneOffset();
-      const [tarantulasRes, enclosuresRes, statsRes, invertsRes, coloniesRes, feedersRes] = await Promise.all([
-        apiClient.get('/tarantulas/').catch(() => null),
+      // No separate /tarantulas/ call (2026-10-20): the unified list below
+      // already holds every tarantula (same ids), so the legacy list was a
+      // second request for a subset of the same rows.
+      const [enclosuresRes, statsRes, invertsRes, coloniesRes, feedersRes] = await Promise.all([
         apiClient.get('/enclosures/', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
         apiClient.get('/analytics/collection').catch(() => null),
         // Unified inverts list = the whole cross-taxon collection
@@ -327,9 +329,10 @@ function DashboardHubScreen() {
         apiClient.get('/feeder-colonies/').catch(() => null),
       ]);
 
-      if (tarantulasRes?.data) {
-        setTarantulas(tarantulasRes.data);
-        fetchAllPremoltPredictions(tarantulasRes.data);
+      if (Array.isArray(invertsRes?.data)) {
+        const ts = (invertsRes.data as any[]).filter((i) => i?.taxon === 'tarantula') as Tarantula[];
+        setTarantulas(ts);
+        fetchAllPremoltPredictions(ts);
       }
       // Feeding status is cross-taxon (one all-taxa call), independent of the
       // tarantulas list — so scorpions/centipedes/etc. show in the widget too.
