@@ -68,6 +68,8 @@ export interface Candidate {
   taxon: string | null;
   photo_url: string | null;
   sitter_note: string | null;
+  /** Room / rack / shelf — groups the care-sheet picker. */
+  location?: string | null;
 }
 
 export interface SitterGuide {

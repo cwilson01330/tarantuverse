@@ -44,6 +44,7 @@ import GrowthChart from '../../src/components/GrowthChart';
 import { MoltNote } from '../../src/components/MoltNote';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import PhotoViewer from '../../src/components/PhotoViewer';
+import PhotoTimeline from '../../src/components/PhotoTimeline';
 import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { FeedingCadenceSheet } from '../../src/components/FeedingCadenceSheet';
@@ -105,6 +106,8 @@ function InvertDetailScreen() {
   // Fullscreen gallery. Tapping a thumbnail used to do nothing on this screen —
   // only long-press (set hero / delete) was wired.
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  // Photo timeline — read-only, so it opens for died/transferred animals too.
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
   // would fail — the API checks every request. Nothing write-shaped shows
@@ -1360,6 +1363,18 @@ function InvertDetailScreen() {
                 );
               }} />
             <Text style={[s.empty, { color: colors.textTertiary, fontStyle: 'normal' }]}>{canKeep ? 'Tap to view full screen. Long-press to set as hero or delete.' : 'Tap to view full screen.'}</Text>
+            {photos.length >= 2 && (
+              <TouchableOpacity
+                onPress={() => setTimelineOpen(true)}
+                style={s.timelineBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Photo timeline"
+                accessibilityHint="Every photo in date order, grouped by molt"
+              >
+                <MaterialCommunityIcons name="timeline-clock-outline" size={18} color={colors.primary} />
+                <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>Photo timeline</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
       </Section>
@@ -1468,6 +1483,18 @@ function InvertDetailScreen() {
         scientificName={invert.scientific_name}
         onPhotoAdded={fetchAll}
       />
+
+      {timelineOpen && photos.length >= 2 && (
+        <PhotoTimeline
+          visible
+          onClose={() => setTimelineOpen(false)}
+          animalName={invertDisplayName(invert)}
+          taxon={invert.taxon}
+          currentInstar={invert.current_instar}
+          photos={photos}
+          molts={molts}
+        />
+      )}
 
       <PhotoViewer
         visible={viewerIndex !== null}
@@ -1701,6 +1728,7 @@ function InfoRow({ label, value }: { label: string; value: string; colors?: Retu
 // so there's nothing left that renders a per-type log list.
 
 const s = StyleSheet.create({
+  timelineBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, alignSelf: 'flex-start', paddingVertical: SPACING.xs },
   // End of record (design handoff 14.1). Neutral by design: surfaceElevated
   // fill with a plain border, never colors.primary (a user-chosen accent
   // shouldn't celebrate this) and never colors.error (red means destructive

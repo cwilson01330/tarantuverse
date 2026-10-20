@@ -48,7 +48,7 @@ function isSitterPage(path: string | null | undefined): boolean {
   // /invite carries a co-keeper invite token in its fragment the same way.
   // /c/<code> is an unlisted card link: the code IS the access, so it stays
   // out of analytics too.
-  return !!path && (path === "/sit" || path.startsWith("/sit/") || path === "/invite" || path.startsWith("/c/"))
+  return !!path && (path === "/sit" || path.startsWith("/sit/") || path === "/invite" || path.startsWith("/c/") || path.startsWith("/care-sheet/"))
 }
 
 let initialized = false

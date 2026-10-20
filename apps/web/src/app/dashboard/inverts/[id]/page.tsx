@@ -45,6 +45,7 @@ import FeedingStatsCard, { type FeedingStats as TarantulaFeedingStats } from '@/
 import PauseFeedingModal from '@/components/PauseFeedingModal'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
 import QRModal from '@/components/QRModal'
+import PhotoTimeline from '@/components/PhotoTimeline'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatLengthMm, formatTempRange } from '@/lib/units'
 import { ROLE_LABEL, attribution, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
@@ -145,7 +146,8 @@ const CARE_LOG_LABELS: Record<CareLogType, string> = {
   overflow: 'Dish overflowed',
   misted: 'Misted',
 }
-interface Photo { id: string; url: string; thumbnail_url?: string | null; caption?: string | null }
+// taken_at / created_at feed the photo timeline (the API has always sent them).
+interface Photo { id: string; url: string; thumbnail_url?: string | null; caption?: string | null; taken_at?: string | null; created_at?: string | null }
 
 /** The tarantula-only feeding analytics. Null on any failure — the card is an
  *  extra, and the verdict above it already says whether she's due. */
@@ -235,6 +237,8 @@ export default function InvertDetailPage() {
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // Photo timeline (read-only, so open for died/transferred animals too).
+  const [timelineOpen, setTimelineOpen] = useState(false)
   const [shareMolt, setShareMolt] = useState<string | null>(null)
   // Breeding module (registry-gated, ADR-021 Phase D)
   const [pairings, setPairings] = useState<any[]>([])
@@ -1151,6 +1155,11 @@ export default function InvertDetailPage() {
             <Section
               title="Photos"
               action={canAdd ? { label: 'Add photo', onClick: () => router.push(`/dashboard/inverts/${id}/add-photo`) } : undefined}
+              extra={photos.length >= 2 ? (
+                <button onClick={() => setTimelineOpen(true)} className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline">
+                  Timeline
+                </button>
+              ) : undefined}
             >
               {photos.length === 0 ? (
                 <p className="text-sm text-theme-tertiary italic">No photos yet.</p>
@@ -1194,6 +1203,19 @@ export default function InvertDetailPage() {
           </>
         )}
       </div>
+
+      {invert && photos.length >= 2 && (
+        <PhotoTimeline
+          open={timelineOpen}
+          onClose={() => setTimelineOpen(false)}
+          animalName={displayName(invert)}
+          taxon={invert.taxon}
+          currentInstar={invert.current_instar}
+          photos={photos}
+          molts={molts}
+          imageUrl={getImageUrl}
+        />
+      )}
 
       {token && invert && canKeep ? (
         <>
@@ -1552,20 +1574,28 @@ function hasHusbandry(i: Invert): boolean {
 function Section({
   title,
   action,
+  extra,
   children,
 }: {
   title: string
   action?: { label: string; onClick: () => void }
+  /** A second header control, left of the action (e.g. the photo Timeline). */
+  extra?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <div className="bg-surface border border-theme rounded-2xl p-5 mb-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-bold text-theme-primary">{title}</h2>
-        {action && (
-          <button onClick={action.onClick} className="text-sm font-semibold text-primary-600 hover:underline">
-            {action.label}
-          </button>
+        {(action || extra) && (
+          <div className="flex items-center gap-4">
+            {extra}
+            {action && (
+              <button onClick={action.onClick} className="text-sm font-semibold text-primary-600 hover:underline">
+                {action.label}
+              </button>
+            )}
+          </div>
         )}
       </div>
       {children}

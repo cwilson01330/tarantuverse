@@ -8,6 +8,8 @@
 
 User-agent: *
 Allow: /
+# Printable sitter care sheets: the token in the path is the access.
+Disallow: /care-sheet/
 
 # OpenAI (training, ChatGPT search, live fetches for a user)
 User-agent: GPTBot
@@ -29,5 +31,6 @@ User-agent: Googlebot
 User-agent: Applebot
 User-agent: DuckDuckBot
 Allow: /
+Disallow: /care-sheet/
 
 Sitemap: https://herpetoverse.com/sitemap.xml

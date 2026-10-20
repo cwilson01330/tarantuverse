@@ -90,6 +90,7 @@ export default function PhotoGallery({
   onMainChanged,
   canUpload = true,
   canManage = true,
+  onPhotosChange,
 }: {
   /** Animal id — used for the animal-scoped list/upload endpoints. */
   animalId: string
@@ -102,8 +103,16 @@ export default function PhotoGallery({
   canUpload?: boolean
   /** Keepers and up may pick the hero photo, delete and re-caption. */
   canManage?: boolean
+  /** Told the current photo list whenever it changes (the photo timeline
+   *  reads it, so the page doesn't fetch the same list twice). */
+  onPhotosChange?: (photos: Photo[]) => void
 }) {
   const [photos, setPhotos] = useState<Photo[]>([])
+  const onPhotosChangeRef = useRef(onPhotosChange)
+  onPhotosChangeRef.current = onPhotosChange
+  useEffect(() => {
+    onPhotosChangeRef.current?.(photos)
+  }, [photos])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 

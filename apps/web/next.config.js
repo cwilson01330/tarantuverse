@@ -105,6 +105,17 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'no-store' },
         ],
       },
+      {
+        // Printable sitter care sheets carry their token in the PATH
+        // (routers/care_sheets.py): never send it on as a Referer, never
+        // index or cache the page.
+        source: '/care-sheet/:token*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      },
     ]
   },
   //

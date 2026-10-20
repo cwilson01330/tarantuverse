@@ -207,6 +207,15 @@ function CollectionScreen() {
           )}
         </View>
         <TouchableOpacity
+          onPress={() => router.push('/care-sheet' as never)}
+          hitSlop={8}
+          style={styles.headerIconGap}
+          accessibilityRole="button"
+          accessibilityLabel="Care sheet for a sitter"
+        >
+          <MaterialCommunityIcons name="printer-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={() => {
             // Closing search clears the query too, otherwise the list stays
             // filtered by an input the keeper can no longer see.
@@ -1161,6 +1170,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerText: { flex: 1, minWidth: 0 },
+  headerIconGap: { marginRight: 18 },
   headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
   headerSubtitle: {
     fontSize: 12,

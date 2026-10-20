@@ -18,7 +18,8 @@ import { MetadataRoute } from 'next'
 // robots.txt, and a disallowed og:image renders as nothing. Keep `/api/og/`,
 // `/api/card-link/` and `/c/` allowed or share-card previews go blank.
 const PUBLIC_ALLOW = ['/', '/api/og/', '/api/card-link/', '/c/']
-const PRIVATE_DISALLOW = ['/dashboard', '/messages', '/api/']
+// `/care-sheet/` pages are private sitter links (the token is the access).
+const PRIVATE_DISALLOW = ['/dashboard', '/messages', '/api/', '/care-sheet/']
 
 const NAMED_CRAWLERS = [
   // OpenAI — training, ChatGPT search index, live fetches for a user

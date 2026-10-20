@@ -55,6 +55,7 @@ import {
   Section,
 } from '../components/reptile-detail/ReptileDetailShared';
 import { AnimalHero } from '../components/reptile-detail/AnimalHero';
+import PhotoTimeline from '../components/PhotoTimeline';
 import { AnimalTimeline } from '../components/reptile-detail/AnimalTimeline';
 import { FeedingCard } from '../components/reptile-detail/FeedingCard';
 import { BrumationRow } from '../components/reptile-detail/BrumationRow';
@@ -110,6 +111,8 @@ export function AnimalDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  // Photo timeline — read-only, so it opens for died/transferred animals too.
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cadenceOpen, setCadenceOpen] = useState(false);
   const [geneticsOpen, setGeneticsOpen] = useState(false);
@@ -404,7 +407,28 @@ export function AnimalDetailScreen() {
               router.push(`/reptile/photos/${animal.id}` as never)
             }
           />
+          {photos && photos.length >= 2 ? (
+            <TouchableOpacity
+              onPress={() => setTimelineOpen(true)}
+              style={styles.timelineBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Photo timeline"
+              accessibilityHint="Every photo in date order, grouped by shed"
+            >
+              <MaterialCommunityIcons name="timeline-clock-outline" size={18} color={colors.primary} />
+              <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>Photo timeline</Text>
+            </TouchableOpacity>
+          ) : null}
         </Section>
+        {timelineOpen && photos && photos.length >= 2 ? (
+          <PhotoTimeline
+            visible
+            onClose={() => setTimelineOpen(false)}
+            animalName={animalTitle(animal)}
+            photos={photos}
+            sheds={sheds}
+          />
+        ) : null}
 
         {/* One merged history replaces the three identically-shaped lists
             (Recent weigh-ins / Recent feedings / Recent sheds) that each
@@ -775,6 +799,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   logBarLabel: { fontSize: 10.5, fontWeight: '600' },
+
+  timelineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, minHeight: 44 },
 
   calculatorLink: {
     marginTop: 12,

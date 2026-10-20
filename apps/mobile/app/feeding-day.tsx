@@ -398,7 +398,21 @@ export default function FeedingDayScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Feeding Day" subtitle="Log feeding for many at once" leftAction={backAction} />
+      <AppHeader
+        title="Feeding Day"
+        subtitle="Log feeding for many at once"
+        leftAction={backAction}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => router.push('/care-sheet' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Care sheet for a sitter"
+            style={{ padding: 4 }}
+          >
+            <MaterialCommunityIcons name="printer-outline" size={24} color={iconColor} />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Filter chips */}
       <ScrollView

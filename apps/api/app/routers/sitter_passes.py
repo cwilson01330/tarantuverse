@@ -375,12 +375,24 @@ def _logging_state(p: KeeperPass, logging_unlocked: bool) -> dict:
     }
 
 
-def build_pass_payload(
+def compose_cards(
     db: Session,
-    p: KeeperPass,
+    owner_user_id: UUID,
+    refs: list,
+    *,
+    keeper: str,
+    keeper_units: Optional[str],
     tz_offset_minutes: Optional[int],
-    logging_unlocked: bool = False,
-) -> dict:
+    now: datetime,
+    extra=None,
+) -> list:
+    """Sitter cards for `refs` (objects with invert_id / colony_id / animal_id,
+    in display order), re-reading the owner's ACTIVE animals at call time.
+
+    Shared by the sitter pass and the printable care sheet (routers/
+    care_sheets.py). `extra(card, row, feedings)` may add per-card fields; it
+    is called once per card that survives the activity check.
+    """
     from app.routers.animals import _animal_feeding_interval
     from app.routers.inverts import (
         INTERVAL_SOURCE_KEEPER,
@@ -388,22 +400,15 @@ def build_pass_payload(
         _recommended_feeding_interval_with_source,
     )
 
-    now = _now()
-    owner = db.query(User).filter(User.id == p.owner_user_id).first()
-    keeper = _keeper_name(owner)
-    # Temperatures on the card follow the keeper's display units (storage is °F).
-    keeper_units = getattr(owner, "measurement_units", None)
-    refs = sorted(p.animals, key=lambda r: r.sort_order)
-
     # Re-check ownership and activity at READ time, not just at creation: an
     # animal transferred or deceased since the pass was made drops off the list.
     inv_ids = [r.invert_id for r in refs if r.invert_id]
     col_ids = [r.colony_id for r in refs if r.colony_id]
     ani_ids = [r.animal_id for r in refs if r.animal_id]
-    inverts = {i.id: i for i in active_inverts_query(db, p.owner_user_id).filter(Invert.id.in_(inv_ids))} if inv_ids else {}
-    colonies = {c.id: c for c in active_colonies_query(db, p.owner_user_id).filter(Colony.id.in_(col_ids))} if col_ids else {}
+    inverts = {i.id: i for i in active_inverts_query(db, owner_user_id).filter(Invert.id.in_(inv_ids))} if inv_ids else {}
+    colonies = {c.id: c for c in active_colonies_query(db, owner_user_id).filter(Colony.id.in_(col_ids))} if col_ids else {}
     animals = (
-        {a.id: a for a in active_animals_query(db, p.owner_user_id)
+        {a.id: a for a in active_animals_query(db, owner_user_id)
          .options(selectinload(Animal.herp_species), selectinload(Animal.enclosure))
          .filter(Animal.id.in_(ani_ids))}
         if ani_ids else {}
@@ -446,7 +451,8 @@ def build_pass_payload(
                 keeper_name=keeper, now=now, tz_offset_minutes=tz_offset_minutes,
                 units=keeper_units,
             )
-            card.update(_logging_fields(p, card, feeds, now))
+            if extra is not None:
+                extra(card, inv, feeds)
             cards.append(card)
         elif r.colony_id and r.colony_id in colonies:
             col = colonies[r.colony_id]
@@ -454,7 +460,8 @@ def build_pass_payload(
                 col, species.get(col.species_id) if col.species_id else None, keeper_name=keeper,
                 units=keeper_units,
             )
-            card.update(_logging_fields(p, card, [], now))
+            if extra is not None:
+                extra(card, col, [])
             cards.append(card)
         elif r.animal_id and r.animal_id in animals:
             a = animals[r.animal_id]
@@ -474,8 +481,29 @@ def build_pass_payload(
                 keeper_name=keeper, now=now, tz_offset_minutes=tz_offset_minutes,
                 units=keeper_units,
             )
-            card.update(_logging_fields(p, card, feeds, now))
+            if extra is not None:
+                extra(card, a, feeds)
             cards.append(card)
+    return cards
+
+
+def build_pass_payload(
+    db: Session,
+    p: KeeperPass,
+    tz_offset_minutes: Optional[int],
+    logging_unlocked: bool = False,
+) -> dict:
+    now = _now()
+    owner = db.query(User).filter(User.id == p.owner_user_id).first()
+    keeper = _keeper_name(owner)
+    # Temperatures on the card follow the keeper's display units (storage is °F).
+    keeper_units = getattr(owner, "measurement_units", None)
+    refs = sorted(p.animals, key=lambda r: r.sort_order)
+    cards = compose_cards(
+        db, p.owner_user_id, refs,
+        keeper=keeper, keeper_units=keeper_units, tz_offset_minutes=tz_offset_minutes, now=now,
+        extra=lambda card, _row, feeds: card.update(_logging_fields(p, card, feeds, now)),
+    )
 
     guide = (
         db.query(SitterGuide)
@@ -510,22 +538,23 @@ async def list_candidates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Animals the keeper can put on a pass, with their sitter notes."""
+    """Animals the keeper can put on a pass (or a printable care sheet), with
+    their sitter notes and location (room / rack / shelf, for grouping)."""
     out = []
     if app == "tarantuverse":
         for i in active_inverts_query(db, current_user.id).order_by(Invert.name).all():
             out.append({"kind": "invert", "id": str(i.id), "name": i.name, "common_name": i.common_name,
                         "scientific_name": i.scientific_name, "taxon": i.taxon, "photo_url": i.photo_url,
-                        "sitter_note": i.sitter_note})
+                        "sitter_note": i.sitter_note, "location": i.location})
         for c in active_colonies_query(db, current_user.id).order_by(Colony.name).all():
             out.append({"kind": "colony", "id": str(c.id), "name": c.name, "common_name": None,
                         "scientific_name": None, "taxon": c.taxon, "photo_url": c.photo_url,
-                        "sitter_note": c.sitter_note})
+                        "sitter_note": c.sitter_note, "location": c.location})
     else:
         for a in active_animals_query(db, current_user.id).order_by(Animal.name).all():
             out.append({"kind": "animal", "id": str(a.id), "name": a.name, "common_name": a.common_name,
                         "scientific_name": a.scientific_name, "taxon": a.taxon, "photo_url": a.photo_url,
-                        "sitter_note": a.sitter_note})
+                        "sitter_note": a.sitter_note, "location": a.location})
     return out
 
 

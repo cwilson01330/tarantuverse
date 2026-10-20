@@ -2163,6 +2163,7 @@ function CollectionScreen() {
               setSearchOpen((v) => !v);
             }, searchOpen)}
             {headerIcon('tune-variant', 'Sort options', () => setSortSheetOpen(true))}
+            {headerIcon('printer-outline', 'Care sheet for a sitter', () => router.push('/care-sheet' as never))}
             {headerIcon(
               viewMode === 'card' ? 'view-grid-outline' : 'view-list-outline',
               viewMode === 'card' ? 'Switch to list view' : 'Switch to grid view',

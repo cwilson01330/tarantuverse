@@ -12,6 +12,7 @@ import { LocationRenameDialog } from '@/components/LocationPicker'
 import { groupByLocation, listLocations, locationKey, renameLocation, UNASSIGNED_KEY, type LocationItem } from '@/lib/locations'
 import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
+import CareSheetDialog from '@/components/CareSheetDialog'
 import { formatLocalDate } from '@/lib/date'
 import {
   listColonies,
@@ -196,6 +197,8 @@ export default function TarantulasPage() {
   const [deceasedSort, setDeceasedSort] = useState<'recent' | 'tenure'>('recent')
   const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey | 'colony'>('all')
   const [showAddMenu, setShowAddMenu] = useState(false)
+  // Printable care sheet for a sitter (routers/care_sheets.py).
+  const [showCareSheet, setShowCareSheet] = useState(false)
   // The dashboard's Add Animal action lands here with ?add=1 to open the picker.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('add') === '1') setShowAddMenu(true)
@@ -882,6 +885,15 @@ export default function TarantulasPage() {
             <h1 className="text-3xl font-bold text-theme-primary">My Collection</h1>
             <p className="text-theme-secondary mt-1">{totalCollectionCount} in your collection</p>
           </div>
+          {totalCollectionCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCareSheet(true)}
+              className="mt-3 sm:mt-0 px-4 py-2 rounded-xl bg-surface border border-theme text-theme-primary font-semibold hover:bg-surface-elevated transition"
+            >
+              🖨️ Care sheet for a sitter
+            </button>
+          )}
         </div>
 
         {/* Two-column layout for collection and activity feed */}
@@ -1370,6 +1382,7 @@ export default function TarantulasPage() {
         onClose={() => setRenameTarget(null)}
         onSubmit={(next) => submitRename(renameTarget ?? '', next)}
       />
+      <CareSheetDialog open={showCareSheet} token={token} onClose={() => setShowCareSheet(false)} />
     </DashboardLayout>
   )
 }

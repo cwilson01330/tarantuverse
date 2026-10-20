@@ -257,4 +257,7 @@ def test_sitter_router_passes_the_owners_units():
 
     src = inspect.getsource(sitter_passes)
     assert 'keeper_units = getattr(owner, "measurement_units", None)' in src
-    assert src.count("units=keeper_units") == 3
+    # The three card composers (invert, colony, animal) live in compose_cards,
+    # shared with the printable care sheet; the pass hands it the owner's units.
+    assert inspect.getsource(sitter_passes.compose_cards).count(" units=keeper_units") == 3
+    assert "keeper_units=keeper_units" in inspect.getsource(sitter_passes.build_pass_payload)

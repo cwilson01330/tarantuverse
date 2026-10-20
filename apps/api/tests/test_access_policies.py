@@ -29,7 +29,7 @@ COLLECTION_ROUTERS = [
     "care_logs", "feedings", "molts", "substrate_changes", "photos", "sheds", "weight_logs",
     "enclosures", "feeder_colonies", "hv_feeder_stocks",
     "pairings", "egg_sacs", "offspring", "clutches", "reptile_pairings", "reptile_offspring",
-    "premolt", "analytics", "qr", "transfers", "import_export",
+    "premolt", "analytics", "qr", "transfers", "import_export", "care_sheets",
 ]
 
 ACCESS_CALLS = ("load_invert(", "load_colony(", "load_animal(", "load_log_parent(", "require(", "scope_collection(")

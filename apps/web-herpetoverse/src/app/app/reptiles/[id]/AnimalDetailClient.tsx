@@ -40,6 +40,7 @@ import {
 } from 'recharts'
 import { ApiError } from '@/lib/apiClient'
 import PhotoGallery from '@/components/PhotoGallery'
+import PhotoTimeline from '@/components/PhotoTimeline'
 import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import { FeedingCadenceDialog } from '@/components/FeedingCadenceDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
@@ -56,6 +57,7 @@ import {
   type CreateWeightLogPayload,
   type FeedingLog,
   type PreySuggestion,
+  type Photo,
   type ShedLog,
   WEIGHT_CONTEXT_LABELS,
   type WeightContext,
@@ -207,6 +209,10 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   // QR upload-session modal
   const [qrOpen, setQrOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // Photo timeline. The list comes from PhotoGallery (onPhotosChange), which
+  // already fetches it. Read-only, so it stays available for closed animals.
+  const [galleryPhotos, setGalleryPhotos] = useState<Photo[]>([])
+  const [timelineOpen, setTimelineOpen] = useState(false)
   // One shed or one weigh-in being shared as its own card.
   const [shareEvent, setShareEvent] = useState<{ kind: 'shed' | 'weight'; id: string } | null>(null)
 
@@ -437,6 +443,13 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
             Photos
           </h2>
           <div className="flex items-center gap-2">
+          {galleryPhotos.length >= 2 && <button
+            type="button"
+            onClick={() => setTimelineOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-800 text-xs font-medium text-neutral-300 hover:text-herp-lime hover:border-herp-teal/40 transition-colors"
+          >
+            Timeline
+          </button>}
           {access.canKeep && <button
             type="button"
             onClick={() => setShareOpen(true)}
@@ -462,8 +475,19 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           onMainChanged={refetchAnimalOnly}
           canUpload={access.canLog}
           canManage={access.canKeep && !access.closed}
+          onPhotosChange={setGalleryPhotos}
         />
       </section>
+
+      {galleryPhotos.length >= 2 && (
+        <PhotoTimeline
+          open={timelineOpen}
+          onClose={() => setTimelineOpen(false)}
+          animalName={animalTitle(animal)}
+          photos={galleryPhotos}
+          sheds={sheds}
+        />
+      )}
 
       {token && access.canKeep && (
         <ShareCardModal open={shareOpen} onClose={() => setShareOpen(false)} app="herpetoverse" animalId={animal.id} kind="profile" token={token} />

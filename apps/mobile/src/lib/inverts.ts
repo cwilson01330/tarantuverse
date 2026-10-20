@@ -465,7 +465,8 @@ export interface InvertGrowthAnalytics {
   days_since_last_molt: number | null;
 }
 export interface InvertSubstrateChange { id: string; invert_id: string | null; changed_at: string; substrate_type: string | null; substrate_depth: string | null; reason: string | null; notes: string | null; /** Set when a co-keeper logged it (null = the owner). */ logged_by_user_id?: string | null; logged_by_name?: string | null; }
-export interface InvertPhoto { id: string; url: string; thumbnail_url: string | null; caption: string | null; }
+// taken_at / created_at feed the photo timeline (the API has always sent them).
+export interface InvertPhoto { id: string; url: string; thumbnail_url: string | null; caption: string | null; taken_at?: string | null; created_at?: string | null; }
 
 /**
  * Hydration events (car_20260909).

@@ -37,6 +37,7 @@ import {
 } from '@/lib/animals'
 import { lastFedTextClass } from '@/lib/cgd'
 import { LocationRenameDialog } from '@/components/LocationPicker'
+import CareSheetDialog from '@/components/CareSheetDialog'
 import {
   groupByLocation,
   listLocations,
@@ -130,6 +131,8 @@ interface AnimalLimits {
 export default function ReptilesPage() {
   const [rows, setRows] = useState<ReptileRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Printable care sheet for a sitter (routers/care_sheets.py).
+  const [careSheetOpen, setCareSheetOpen] = useState(false)
   // null = "All"; otherwise the active taxon filter.
   const [activeTaxon, setActiveTaxon] = useState<Taxon | null>(null)
   // Local search — filters the rows already loaded (no endpoint, no debounce).
@@ -355,6 +358,13 @@ export default function ReptilesPage() {
           >
             <span aria-hidden="true">🍽️</span> Feeding Day
           </Link>
+          <button
+            type="button"
+            onClick={() => setCareSheetOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-300 hover:text-white hover:border-neutral-700 transition-colors"
+          >
+            <span aria-hidden="true">🖨️</span> Care sheet for a sitter
+          </button>
           <Link
             href="/app/import"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-300 hover:text-white hover:border-neutral-700 transition-colors"
@@ -553,6 +563,7 @@ export default function ReptilesPage() {
         onClose={() => setRenameTarget(null)}
         onSubmit={(next) => submitRename(renameTarget ?? '', next)}
       />
+      <CareSheetDialog open={careSheetOpen} onClose={() => setCareSheetOpen(false)} />
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { INVERT_TAXA, isInvertTaxon, isGrazer, lifeStageLabel } from '@/lib/inverts'
 import DashboardLayout from '@/components/DashboardLayout'
 import { LocationDialog } from '@/components/LocationPicker'
+import CareSheetDialog from '@/components/CareSheetDialog'
 import PremiumIntroCard, { shouldShowPremiumIntro } from '@/components/PremiumIntroCard'
 import { bulkSetLocation, groupByLocation, listLocations, UNASSIGNED_KEY, type LocationItem } from '@/lib/locations'
 
@@ -113,6 +114,8 @@ export default function FeedingDayPage() {
   const [groupByLoc, setGroupByLoc] = useState(false)
   const [locations, setLocations] = useState<LocationItem[]>([])
   const [locDialogOpen, setLocDialogOpen] = useState(false)
+  // Printable care sheet for a sitter (routers/care_sheets.py).
+  const [careSheetOpen, setCareSheetOpen] = useState(false)
   const [locBusy, setLocBusy] = useState(false)
   // The one-time "here's what you get" card — the server decides, see the component.
   const [introOpen, setIntroOpen] = useState(false)
@@ -499,12 +502,21 @@ export default function FeedingDayPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/dashboard"
-            className="text-sm text-theme-secondary hover:text-theme-primary transition flex-shrink-0"
-          >
-            ← Back to Dashboard
-          </Link>
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setCareSheetOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-surface border border-theme text-sm font-semibold text-theme-primary hover:bg-surface-elevated transition"
+            >
+              🖨️ Care sheet for a sitter
+            </button>
+            <Link
+              href="/dashboard"
+              className="text-sm text-theme-secondary hover:text-theme-primary transition"
+            >
+              ← Back to Dashboard
+            </Link>
+          </div>
         </div>
 
         {/* Honesty note about the overdue heuristic */}
@@ -755,6 +767,7 @@ export default function FeedingDayPage() {
         onClose={() => setLocDialogOpen(false)}
         onPick={applyLocation}
       />
+      <CareSheetDialog open={careSheetOpen} token={token} onClose={() => setCareSheetOpen(false)} />
     </DashboardLayout>
   )
 }

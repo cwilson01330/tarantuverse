@@ -408,6 +408,16 @@ function FeedingDayScreen() {
         title="Feeding Day"
         subtitle="Log feeding for many at once"
         leftAction={<HeaderBackButton />}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => router.push('/care-sheet' as never)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Care sheet for a sitter"
+          >
+            <MaterialCommunityIcons name="printer-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        }
       />
 
       {/* Filter chips */}
