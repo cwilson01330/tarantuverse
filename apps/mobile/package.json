@@ -13,6 +13,7 @@
     "build:ios": "eas build --platform ios",
     "lint": "eslint .",
     "lint:tokens": "node scripts/check-design-tokens.js",
+    "check:bundle": "expo export --platform android --dump-sourcemap --output-dir ../../.bundle-check && node ../../tools/check-single-react-native.js ../../.bundle-check",
     "test": "jest --passWithNoTests"
   },
   "dependencies": {

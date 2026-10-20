@@ -133,3 +133,6 @@ docs/design/species_images_r2.csv
 
 # Design agent HTML exports
 *(standalone).html
+
+# Bundle check output (tools/check-single-react-native.js)
+.bundle-check/

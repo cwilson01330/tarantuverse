@@ -35,4 +35,17 @@ config.resolver = {
   ],
 };
 
-module.exports = config;
+// One copy of React Native per bundle (2026-10-20). pnpm keeps two installs
+// of react-native (the apps pull different @types/react / @babel/core), and a
+// bundle that mixes them crashes on Expo native views ("View config getter
+// callback for component `ViewManagerAdapter_ExpoLinearGradient` ..."). See
+// tools/metro-singletons.js. Optional so a build that doesn't ship tools/
+// (EAS installs flat, with one copy anyway) still bundles.
+let withSingletons = (c) => c;
+try {
+  ({ withSingletons } = require(path.resolve(workspaceRoot, 'tools/metro-singletons.js')));
+} catch (e) {
+  if (e && e.code !== 'MODULE_NOT_FOUND') throw e;
+}
+
+module.exports = withSingletons(config, projectRoot);

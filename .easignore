@@ -119,3 +119,6 @@ examples/
 **/*.spec.ts
 **/*.spec.tsx
 **/*.spec.js
+
+# ===== Bundle check output (tools/check-single-react-native.js) =====
+.bundle-check
