@@ -5,9 +5,14 @@
  * the slider carries a marker at every logged molt. Optional side-by-side
  * compare (first vs latest by default).
  *
- * Read-only, so it opens for living, died and transferred animals alike.
- * OTA-safe: core RN only (Modal, FlatList paging, PanResponder) — no
- * gesture-handler / reanimated / slider package. Grouping rules live in
+ * Opens for living, died and transferred animals alike. The one edit is the
+ * photo's DATE (when the parent passes onSetDate): uploads are dated by upload
+ * time, so old photos added in one go land out of order; setting the day it
+ * was taken fixes both the order and the molt grouping (no free drag-reorder
+ * on purpose — the molt labels follow the date).
+ * OTA-safe: core RN only (Modal, FlatList paging, PanResponder, the JS-only
+ * DateInput) — no gesture-handler / reanimated / slider / native date-picker
+ * package. Grouping rules live in
  * src/lib/photo-timeline.ts (pure + tested); lengths go through
  * src/lib/units, never a hardcoded unit.
  */
@@ -40,9 +45,13 @@ import {
   markerFraction,
   markerLabel,
   periodLabel,
+  photoDateError,
+  takenAtFromLocalDate,
+  toLocalDateInput,
   type PhotoTimelineEntry,
   type PhotoTimelineMarker,
 } from '../lib/photo-timeline';
+import DateInput from './DateInput';
 import { SPACING, TYPE } from '../theme/tokens';
 
 export interface TimelinePhotoRow {
@@ -74,6 +83,7 @@ export default function PhotoTimeline({
   currentInstar,
   photos,
   molts,
+  onSetDate,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -83,6 +93,11 @@ export default function PhotoTimeline({
   currentInstar?: number | null;
   photos: TimelinePhotoRow[];
   molts: TimelineMoltRow[];
+  /**
+   * PATCH the photo's taken_at and update the parent's list; throw an Error
+   * with a readable message on failure. Omit for viewers who can't edit.
+   */
+  onSetDate?: (photoId: string, takenAt: string) => Promise<void>;
 }) {
   const { colors, layout } = useTheme();
   const { units } = useUnits();
@@ -124,6 +139,40 @@ export default function PhotoTimeline({
     const next = Math.max(0, Math.min(n - 1, i));
     setIdx(next);
     listRef.current?.scrollToIndex({ index: next, animated: false });
+  };
+
+  // "Date taken" edit. After a save the photo moves; follow it.
+  const [saving, setSaving] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+  const followId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!followId.current) return;
+    const at = entries.findIndex((e) => e.photo.id === followId.current);
+    followId.current = null;
+    if (at < 0) return;
+    setIdx(at);
+    // Let the pager lay out the re-ordered data first.
+    requestAnimationFrame(() => listRef.current?.scrollToIndex({ index: at, animated: false }));
+  }, [entries]);
+  useEffect(() => setDateError(null), [idx, compare]);
+
+  const saveDate = async (photoId: string, d: Date) => {
+    if (!onSetDate || saving) return;
+    const ymd = toLocalDateInput(d);
+    const problem = photoDateError(ymd);
+    const takenAt = problem ? null : takenAtFromLocalDate(ymd);
+    if (problem || !takenAt) { setDateError(problem ?? 'Enter a valid date.'); return; }
+    setSaving(true);
+    setDateError(null);
+    followId.current = photoId;
+    try {
+      await onSetDate(photoId, takenAt);
+    } catch (err) {
+      followId.current = null;
+      setDateError(err instanceof Error && err.message ? err.message : 'Could not save the date.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (n === 0) return null;
@@ -227,6 +276,24 @@ export default function PhotoTimeline({
               <Text style={[TYPE.body, { color: colors.textSecondary }]}>{metaFor(current)}</Text>
               {sizeFor(current) ? <Text style={[TYPE.body, { color: colors.textSecondary }]}>{sizeFor(current)}</Text> : null}
               {current.photo.caption ? <Text style={[TYPE.body, { color: colors.textTertiary, fontStyle: 'italic' }]} numberOfLines={2}>{current.photo.caption}</Text> : null}
+              {onSetDate ? (
+                <View style={styles.dateRow}>
+                  <Text style={[TYPE.label, { color: colors.textSecondary }]}>Date taken</Text>
+                  <View style={styles.dateInput}>
+                    <DateInput
+                      key={current.photo.id}
+                      value={new Date(current.date)}
+                      onChange={(d) => saveDate(current.photo.id, d)}
+                      maximumDate={new Date()}
+                      label="Date taken"
+                    />
+                  </View>
+                  {saving ? <Text style={[TYPE.caption, { color: colors.textSecondary }]}>Saving…</Text> : null}
+                </View>
+              ) : null}
+              {dateError ? (
+                <Text style={[TYPE.caption, { color: colors.error }]} accessibilityLiveRegion="polite">{dateError}</Text>
+              ) : null}
             </View>
 
             {n > 1 && (
@@ -270,7 +337,9 @@ export default function PhotoTimeline({
         )}
 
         <Text style={[TYPE.caption, styles.note, { color: colors.textTertiary }]}>
-          Photos are dated by when they were added to the app.{moltCount === 0 ? ' Log molts to see each photo placed between them.' : ''}
+          Photos are dated by when they were added to the app.
+          {onSetDate ? ' One out of order? Tap its date to set the day it was taken and it moves into place.' : ''}
+          {moltCount === 0 ? ' Log molts to see each photo placed between them.' : ''}
         </Text>
       </View>
     </Modal>
@@ -426,6 +495,8 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%' },
   counter: { position: 'absolute', top: SPACING.sm, right: SPACING.sm, paddingHorizontal: SPACING.sm, paddingVertical: 2 },
   captionBox: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, gap: 2 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.sm },
+  dateInput: { flexShrink: 1 },
   scrubWrap: { paddingHorizontal: SPACING.xl, marginTop: SPACING.md },
   markerRow: { height: 22 },
   marker: { position: 'absolute', top: 0, width: 60, alignItems: 'center' },

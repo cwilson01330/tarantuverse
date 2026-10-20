@@ -5,23 +5,31 @@
  * scrubbable slider, each labelled by the molt period it falls in, with a
  * marker on the slider at every logged molt. Optional side-by-side compare.
  *
- * Read-only: no editing photos here, so it opens for living, died and
- * transferred animals alike. Grouping lives in lib/photoTimeline.ts (pure,
+ * Opens for living, died and transferred animals alike. The one edit is the
+ * photo's DATE ("Change date", only when the parent passes onSetDate): uploads
+ * are dated by upload time, so old photos added in one go land out of order,
+ * and both the order and the molt grouping follow the date — there's no free
+ * drag-to-reorder on purpose. Grouping lives in lib/photoTimeline.ts (pure,
  * shared rules with the mobile + Herpetoverse copies). Lengths go through
  * lib/units — never a hardcoded unit.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useUnits } from '@/components/UnitsProvider'
 import { formatLength } from '@/lib/units'
 import { formatLocalDate } from '@/lib/date'
 import { formatStage, growthLengthLabel, stageSummary, tracksInstars } from '@/lib/inverts'
 import {
+  PHOTO_DATE_MIN,
   daysAfterLabel,
   groupPhotosByMolt,
+  localDateInput,
   markerFraction,
   markerLabel,
   periodLabel,
+  photoDateError,
+  takenAtFromLocalDate,
+  toLocalDateInput,
   type PhotoTimelineEntry,
 } from '@/lib/photoTimeline'
 
@@ -53,6 +61,7 @@ export default function PhotoTimeline({
   photos,
   molts,
   imageUrl,
+  onSetDate,
 }: {
   open: boolean
   onClose: () => void
@@ -64,6 +73,11 @@ export default function PhotoTimeline({
   molts: TimelineMoltRow[]
   /** Resolves a stored photo url (relative → API origin). */
   imageUrl: (url?: string | null) => string
+  /**
+   * PATCH the photo's taken_at and update the parent's list; throw an Error
+   * with a readable message on failure. Omit for viewers who can't edit.
+   */
+  onSetDate?: (photoId: string, takenAt: string | null) => Promise<void>
 }) {
   const { units } = useUnits()
   const timeline = useMemo(
@@ -91,6 +105,16 @@ export default function PhotoTimeline({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  // "Change date" editor for the current photo.
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [dateError, setDateError] = useState<string | null>(null)
+  const editingRef = useRef(false)
+  editingRef.current = editing
+  // After a save the photo moves; follow it to its new place.
+  const followId = useRef<string | null>(null)
+
   // Open on the newest photo; compare defaults to first vs latest.
   useEffect(() => {
     if (!open) return
@@ -98,15 +122,34 @@ export default function PhotoTimeline({
     setLeft(0)
     setRight(Math.max(0, n - 1))
     setCompare(false)
+    setEditing(false)
   }, [open, n])
 
-  // Dialog behaviour: focus in, Escape closes, ←/→ step, body scroll locked.
+  useEffect(() => {
+    if (!followId.current) return
+    const at = entries.findIndex((e) => e.photo.id === followId.current)
+    followId.current = null
+    if (at >= 0) setIdx(at)
+  }, [entries])
+
+  // Moving to another photo (or into compare) drops an unsaved edit.
+  useEffect(() => {
+    setEditing(false)
+    setDateError(null)
+  }, [idx, compare])
+
+  // Dialog behaviour: focus in, Escape closes (or cancels a date edit),
+  // ←/→ step, body scroll locked.
   useEffect(() => {
     if (!open) return
     const previous = document.activeElement as HTMLElement | null
     panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onCloseRef.current(); return }
+      if (e.key === 'Escape') {
+        if (editingRef.current) { setEditing(false); return }
+        onCloseRef.current()
+        return
+      }
       const tag = (e.target as HTMLElement | null)?.tagName
       // The range input and selects handle their own arrow keys.
       if (tag === 'INPUT' || tag === 'SELECT') return
@@ -143,6 +186,32 @@ export default function PhotoTimeline({
   const optionLabel = (e: Entry, i: number) => `${i + 1}. ${titleFor(e)} · ${metaFor(e)}`
 
   const current = entries[Math.min(idx, n - 1)]
+
+  const startEdit = () => {
+    setDraft(localDateInput(current.date) ?? toLocalDateInput(new Date()))
+    setDateError(null)
+    setEditing(true)
+  }
+  const saveDate = async (ev: FormEvent) => {
+    ev.preventDefault()
+    if (!onSetDate || saving) return
+    const problem = photoDateError(draft)
+    const takenAt = problem ? null : takenAtFromLocalDate(draft)
+    if (problem || !takenAt) { setDateError(problem ?? 'Enter a valid date.'); return }
+    setSaving(true)
+    setDateError(null)
+    try {
+      followId.current = current.photo.id
+      await onSetDate(current.photo.id, takenAt)
+      setEditing(false)
+    } catch (err) {
+      followId.current = null
+      setDateError(err instanceof Error && err.message ? err.message : 'Could not save the date.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Periods that have photos, for the jump chips.
   const periods: { moltNumber: number; first: number; count: number }[] = []
   entries.forEach((e, i) => {
@@ -256,6 +325,49 @@ export default function PhotoTimeline({
               </div>
               <EntryCaption title={titleFor(current)} meta={metaFor(current)} size={sizeFor(current)} caption={current.photo.caption} />
 
+              {onSetDate && (editing ? (
+                <form onSubmit={saveDate} className="mt-3 flex flex-wrap items-end gap-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Date taken
+                    <input
+                      type="date"
+                      value={draft}
+                      min={PHOTO_DATE_MIN}
+                      max={toLocalDateInput(new Date())}
+                      onChange={(e) => setDraft(e.target.value)}
+                      required
+                      autoFocus
+                      className="mt-1 block px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    {saving ? 'Saving…' : 'Save date'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  {dateError && (
+                    <p role="alert" className="w-full text-sm text-red-700 dark:text-red-400">{dateError}</p>
+                  )}
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  className="mt-2 text-sm font-medium text-primary-700 dark:text-primary-400 hover:underline"
+                >
+                  Change date
+                </button>
+              ))}
+
               {/* Slider. Native range input: drag, click and arrow keys for
                   free. Molt markers sit between the photo stops. */}
               <div className="mt-5 px-2">
@@ -324,6 +436,7 @@ export default function PhotoTimeline({
           )}
           <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
             Photos are dated by when they were added to the app.
+            {onSetDate ? ' One out of order? Use Change date to set the day it was taken and it moves into place.' : ''}
             {moltCount === 0 ? ' Log molts to see each photo placed between them.' : ''}
           </p>
         </div>

@@ -85,6 +85,7 @@ import {
   relativeDays,
   restLabel,
   setBrumation,
+  updatePhotoTakenAt,
 } from '@/lib/animals'
 import { CGD_BRANDS, DEFAULT_CGD_FOOD_TYPE } from '@/lib/cgd'
 import {
@@ -210,9 +211,20 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   const [qrOpen, setQrOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   // Photo timeline. The list comes from PhotoGallery (onPhotosChange), which
-  // already fetches it. Read-only, so it stays available for closed animals.
+  // already fetches it. Stays available for closed animals; its one edit is a
+  // photo's date, which goes back through the gallery (takenAtPatch) so the
+  // gallery remains the single source of the list.
   const [galleryPhotos, setGalleryPhotos] = useState<Photo[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [takenAtPatch, setTakenAtPatch] = useState<{ id: string; taken_at: string | null } | null>(null)
+  const setPhotoDate = useCallback(async (photoId: string, takenAt: string) => {
+    try {
+      const updated = await updatePhotoTakenAt(photoId, takenAt)
+      setTakenAtPatch({ id: photoId, taken_at: updated.taken_at })
+    } catch (err) {
+      throw new Error(err instanceof Error && err.message ? err.message : 'Could not save the date.')
+    }
+  }, [])
   // One shed or one weigh-in being shared as its own card.
   const [shareEvent, setShareEvent] = useState<{ kind: 'shed' | 'weight'; id: string } | null>(null)
 
@@ -476,6 +488,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           canUpload={access.canLog}
           canManage={access.canKeep && !access.closed}
           onPhotosChange={setGalleryPhotos}
+          takenAtPatch={takenAtPatch}
         />
       </section>
 
@@ -486,6 +499,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           animalName={animalTitle(animal)}
           photos={galleryPhotos}
           sheds={sheds}
+          onSetDate={access.canKeep ? setPhotoDate : undefined}
         />
       )}
 

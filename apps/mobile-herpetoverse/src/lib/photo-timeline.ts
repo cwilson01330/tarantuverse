@@ -170,3 +170,58 @@ export function markerFraction(beforeIndex: number, photoCount: number): number 
   if (beforeIndex >= photoCount) return 1
   return (beforeIndex - 0.5) / (photoCount - 1)
 }
+
+// ── Keeper-set photo dates (PATCH /photos/{id} { taken_at }) ─────────────────
+// Uploads are dated by upload time (EXIF is stripped), so a batch of old photos
+// lands out of order. Keepers fix it by setting the day each was taken — the
+// timeline's order AND molt grouping both follow the date, which is why there
+// is no free drag-to-reorder.
+
+/** Earliest day a keeper may set (the API refuses anything before it). */
+export const PHOTO_DATE_MIN = '1990-01-01'
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+/** Local YYYY-MM-DD for a Date. */
+export function toLocalDateInput(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** Local YYYY-MM-DD of an ISO date/datetime — where a date editor starts. Null if it doesn't parse. */
+export function localDateInput(value: string | null | undefined): string | null {
+  const d = parse(value)
+  return d ? toLocalDateInput(d) : null
+}
+
+/** A real local calendar day from YYYY-MM-DD, or null ("2026-02-31" is null, not March 3). */
+function parseDayStrict(ymd: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
+  if (!m) return null
+  const y = Number(m[1]), mo = Number(m[2]) - 1, day = Number(m[3])
+  const d = new Date(y, mo, day, 12, 0, 0)
+  if (d.getFullYear() !== y || d.getMonth() !== mo || d.getDate() !== day) return null
+  return d
+}
+
+/**
+ * Why a keeper-entered day can't be saved, or null when it's fine. Mirrors the
+ * API: a real date, not before 1990, not after today (local).
+ */
+export function photoDateError(ymd: string, today: Date = new Date()): string | null {
+  const d = parseDayStrict(ymd)
+  if (!d) return 'Enter a date like 2025-06-14.'
+  if (toLocalDateInput(d) < PHOTO_DATE_MIN) return "Photo date can't be before 1990."
+  if (toLocalDateInput(d) > toLocalDateInput(today)) return "Photo date can't be in the future."
+  return null
+}
+
+/**
+ * The taken_at to send for a keeper-chosen day: LOCAL NOON as an ISO string,
+ * so the calendar day survives any time zone. Null for an invalid day.
+ */
+export function takenAtFromLocalDate(ymd: string): string | null {
+  const d = parseDayStrict(ymd)
+  return d ? d.toISOString() : null
+}

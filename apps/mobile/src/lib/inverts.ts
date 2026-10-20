@@ -850,6 +850,11 @@ export async function setInvertMainPhoto(photoId: string): Promise<void> {
 export async function deleteInvertPhoto(photoId: string): Promise<void> {
   await apiClient.delete(`/photos/${photoId}`);
 }
+/** Set the day a photo was taken (photo timeline "Date taken"). Returns the saved taken_at. */
+export async function setPhotoTakenAt(photoId: string, takenAt: string | null): Promise<string | null> {
+  const { data } = await apiClient.patch<{ taken_at: string | null }>(`/photos/${photoId}`, { taken_at: takenAt });
+  return data.taken_at;
+}
 
 // ---------------------------------------------------------------------------
 // Display helpers

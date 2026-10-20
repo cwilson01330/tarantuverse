@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.photo import Photo
@@ -38,13 +38,37 @@ from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_l
 class PhotoUpdate(BaseModel):
     """Partial-update body for photos.
 
-    Only `caption` is mutable via this endpoint — the file, thumbnails, and
-    taken_at are immutable once uploaded. Clients should send the field they
-    want to change; unset fields are preserved.
+    `caption` and `taken_at` are mutable; the file and thumbnails are not.
+    Clients send only the fields they want to change; unset fields are
+    preserved.
     """
 
     # Empty string and `null` are both valid — both clear the caption.
     caption: Optional[str] = Field(default=None, max_length=500)
+    # When the photo was taken (2026-10-20). Uploads stamp the upload time and
+    # EXIF is stripped, so a batch of old photos lands out of order on the
+    # photo timeline; the keeper fixes it by setting the real day. Clients
+    # send local noon of the chosen day so the calendar day survives time
+    # zones. `null` = forget it (the timeline falls back to created_at).
+    taken_at: Optional[datetime] = None
+
+
+# Keeper-set photo dates: nothing before this, nothing after "now" plus this
+# much slack (local noon of today can sit up to ~a day ahead of UTC now).
+PHOTO_DATE_MIN = datetime(1990, 1, 1, tzinfo=timezone.utc)
+PHOTO_DATE_FUTURE_SLACK = timedelta(hours=36)
+
+
+def check_photo_taken_at(value: datetime) -> datetime:
+    """Normalise a keeper-set taken_at to aware UTC, or 400 if out of range."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    value = value.astimezone(timezone.utc)
+    if value < PHOTO_DATE_MIN:
+        raise HTTPException(status_code=400, detail="Photo date can't be before 1990.")
+    if value > datetime.now(timezone.utc) + PHOTO_DATE_FUTURE_SLACK:
+        raise HTTPException(status_code=400, detail="Photo date can't be in the future.")
+    return value
 
 logger = logging.getLogger(__name__)
 
@@ -936,10 +960,13 @@ async def update_photo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update a photo's editable metadata (currently: caption only).
+    """Update a photo's editable metadata: caption and/or taken_at.
 
-    Polymorphic — same endpoint handles every parent type. Access goes
-    through utils/access (owner, keeper, or the logger who uploaded it).
+    Polymorphic — same endpoint handles every parent type (TV inverts and
+    legacy parents, colonies, HV animals). Access goes through utils/access
+    (owner, keeper, or the logger who uploaded it). Like caption edits, a date
+    fix stays open on died/transferred animals — it corrects history, it
+    doesn't add to it.
     """
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
     _parent, access = load_log_parent(db, current_user, photo, "logger", not_found="Photo not found")
@@ -950,7 +977,14 @@ async def update_photo(
     # "sent as null" (we allow clearing the caption with null or "").
     updates = data.model_dump(exclude_unset=True)
 
+    # Validate before touching the row (400 with a plain message).
+    if updates.get("taken_at") is not None:
+        updates["taken_at"] = check_photo_taken_at(updates["taken_at"])
+
     try:
+        if "taken_at" in updates:
+            photo.taken_at = updates["taken_at"]
+
         if "caption" in updates:
             raw = updates["caption"]
             # Normalize empty string to None for consistent DB state.

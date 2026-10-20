@@ -675,8 +675,22 @@ export function deletePhoto(photoId: string): Promise<void> {
 }
 
 /**
- * Update a photo's editable metadata. Only caption is mutable
- * server-side right now; passing null or "" clears the caption.
+ * Set the day a photo was taken (photo timeline "Change date"). Uploads are
+ * dated by upload time; send local noon of the chosen day
+ * (lib/photoTimeline `takenAtFromLocalDate`). null forgets it.
+ */
+export function updatePhotoTakenAt(
+  photoId: string,
+  takenAt: string | null,
+): Promise<Photo> {
+  return apiFetch<Photo>(`/api/v1/photos/${encodeURIComponent(photoId)}`, {
+    method: 'PATCH',
+    json: { taken_at: takenAt },
+  })
+}
+
+/**
+ * Update a photo's caption; passing null or "" clears it.
  */
 export function updatePhotoCaption(
   photoId: string,

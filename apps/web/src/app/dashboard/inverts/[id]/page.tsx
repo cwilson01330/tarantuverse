@@ -535,6 +535,23 @@ export default function InvertDetailPage() {
     } catch { alert('Could not set hero photo.') }
   }
 
+  // Photo timeline "Change date": the keeper sets the day a photo was taken
+  // (uploads are dated by upload time). Throws with the API's message.
+  const setPhotoDate = async (photoId: string, takenAt: string | null) => {
+    if (!token) throw new Error('Not signed in')
+    const res = await fetch(`${API_URL}/api/v1/photos/${photoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ taken_at: takenAt }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      throw new Error(typeof body?.detail === 'string' ? body.detail : 'Could not save the date.')
+    }
+    const updated: Photo = await res.json()
+    setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, taken_at: updated.taken_at } : p)))
+  }
+
   const deletePhoto = async (photoId: string) => {
     if (!token) return
     if (!confirm('Delete this photo? This cannot be undone.')) return
@@ -1214,6 +1231,7 @@ export default function InvertDetailPage() {
           photos={photos}
           molts={molts}
           imageUrl={getImageUrl}
+          onSetDate={canKeep ? setPhotoDate : undefined}
         />
       )}
 

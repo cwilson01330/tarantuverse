@@ -6,9 +6,14 @@
  * compare (first vs latest by default). Tarantuverse mobile has the molt
  * version (apps/mobile/src/components/PhotoTimeline.tsx) — keep them alike.
  *
- * Read-only, so it opens for living, died and transferred animals alike.
- * OTA-safe: core RN only (Modal, FlatList paging, PanResponder) — no
- * gesture-handler / reanimated / slider package. Grouping rules live in
+ * Opens for living, died and transferred animals alike. The one edit is the
+ * photo's DATE (when the parent passes onSetDate): uploads are dated by upload
+ * time, so old photos added in one go land out of order; setting the day it
+ * was taken fixes both the order and the shed grouping (no free drag-reorder
+ * on purpose — the shed labels follow the date). HV dates are typed
+ * YYYY-MM-DD like the rest of HV's forms (FormPrimitives).
+ * OTA-safe: core RN only (Modal, FlatList paging, PanResponder, TextInput) —
+ * no gesture-handler / reanimated / slider / date-picker package. Grouping rules live in
  * src/lib/photo-timeline.ts (pure + tested); lengths go through
  * src/lib/units, never a hardcoded unit.
  */
@@ -16,8 +21,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,12 +44,17 @@ import type { ShedLog } from '../lib/animals';
 import {
   daysAfterLabel,
   groupPhotosByMolt,
+  localDateInput,
   markerFraction,
   markerLabel,
   periodLabel,
+  photoDateError,
+  takenAtFromLocalDate,
+  toLocalDateInput,
   type PhotoTimelineEntry,
   type PhotoTimelineMarker,
 } from '../lib/photo-timeline';
+import { ThemedInput } from './forms/FormPrimitives';
 import { TYPE } from '../theme/type';
 
 /** Mirrors useTheme().layout.spacing (static here for StyleSheet.create). */
@@ -66,12 +78,18 @@ export default function PhotoTimeline({
   animalName,
   photos,
   sheds,
+  onSetDate,
 }: {
   visible: boolean;
   onClose: () => void;
   animalName: string;
   photos: Photo[];
   sheds: ShedLog[];
+  /**
+   * PATCH the photo's taken_at and update the parent's list; throw an Error
+   * with a readable message on failure. Omit for viewers who can't edit.
+   */
+  onSetDate?: (photoId: string, takenAt: string) => Promise<void>;
 }) {
   const { colors, layout } = useTheme();
   const { units } = useUnits();
@@ -107,6 +125,45 @@ export default function PhotoTimeline({
     listRef.current?.scrollToIndex({ index: next, animated: false });
   };
 
+  // "Change date" editor. After a save the photo moves; follow it.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+  const followId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!followId.current) return;
+    const at = entries.findIndex((e) => e.photo.id === followId.current);
+    followId.current = null;
+    if (at < 0) return;
+    setIdx(at);
+    // Let the pager lay out the re-ordered data first.
+    requestAnimationFrame(() => listRef.current?.scrollToIndex({ index: at, animated: false }));
+  }, [entries]);
+  useEffect(() => {
+    setEditing(false);
+    setDateError(null);
+  }, [idx, compare]);
+
+  const saveDate = async (photoId: string) => {
+    if (!onSetDate || saving) return;
+    const problem = photoDateError(draft);
+    const takenAt = problem ? null : takenAtFromLocalDate(draft);
+    if (problem || !takenAt) { setDateError(problem ?? 'Enter a valid date.'); return; }
+    setSaving(true);
+    setDateError(null);
+    followId.current = photoId;
+    try {
+      await onSetDate(photoId, takenAt);
+      setEditing(false);
+    } catch (err) {
+      followId.current = null;
+      setDateError(err instanceof Error && err.message ? err.message : 'Could not save the date.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (n === 0) return null;
 
   const titleFor = (e: Entry) => periodLabel(e.moltNumber, moltCount, NOUN) ?? 'Photo';
@@ -128,7 +185,7 @@ export default function PhotoTimeline({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
-      <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.sm }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.sm }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <View style={styles.headerText}>
@@ -204,6 +261,57 @@ export default function PhotoTimeline({
               <Text style={[TYPE.body, { color: colors.textSecondary }]}>{metaFor(current)}</Text>
               {sizeFor(current) ? <Text style={[TYPE.body, { color: colors.textSecondary }]}>{sizeFor(current)}</Text> : null}
               {current.photo.caption ? <Text style={[TYPE.body, { color: colors.textTertiary, fontStyle: 'italic' }]} numberOfLines={2}>{current.photo.caption}</Text> : null}
+              {onSetDate && !editing ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setDraft(localDateInput(current.date) ?? toLocalDateInput(new Date()));
+                    setDateError(null);
+                    setEditing(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change the date this photo was taken"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.changeDate}
+                >
+                  <Text style={[TYPE.label, { color: colors.primary }]}>Change date</Text>
+                </TouchableOpacity>
+              ) : null}
+              {onSetDate && editing ? (
+                <View style={styles.dateRow}>
+                  <ThemedInput
+                    value={draft}
+                    onChangeText={setDraft}
+                    placeholder="YYYY-MM-DD"
+                    autoFocus
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    keyboardType="numbers-and-punctuation"
+                    returnKeyType="done"
+                    onSubmitEditing={() => saveDate(current.photo.id)}
+                    accessibilityLabel="Date taken, year-month-day"
+                    style={styles.dateInput}
+                  />
+                  <TouchableOpacity
+                    onPress={() => saveDate(current.photo.id)}
+                    disabled={saving}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: saving, busy: saving }}
+                    style={[styles.pill, { borderRadius: layout.radius.xl, borderColor: colors.primary, backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
+                  >
+                    <Text style={[TYPE.label, { color: colors.background }]}>{saving ? 'Saving…' : 'Save'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { setEditing(false); setDateError(null); }}
+                    accessibilityRole="button"
+                    style={[styles.pill, { borderRadius: layout.radius.xl, borderColor: colors.border, backgroundColor: colors.surface }]}
+                  >
+                    <Text style={[TYPE.label, { color: colors.textPrimary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              {dateError ? (
+                <Text style={[TYPE.caption, { color: colors.danger }]} accessibilityLiveRegion="polite">{dateError}</Text>
+              ) : null}
             </View>
 
             {n > 1 && (
@@ -247,9 +355,11 @@ export default function PhotoTimeline({
         )}
 
         <Text style={[TYPE.caption, styles.note, { color: colors.textTertiary }]}>
-          Photos are dated by when they were added to the app.{moltCount === 0 ? ' Log sheds to see each photo placed between them.' : ''}
+          Photos are dated by when they were added to the app.
+          {onSetDate ? ' One out of order? Use Change date to set the day it was taken and it moves into place.' : ''}
+          {moltCount === 0 ? ' Log sheds to see each photo placed between them.' : ''}
         </Text>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -403,6 +513,9 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%' },
   counter: { position: 'absolute', top: SPACING.sm, right: SPACING.sm, paddingHorizontal: SPACING.sm, paddingVertical: 2 },
   captionBox: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, gap: 2 },
+  changeDate: { alignSelf: 'flex-start', marginTop: SPACING.xs, paddingVertical: SPACING.xs },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.sm },
+  dateInput: { flex: 1, minWidth: 0 },
   scrubWrap: { paddingHorizontal: SPACING.xl, marginTop: SPACING.md },
   markerRow: { height: 22 },
   marker: { position: 'absolute', top: 0, width: 60, alignItems: 'center' },

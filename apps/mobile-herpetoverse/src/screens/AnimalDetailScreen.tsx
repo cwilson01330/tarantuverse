@@ -76,7 +76,8 @@ import {
   listSheds,
   listWeightLogs,
 } from '../lib/animals';
-import { type Photo, listPhotos } from '../lib/photos';
+import { type Photo, listPhotos, updatePhotoTakenAt } from '../lib/photos';
+import { extractErrorMessage } from '../components/forms/FormPrimitives';
 import { type AnimalEvent, eventTitle, listAnimalEvents } from '../lib/animal-events';
 import { useAuth } from '../contexts/AuthContext';
 import { TYPE } from '../theme/type';
@@ -142,6 +143,17 @@ export function AnimalDetailScreen() {
     (e: { logged_by_user_id?: string | null }) => !closed && canChangeEntry(role, user?.id, e),
     [role, user?.id, closed],
   );
+  // Photo timeline "Change date": uploads are dated by upload time, so the
+  // keeper sets the real day and the photo moves into place. Open on closed
+  // animals too — it corrects history rather than adding to it.
+  const setPhotoDate = useCallback(async (photoId: string, takenAt: string) => {
+    try {
+      const updated = await updatePhotoTakenAt(photoId, takenAt);
+      setPhotos((prev) => prev && prev.map((p) => (p.id === photoId ? { ...p, taken_at: updated.taken_at } : p)));
+    } catch (err) {
+      throw new Error(extractErrorMessage(err, 'Could not save the date.'));
+    }
+  }, []);
   const [deleting, setDeleting] = useState(false);
   // Delete for a closed record — Edit, where Delete normally lives, isn't
   // offered for those. Counts the breeding records that go with it first.
@@ -427,6 +439,7 @@ export function AnimalDetailScreen() {
             animalName={animalTitle(animal)}
             photos={photos}
             sheds={sheds}
+            onSetDate={canKeep ? setPhotoDate : undefined}
           />
         ) : null}
 

@@ -105,6 +105,22 @@ export async function updatePhotoCaption(
   return data;
 }
 
+/**
+ * Set the day a photo was taken (photo timeline "Change date"). Uploads are
+ * dated by upload time; send local noon of the chosen day
+ * (lib/photo-timeline `takenAtFromLocalDate`). null forgets it.
+ */
+export async function updatePhotoTakenAt(
+  photoId: string,
+  takenAt: string | null,
+): Promise<Photo> {
+  const { data } = await apiClient.patch<Photo>(
+    `/photos/${encodeURIComponent(photoId)}`,
+    { taken_at: takenAt },
+  );
+  return data;
+}
+
 export async function setMainPhoto(photoId: string): Promise<void> {
   await apiClient.patch(`/photos/${encodeURIComponent(photoId)}/set-main`);
 }

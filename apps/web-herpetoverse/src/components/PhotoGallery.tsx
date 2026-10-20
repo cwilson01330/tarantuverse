@@ -91,6 +91,7 @@ export default function PhotoGallery({
   canUpload = true,
   canManage = true,
   onPhotosChange,
+  takenAtPatch,
 }: {
   /** Animal id — used for the animal-scoped list/upload endpoints. */
   animalId: string
@@ -106,6 +107,9 @@ export default function PhotoGallery({
   /** Told the current photo list whenever it changes (the photo timeline
    *  reads it, so the page doesn't fetch the same list twice). */
   onPhotosChange?: (photos: Photo[]) => void
+  /** A photo date the page just saved (photo timeline "Change date"). Merged
+   *  into this list so the gallery stays the one source of the photos. */
+  takenAtPatch?: { id: string; taken_at: string | null } | null
 }) {
   const [photos, setPhotos] = useState<Photo[]>([])
   const onPhotosChangeRef = useRef(onPhotosChange)
@@ -113,6 +117,10 @@ export default function PhotoGallery({
   useEffect(() => {
     onPhotosChangeRef.current?.(photos)
   }, [photos])
+  useEffect(() => {
+    if (!takenAtPatch) return
+    setPhotos((prev) => prev.map((p) => (p.id === takenAtPatch.id ? { ...p, taken_at: takenAtPatch.taken_at } : p)))
+  }, [takenAtPatch])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 

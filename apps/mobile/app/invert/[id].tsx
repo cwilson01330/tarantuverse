@@ -22,7 +22,7 @@ import {
   INVERT_TAXA, deleteInvert, getInvert, invertDisplayName,
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
-  setInvertMainPhoto, deleteInvertPhoto, getInvertGrowth, listInvertPairings,
+  setInvertMainPhoto, deleteInvertPhoto, setPhotoTakenAt, getInvertGrowth, listInvertPairings,
   reviveInvert, listInvertEvents, deleteAnimalEvent, ANIMAL_EVENT_LABELS,
   type AnimalEvent,
   createInvertTransfer, createInvertFeeding, getInvertFeedingStats,
@@ -318,6 +318,17 @@ function InvertDetailScreen() {
         confirmDeleteLog('photo', () => deleteInvertPhoto(photo.id));
       } },
     ]);
+  };
+
+  // Photo timeline "Date taken": uploads are dated by upload time, so the
+  // keeper sets the real day and the photo moves into place.
+  const handleSetPhotoDate = async (photoId: string, takenAt: string) => {
+    try {
+      const saved = await setPhotoTakenAt(photoId, takenAt);
+      setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, taken_at: saved } : p)));
+    } catch (err) {
+      throw new Error(getErrorMessage(err, 'Could not save the date.'));
+    }
   };
 
   const styles = makeStyles(colors);
@@ -1493,6 +1504,7 @@ function InvertDetailScreen() {
           currentInstar={invert.current_instar}
           photos={photos}
           molts={molts}
+          onSetDate={canKeep ? handleSetPhotoDate : undefined}
         />
       )}
 

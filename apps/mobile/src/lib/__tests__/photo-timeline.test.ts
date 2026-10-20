@@ -11,6 +11,11 @@ import {
   markerLabel,
   periodLabel,
   photoDate,
+  PHOTO_DATE_MIN,
+  localDateInput,
+  photoDateError,
+  takenAtFromLocalDate,
+  toLocalDateInput,
 } from '../photo-timeline';
 
 const photo = (id: string, created_at: string, taken_at: string | null = null) => ({ id, created_at, taken_at });
@@ -111,5 +116,52 @@ describe('labels', () => {
   it('counts calendar days', () => {
     expect(calendarDaysBetween('2026-03-07', '2026-03-09T23:59:00')).toBe(2);
     expect(calendarDaysBetween('2026-03-07', 'nope')).toBeNull();
+  });
+});
+
+describe('keeper-set photo dates', () => {
+  const today = new Date(2026, 9, 20, 9, 0, 0); // Oct 20 2026, local
+
+  it('reads a stored date back as a local day', () => {
+    expect(localDateInput('2026-03-07T12:00:00')).toBe('2026-03-07');
+    expect(localDateInput('2026-03-07')).toBe('2026-03-07');
+    expect(localDateInput(null)).toBeNull();
+    expect(localDateInput('nope')).toBeNull();
+    expect(toLocalDateInput(new Date(2025, 0, 5))).toBe('2025-01-05');
+  });
+
+  it('sends local noon, so the chosen day survives a round trip', () => {
+    const iso = takenAtFromLocalDate('2024-06-14');
+    expect(iso).not.toBeNull();
+    const back = new Date(iso as string);
+    expect([back.getFullYear(), back.getMonth(), back.getDate(), back.getHours()]).toEqual([2024, 5, 14, 12]);
+    expect(localDateInput(iso)).toBe('2024-06-14');
+    expect(takenAtFromLocalDate(' 2024-06-14 ')).toBe(iso);
+  });
+
+  it('refuses days that do not exist', () => {
+    expect(takenAtFromLocalDate('2026-02-31')).toBeNull();
+    expect(takenAtFromLocalDate('2026-13-01')).toBeNull();
+    expect(takenAtFromLocalDate('June 14')).toBeNull();
+    expect(photoDateError('2026-02-31', today)).toMatch(/like/);
+    expect(photoDateError('', today)).toMatch(/like/);
+  });
+
+  it('matches the API range: 1990 through today', () => {
+    expect(photoDateError('1989-12-31', today)).toMatch(/1990/);
+    expect(photoDateError(PHOTO_DATE_MIN, today)).toBeNull();
+    expect(photoDateError('2026-10-20', today)).toBeNull();
+    expect(photoDateError('2026-10-21', today)).toMatch(/future/);
+  });
+
+  it('a corrected date re-orders the timeline and moves the photo into the right molt period', () => {
+    const molts = [{ id: 'm1', at: '2026-03-01T08:00:00' }];
+    const uploaded = [photo('old', '2026-10-20T10:00:00'), photo('new', '2026-10-19T10:00:00')];
+    const before = groupPhotosByMolt(uploaded, molts);
+    expect(before.entries.map((e) => [e.photo.id, e.moltNumber])).toEqual([['new', 1], ['old', 1]]);
+    const fixed = [{ ...uploaded[0], taken_at: takenAtFromLocalDate('2026-01-15') }, uploaded[1]];
+    const after = groupPhotosByMolt(fixed, molts);
+    expect(after.entries.map((e) => [e.photo.id, e.moltNumber])).toEqual([['old', 0], ['new', 1]]);
+    expect(after.markers).toEqual([{ beforeIndex: 1, molts: [{ id: 'm1', number: 1, at: '2026-03-01T08:00:00' }] }]);
   });
 });
