@@ -4,6 +4,7 @@ Analytics routes for collection-wide statistics and insights
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct, extract
@@ -21,6 +22,8 @@ from app.schemas.analytics import (
     MoltHeatmapEntry,
     CollectionGrowthEntry,
     SpeciesDistEntry,
+    FeedingCostUpdate,
+    FeedingCostResponse,
 )
 from app.utils.dependencies import get_current_user
 from app.utils.access import policy
@@ -399,6 +402,18 @@ async def get_collection_analytics(
 # fallback (one item per animal per week) would invent a bill for them.
 NO_PREY_TAXA = {"millipede", "isopod", "roach"}
 
+# Used when a keeper hasn't set their own cost per feeding (users.
+# feeding_cost_per_meal). It was the only figure until 2026-10-22.
+DEFAULT_COST_PER_FEEDING = 0.50
+
+
+def keeper_cost_per_feeding(user) -> tuple:
+    """(cost per feeding, is_default) for this keeper."""
+    raw = getattr(user, "feeding_cost_per_meal", None)
+    if raw is None:
+        return DEFAULT_COST_PER_FEEDING, True
+    return round(float(raw), 2), False
+
 
 def _sex_value(sex) -> str:
     v = getattr(sex, "value", sex)
@@ -451,7 +466,10 @@ async def get_advanced_analytics(
     total_count = len(animals)
 
     if not owned:
+        empty_cost, empty_is_default = keeper_cost_per_feeding(current_user)
         return AdvancedAnalyticsResponse(
+            cost_per_feeding=empty_cost,
+            cost_per_feeding_is_default=empty_is_default,
             collection_value_total=0.0,
             collection_value_average=0.0,
             most_expensive_name=None,
@@ -540,13 +558,15 @@ async def get_advanced_analytics(
         .scalar()
         or 0
     )
-    # Estimate: $0.50 per feeding in the last 30 days; with no recent
-    # feedings, one prey item per predator per week.
+    # Estimate: the keeper's cost per feeding (default 0.50) times the
+    # feedings in the last 30 days; with no recent feedings, one prey item
+    # per predator per week.
+    cost_per_feeding, cost_is_default = keeper_cost_per_feeding(current_user)
     if recent_feedings > 0:
-        estimated_monthly_feeding_cost = float(recent_feedings * 0.50)
+        estimated_monthly_feeding_cost = float(recent_feedings * cost_per_feeding)
     else:
         predators = sum(1 for a in animals if a.taxon not in NO_PREY_TAXA)
-        estimated_monthly_feeding_cost = float(predators * 4 * 0.50)
+        estimated_monthly_feeding_cost = float(predators * 4 * cost_per_feeding)
 
     total_molts = (
         db.query(func.count(MoltLog.id)).filter(_owned_log_clause(MoltLog, ids)).scalar() or 0
@@ -568,4 +588,30 @@ async def get_advanced_analytics(
         total_feedings_logged=total_feedings,
         total_molts_logged=total_molts,
         estimated_monthly_feeding_cost=round(estimated_monthly_feeding_cost, 2),
+        cost_per_feeding=cost_per_feeding,
+        cost_per_feeding_is_default=cost_is_default,
     )
+
+
+@router.put("/feeding-cost/", response_model=FeedingCostResponse)
+@policy("owner_only")
+async def set_feeding_cost(
+    payload: FeedingCostUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set what one feeding costs this keeper (2026-10-22).
+
+    Drives the advanced-analytics "Est. Monthly Feeding Cost". A plain number
+    in the keeper's own currency, 0–1000, rounded to cents. `null` goes back
+    to the default. Not premium-gated: it only stores a preference, and the
+    card that reads it is.
+    """
+    value = payload.cost_per_feeding
+    current_user.feeding_cost_per_meal = (
+        None if value is None else Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    )
+    db.commit()
+    db.refresh(current_user)
+    cost, is_default = keeper_cost_per_feeding(current_user)
+    return FeedingCostResponse(cost_per_feeding=cost, is_default=is_default)

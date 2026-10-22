@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import { isPaymentRequired } from '../../src/utils/errors';
 import { INVERT_TAXA, isInvertTaxon } from '../../src/lib/inverts';
+import { SPACING, TYPE } from '../../src/theme/tokens';
 
 interface MoltHeatmapEntry {
   month: string;
@@ -55,6 +57,10 @@ interface AdvancedAnalytics {
   total_feedings_logged: number;
   total_molts_logged: number;
   estimated_monthly_feeding_cost: number;
+  /** The keeper's cost per feeding behind the estimate (2026-10-22); absent
+   *  from older API deploys, which always used 0.50. */
+  cost_per_feeding?: number;
+  cost_per_feeding_is_default?: boolean;
 }
 
 const SEX_COLORS: { [key: string]: string } = {
@@ -87,6 +93,37 @@ export default function AdvancedAnalyticsScreen() {
   useEffect(() => {
     fetchAdvancedAnalytics();
   }, []);
+
+  // Cost per feeding (2026-10-22). It was a fixed $0.50; keepers set their
+  // own. Saving refreshes the numbers without the full-screen spinner.
+  const [editingCost, setEditingCost] = useState(false);
+  const [costDraft, setCostDraft] = useState('');
+  const [savingCost, setSavingCost] = useState(false);
+  const [costError, setCostError] = useState<string | null>(null);
+
+  const saveFeedingCost = async (value: number | null) => {
+    setSavingCost(true);
+    setCostError(null);
+    try {
+      await apiClient.put('/analytics/feeding-cost/', { cost_per_feeding: value });
+      const response = await apiClient.get('/analytics/advanced/');
+      setAnalytics(response.data);
+      setEditingCost(false);
+    } catch {
+      setCostError("Couldn't save that. Try again.");
+    } finally {
+      setSavingCost(false);
+    }
+  };
+
+  const submitFeedingCost = () => {
+    const n = Number(costDraft.replace(',', '.').replace(/[^0-9.]/g, ''));
+    if (costDraft.trim() === '' || !Number.isFinite(n) || n < 0 || n > 1000) {
+      setCostError('Enter an amount from 0 to 1000.');
+      return;
+    }
+    saveFeedingCost(Math.round(n * 100) / 100);
+  };
 
   const fetchAdvancedAnalytics = async () => {
     try {
@@ -696,9 +733,101 @@ export default function AdvancedAnalyticsScreen() {
           >
             ${analytics.estimated_monthly_feeding_cost.toFixed(2)}
           </Text>
-          <Text style={{ fontSize: 12, color: colors.textTertiary }}>
-            At $0.50 per feeding
-          </Text>
+          {editingCost ? (
+            <View style={{ gap: SPACING.sm, marginTop: SPACING.xs }}>
+              <Text style={[TYPE.label, { color: colors.textSecondary }]}>Cost per feeding</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+                <Text style={[TYPE.body, { color: colors.textSecondary }]}>$</Text>
+                <TextInput
+                  value={costDraft}
+                  onChangeText={setCostDraft}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={submitFeedingCost}
+                  accessibilityLabel="Cost per feeding"
+                  style={[
+                    TYPE.body,
+                    {
+                      minWidth: 96,
+                      paddingHorizontal: SPACING.md,
+                      paddingVertical: SPACING.sm,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: layout.radius.sm,
+                      color: colors.textPrimary,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                What one meal costs you on average. 0 if you breed your own feeders.
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm }}>
+                <TouchableOpacity
+                  onPress={submitFeedingCost}
+                  disabled={savingCost}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: savingCost, busy: savingCost }}
+                  style={{
+                    paddingHorizontal: SPACING.lg,
+                    paddingVertical: SPACING.sm,
+                    borderRadius: layout.radius.sm,
+                    backgroundColor: colors.primary,
+                    opacity: savingCost ? 0.6 : 1,
+                  }}
+                >
+                  <Text style={[TYPE.bodyStrong, { color: colors.surface }]}>{savingCost ? 'Saving…' : 'Save'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { setEditingCost(false); setCostError(null); }}
+                  accessibilityRole="button"
+                  style={{
+                    paddingHorizontal: SPACING.lg,
+                    paddingVertical: SPACING.sm,
+                    borderRadius: layout.radius.sm,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>Cancel</Text>
+                </TouchableOpacity>
+                {analytics.cost_per_feeding_is_default === false && (
+                  <TouchableOpacity
+                    onPress={() => saveFeedingCost(null)}
+                    disabled={savingCost}
+                    accessibilityRole="button"
+                    style={{ paddingHorizontal: SPACING.sm, paddingVertical: SPACING.sm }}
+                  >
+                    <Text style={[TYPE.body, { color: colors.textSecondary }]}>Use default ($0.50)</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {costError ? (
+                <Text style={[TYPE.caption, { color: colors.error }]} accessibilityLiveRegion="polite">{costError}</Text>
+              ) : null}
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SPACING.sm }}>
+              <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                At ${(analytics.cost_per_feeding ?? 0.5).toFixed(2)} per feeding
+                {analytics.cost_per_feeding_is_default !== false ? ' (default)' : ''}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCostDraft((analytics.cost_per_feeding ?? 0.5).toFixed(2));
+                  setCostError(null);
+                  setEditingCost(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Change cost per feeding"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[TYPE.caption, { color: colors.primary, fontWeight: '600' }]}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <View style={{ height: 32 }} />

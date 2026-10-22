@@ -3,7 +3,7 @@ Schemas for analytics and collection statistics
 """
 from typing import List, Optional, Dict, Any
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SpeciesCount(BaseModel):
@@ -67,6 +67,16 @@ class SpeciesDistEntry(BaseModel):
     count: int
 
 
+class FeedingCostUpdate(BaseModel):
+    """Keeper's cost per feeding. null = go back to the default."""
+    cost_per_feeding: Optional[float] = Field(default=None, ge=0, le=1000)
+
+
+class FeedingCostResponse(BaseModel):
+    cost_per_feeding: float
+    is_default: bool
+
+
 class AdvancedAnalyticsResponse(BaseModel):
     """Premium advanced analytics response"""
     # Collection value
@@ -92,6 +102,10 @@ class AdvancedAnalyticsResponse(BaseModel):
     total_feedings_logged: int
     total_molts_logged: int
     estimated_monthly_feeding_cost: float
+    # The per-feeding figure behind that estimate (2026-10-22): the keeper's
+    # own when set, else the 0.50 default. Defaults keep older callers valid.
+    cost_per_feeding: float = 0.50
+    cost_per_feeding_is_default: bool = True
 
     class Config:
         from_attributes = True

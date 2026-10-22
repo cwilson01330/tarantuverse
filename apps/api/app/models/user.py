@@ -1,7 +1,7 @@
 """
 User model
 """
-from sqlalchemy import CheckConstraint, Column, String, Boolean, DateTime, Text, Integer, ForeignKey
+from sqlalchemy import CheckConstraint, Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -38,6 +38,10 @@ class User(Base):
         CheckConstraint(
             "measurement_units IS NULL OR measurement_units IN ('imperial', 'metric')",
             name="users_measurement_units_check",
+        ),
+        CheckConstraint(
+            "feeding_cost_per_meal IS NULL OR (feeding_cost_per_meal >= 0 AND feeding_cost_per_meal <= 1000)",
+            name="users_feeding_cost_per_meal_check",
         ),
     )
 
@@ -110,6 +114,12 @@ class User(Base):
     # Display only -- storage stays inches / mm / °F / grams whatever this is
     # (see utils/units.py). Migration unt_20261008_measurement_units.
     measurement_units = Column(String(10), nullable=True)
+
+    # What one feeding costs this keeper, for the advanced-analytics monthly
+    # estimate. NULL = never set -> DEFAULT_COST_PER_FEEDING (routers/
+    # analytics.py). Plain number in the keeper's own currency; the app
+    # doesn't convert money. Migration fcm_20261022_feeding_cost.
+    feeding_cost_per_meal = Column(Numeric(7, 2), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

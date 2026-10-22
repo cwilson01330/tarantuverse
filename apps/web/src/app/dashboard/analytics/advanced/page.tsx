@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +61,10 @@ interface AdvancedAnalytics {
   total_feedings_logged: number;
   total_molts_logged: number;
   estimated_monthly_feeding_cost: number;
+  /** The keeper's cost per feeding behind the estimate (2026-10-22); absent
+   *  from older API deploys, which always used 0.50. */
+  cost_per_feeding?: number;
+  cost_per_feeding_is_default?: boolean;
 }
 
 const COLORS = [
@@ -128,6 +132,38 @@ export default function AdvancedAnalyticsPage() {
   useEffect(() => {
     fetchAdvancedAnalytics();
   }, [fetchAdvancedAnalytics]);
+
+  // Cost per feeding (2026-10-22). It was a fixed $0.50; keepers set their
+  // own. Saving refreshes the numbers without the full-page spinner.
+  const [editingCost, setEditingCost] = useState(false);
+  const [costDraft, setCostDraft] = useState("");
+  const [savingCost, setSavingCost] = useState(false);
+  const [costError, setCostError] = useState<string | null>(null);
+
+  const saveFeedingCost = async (value: number | null) => {
+    setSavingCost(true);
+    setCostError(null);
+    try {
+      await apiClient.put("/api/v1/analytics/feeding-cost/", { cost_per_feeding: value });
+      const response = await apiClient.get("/api/v1/analytics/advanced/");
+      setAnalytics(response.data);
+      setEditingCost(false);
+    } catch {
+      setCostError("Couldn't save that. Try again.");
+    } finally {
+      setSavingCost(false);
+    }
+  };
+
+  const submitFeedingCost = (e: FormEvent) => {
+    e.preventDefault();
+    const n = Number(costDraft.replace(",", ".").replace(/[^0-9.]/g, ""));
+    if (costDraft.trim() === "" || !Number.isFinite(n) || n < 0 || n > 1000) {
+      setCostError("Enter an amount from 0 to 1000.");
+      return;
+    }
+    saveFeedingCost(Math.round(n * 100) / 100);
+  };
 
   if (loading) {
     return (
@@ -368,9 +404,74 @@ export default function AdvancedAnalyticsPage() {
               <p className="text-3xl font-bold text-gray-900 dark:text-white">
                 ${analytics.estimated_monthly_feeding_cost.toFixed(2)}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                At $0.50 per feeding
-              </p>
+              {editingCost ? (
+                <form onSubmit={submitFeedingCost} className="mt-2 space-y-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Cost per feeding
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-gray-500 dark:text-gray-400">$</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={costDraft}
+                        onChange={(e) => setCostDraft(e.target.value)}
+                        autoFocus
+                        aria-describedby="feeding-cost-help"
+                        className="w-24 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                      />
+                    </div>
+                  </label>
+                  <p id="feeding-cost-help" className="text-xs text-gray-500 dark:text-gray-400">
+                    What one meal costs you on average. 0 if you breed your own feeders.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      disabled={savingCost}
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60"
+                    >
+                      {savingCost ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingCost(false); setCostError(null); }}
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    {analytics.cost_per_feeding_is_default === false && (
+                      <button
+                        type="button"
+                        disabled={savingCost}
+                        onClick={() => saveFeedingCost(null)}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:underline"
+                      >
+                        Use default ($0.50)
+                      </button>
+                    )}
+                  </div>
+                  {costError && (
+                    <p role="alert" className="text-sm text-red-700 dark:text-red-400">{costError}</p>
+                  )}
+                </form>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  At ${(analytics.cost_per_feeding ?? 0.5).toFixed(2)} per feeding
+                  {analytics.cost_per_feeding_is_default !== false ? " (default)" : ""}
+                  {" · "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCostDraft((analytics.cost_per_feeding ?? 0.5).toFixed(2));
+                      setCostError(null);
+                      setEditingCost(true);
+                    }}
+                    className="font-medium text-primary-700 dark:text-primary-400 hover:underline"
+                  >
+                    Change
+                  </button>
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
