@@ -43,18 +43,20 @@ export default function WhatsNewCard() {
     router.push(route as never);
   };
 
+  // Same layout as Herpetoverse's card: title row with only the close button,
+  // entries separated by dividers, and "See all" as its own full-width row at
+  // the bottom so it can't get lost next to the close button.
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
+        <MaterialCommunityIcons
+          name="creation"
+          size={20}
+          color={colors.primary}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
         <AppText variant="heading" accessibilityRole="header" style={styles.heading}>What's new</AppText>
-        <TouchableOpacity
-          onPress={() => router.push('/whats-new' as never)}
-          style={styles.hit}
-          accessibilityRole="button"
-          accessibilityLabel="See all what's new"
-        >
-          <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>See all</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           onPress={dismiss}
           style={styles.hit}
@@ -64,16 +66,37 @@ export default function WhatsNewCard() {
           <MaterialCommunityIcons name="close" size={22} color={colors.textTertiary} />
         </TouchableOpacity>
       </View>
-      {entries.map((entry) => (
-        <WhatsNewEntryView key={entry.id} entry={entry} onAction={act} />
+      {entries.map((entry, i) => (
+        <View key={entry.id}>
+          {i > 0 ? <View style={[styles.divider, { backgroundColor: colors.border }]} /> : null}
+          <WhatsNewEntryView entry={entry} onAction={act} />
+        </View>
       ))}
+      <TouchableOpacity
+        onPress={() => router.push('/whats-new' as never)}
+        style={[styles.seeAll, { borderTopColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="See all what's new"
+      >
+        <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>See all</Text>
+        <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
+      </TouchableOpacity>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
   card: { marginHorizontal: SPACING.lg, marginTop: SPACING.md, gap: SPACING.md },
-  header: { flexDirection: 'row', alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   heading: { flex: 1 },
-  hit: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.xs },
+  hit: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
+  divider: { height: StyleSheet.hairlineWidth, marginBottom: SPACING.md },
+  seeAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    minHeight: 44,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
 });
