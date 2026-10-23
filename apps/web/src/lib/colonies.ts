@@ -234,8 +234,13 @@ function authHeaders(token: string, json = false): HeadersInit {
 export async function listColonies(
   token: string,
   includeInactive = false,
+  /** Owner's user id when reading a collection shared with you; omit for your own. */
+  collection?: string | null,
 ): Promise<ColonyListItem[]> {
-  const qs = includeInactive ? '?include_inactive=true' : ''
+  const params = new URLSearchParams()
+  if (includeInactive) params.set('include_inactive', 'true')
+  if (collection) params.set('collection', collection)
+  const qs = params.toString() ? `?${params.toString()}` : ''
   const res = await fetch(`${API_URL}/api/v1/colonies/${qs}`, {
     headers: authHeaders(token),
   })

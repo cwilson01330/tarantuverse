@@ -45,6 +45,7 @@ import { MoltNote } from '../../src/components/MoltNote';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import PhotoTimeline from '../../src/components/PhotoTimeline';
+import CostOfKeepingCard from '../../src/components/CostOfKeepingCard';
 import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { FeedingCadenceSheet } from '../../src/components/FeedingCadenceSheet';
@@ -81,6 +82,8 @@ function InvertDetailScreen() {
   const [pairings, setPairings] = useState<InvertPairing[]>([]);
   const [transferring, setTransferring] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Bumped when fetchAll finishes; the cost card refetches on it (not on focus).
+  const [costKey, setCostKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   /** Slices that failed to load on the last fetch (empty = all good). */
   const [partialFailure, setPartialFailure] = useState<string[]>([]);
@@ -204,6 +207,9 @@ function InvertDetailScreen() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load this animal.");
     } finally {
+      // Before setLoading(false): the cost card is unmounted while `loading`
+      // is true, so it mounts once with the new key and fetches once per reload.
+      setCostKey((k) => k + 1);
       setLoading(false);
     }
   }, [id]);
@@ -972,6 +978,11 @@ function InvertDetailScreen() {
           <InfoGrid items={husbandryItems} />
         </CollapsibleRow>
       )}
+
+      {/* Cost of keeping (expense tracking, 2026-10-22). Keeper and up only, so
+          loggers and viewers cost no request; shown on died/transferred animals
+          too. Reloads when `costKey` changes (end of a full reload), so it is NOT in refreshSlices. */}
+      {canKeep && id ? <CostOfKeepingCard kind="invert" id={id} ownerId={invert.user_id} reloadKey={costKey} /> : null}
 
       {/* Provenance (BRIEF §6) — render only the facts we actually have. */}
       {invert.provenance && (

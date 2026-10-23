@@ -59,6 +59,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
     { icon: '📖', label: 'Species', path: '/species' },
     { icon: '🔖', label: 'Shortlist', path: '/dashboard/shortlist' },
     { icon: '📊', label: 'Analytics', path: '/dashboard/analytics' },
+    { icon: '🧾', label: 'Expenses', path: '/dashboard/expenses' },
     { icon: '💰', label: 'Collection Value', path: '/dashboard/collection-value' },
     { icon: '🥚', label: 'Breeding', path: '/dashboard/breeding' },
     { icon: '🦗', label: 'Feeders', path: '/dashboard/feeders' },

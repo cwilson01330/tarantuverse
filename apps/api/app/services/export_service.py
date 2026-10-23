@@ -50,6 +50,9 @@ from app.models.hv_feeder import HvFeederLog, HvFeederStock
 # Tarantuverse feeder colonies (crickets, roaches, ...) and their care log.
 from app.models.feeder_colony import FeederColony
 from app.models.feeder_care_log import FeederCareLog
+# Expense tracking (2026-10-22). The keeper's own money records: exported to
+# them and nowhere else (privacy: tests/test_expense_privacy.py).
+from app.models.expense import Expense, ExpenseShare
 from app.utils.units import EXPORT_UNITS
 
 
@@ -305,6 +308,19 @@ FEEDER_CARE_LOG_FIELDS = [
     "count_delta", "notes", "created_at",
 ]
 
+# Expense tracking. Both apps' rows are exported, each with its `app`.
+# `shares` is not a column: JSON nests each expense's shares under it; the CSV
+# keeps them flat in expense_shares.csv, where `expense_id` ties a row back.
+EXPENSE_FIELDS = [
+    "id", "owner_id", "created_by", "app", "spent_on", "description",
+    "category", "amount", "notes", "split_mode", "split_label",
+    "created_at", "updated_at",
+]
+
+EXPENSE_SHARE_FIELDS = [
+    "id", "expense_id", "invert_id", "colony_id", "animal_id", "amount", "position",
+]
+
 
 # ---------------------------------------------------------------------------
 # Query helpers
@@ -511,6 +527,46 @@ def _get_feeder_care_logs(db: Session, user_id: UUID) -> List[FeederCareLog]:
     )
 
 
+def _get_expenses(db: Session, user_id: UUID) -> List[Expense]:
+    """Every expense the keeper OWNS, both apps, newest first. By owner_id —
+    a co-keeper's logged expense belongs to the collection owner, and the
+    co-keeper's own export never carries it."""
+    return (
+        db.query(Expense)
+        .filter(Expense.owner_id == user_id)
+        .order_by(Expense.spent_on.desc(), Expense.created_at.desc())
+        .all()
+    )
+
+
+def _get_expense_shares(db: Session, user_id: UUID) -> List[ExpenseShare]:
+    """Shares of the keeper's own expenses, read through the expense owner
+    (like feeder logs) so a share is never exported to anyone else."""
+    return (
+        db.query(ExpenseShare)
+        .filter(
+            ExpenseShare.expense_id.in_(
+                select(Expense.id).where(Expense.owner_id == user_id)
+            )
+        )
+        .order_by(ExpenseShare.expense_id, ExpenseShare.position)
+        .all()
+    )
+
+
+def _expense_rows(expenses: List[Expense], shares: List[ExpenseShare]) -> List[Dict[str, Any]]:
+    """Expense dicts (EXPENSE_FIELDS order) each with its shares nested."""
+    by_expense: Dict[str, List[Dict[str, Any]]] = {}
+    for sh in shares:
+        by_expense.setdefault(str(sh.expense_id), []).append(_row_to_dict(sh, EXPENSE_SHARE_FIELDS))
+    rows = []
+    for e in expenses:
+        row = _row_to_dict(e, EXPENSE_FIELDS)
+        row["shares"] = by_expense.get(str(e.id), [])
+        rows.append(row)
+    return rows
+
+
 def _feeder_colony_dict(colony: FeederColony) -> Dict[str, Any]:
     row = _row_to_dict(colony, [f for f in FEEDER_COLONY_FIELDS if f != "species_scientific_name"])
     species = colony.feeder_species
@@ -553,6 +609,10 @@ class ExportService:
         colonies = _get_colonies(db, user.id)
         c_ids = [c.id for c in colonies]
 
+        # Expense tracking — one query each; the flat share list feeds the CSVs.
+        expense_shares = _get_expense_shares(db, user.id)
+        expenses = _expense_rows(_get_expenses(db, user.id), expense_shares)
+
         return {
             "profile": _row_to_dict(user, USER_PROFILE_FIELDS),
             "tarantulas": [_row_to_dict(t, TARANTULA_FIELDS) for t in tarantulas],
@@ -586,6 +646,9 @@ class ExportService:
             "colony_events": [_row_to_dict(e, COLONY_EVENT_FIELDS) for e in _get_colony_events(db, c_ids)],
             # --- Hydration (car_20260909) ---
             "care_logs": [_row_to_dict(c, CARE_LOG_FIELDS) for c in _get_care_logs(db, user.id)],
+            # --- Expense tracking (2026-10-22): nested shares + the flat list ---
+            "expenses": expenses,
+            "expense_shares": [_row_to_dict(sh, EXPENSE_SHARE_FIELDS) for sh in expense_shares],
         }
 
     # ---- JSON export ----------------------------------------------------
@@ -644,6 +707,9 @@ class ExportService:
             # Colony mode (ADR-010) population entries + their event log
             "colonies": data["colonies"],
             "colony_events": data["colony_events"],
+            # Expense tracking: every expense (both apps) with its shares nested.
+            # .get(): callers that build `data` by hand may predate expenses.
+            "expenses": data.get("expenses") or [],
             "counts": {
                 "inverts": len(data["inverts"]),
                 "tarantulas": len(data["tarantulas"]),
@@ -671,6 +737,8 @@ class ExportService:
                 "colonies": len(data["colonies"]),
                 "colony_events": len(data["colony_events"]),
                 "care_logs": len(data["care_logs"]),
+                "expenses": len(data.get("expenses") or []),
+                "expense_shares": len(data.get("expense_shares") or []),
             },
         }
 
@@ -732,6 +800,11 @@ class ExportService:
             if data.get("feeder_colonies"):
                 zf.writestr("feeder_colonies.csv", ExportService._to_csv_bytes(data["feeder_colonies"], FEEDER_COLONY_FIELDS))
                 zf.writestr("feeder_care_logs.csv", ExportService._to_csv_bytes(data.get("feeder_care_logs") or [], FEEDER_CARE_LOG_FIELDS))
+
+            # Expense tracking: the expenses, and their shares flat (expense_id
+            # on each row). Written even when empty, like pairings.csv.
+            zf.writestr("expenses.csv", ExportService._to_csv_bytes(data.get("expenses") or [], EXPENSE_FIELDS))
+            zf.writestr("expense_shares.csv", ExportService._to_csv_bytes(data.get("expense_shares") or [], EXPENSE_SHARE_FIELDS))
 
             # Colony mode CSVs — only when the keeper has colonies.
             if data["colonies"]:
@@ -972,6 +1045,14 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, 
                 zf.writestr("all_feeder_care_logs.csv", ExportService._to_csv_bytes(data.get("feeder_care_logs") or [], FEEDER_CARE_LOG_FIELDS))
             if data["enclosures"]:
                 zf.writestr("enclosures.json", json.dumps(data["enclosures"], indent=2, default=str))
+
+            # Expense tracking — only when the keeper has any: one JSON with
+            # each expense's shares nested, plus the two CSVs.
+            expenses = data.get("expenses") or []
+            if expenses:
+                zf.writestr("expenses.json", json.dumps(expenses, indent=2, default=str))
+                zf.writestr("expenses.csv", ExportService._to_csv_bytes(expenses, EXPENSE_FIELDS))
+                zf.writestr("expense_shares.csv", ExportService._to_csv_bytes(data.get("expense_shares") or [], EXPENSE_SHARE_FIELDS))
             breeding = {
                 "pairings": data["pairings"],
                 "egg_sacs": data["egg_sacs"],
@@ -1025,6 +1106,8 @@ Files included:
   hv_feeder_logs.csv    – Feeder restock / used / cleaned records (if any)
   feeder_colonies.csv   – Feeder colonies: crickets, roaches, ... (if any)
   feeder_care_logs.csv  – Feeder colony care / restock records (if any)
+  expenses.csv          – Expenses you recorded, both apps (amounts in your own currency)
+  expense_shares.csv    – How each expense was divided (expense_id links to expenses.csv)
   profile.json          – Your profile information
 
 Units: every number is in the units it is stored in, whatever your
@@ -1059,6 +1142,9 @@ Structure:
   reptile_breeding.json       – Reptile pairings, clutches, offspring (if any)
   hv_feeders.json             – Herpetoverse feeder stock with its logs (if any)
   feeders.json                – Feeder colonies with their care logs (if any)
+  expenses.json               – Expenses (both apps), each with its shares (if any)
+  expenses.csv                – Expenses in spreadsheet format (if any)
+  expense_shares.csv          – How each expense was divided (if any)
   all_animals.csv             – Every animal, every taxon, in one sheet
   all_feeding_logs.csv        – Feeding logs in spreadsheet format
   all_molt_logs.csv           – Molt logs in spreadsheet format

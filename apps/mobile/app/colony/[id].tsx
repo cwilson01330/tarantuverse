@@ -31,6 +31,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppHeader } from '../../src/components/AppHeader';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import DateInput from '../../src/components/DateInput';
+import CostOfKeepingCard from '../../src/components/CostOfKeepingCard';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import QRSheet from '../../src/components/QRSheet';
@@ -169,6 +170,8 @@ export default function ColonyDetailScreen() {
   const [careNote, setCareNote] = useState('');
   const [careBusy, setCareBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Bumped when fetchColony finishes; the cost card refetches on it (not on focus).
+  const [costKey, setCostKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
 
@@ -266,6 +269,7 @@ export default function ColonyDetailScreen() {
           : e?.response?.data?.detail || e?.message || 'Failed to load colony';
       setLoadError(typeof msg === 'string' ? msg : 'Failed to load colony');
     } finally {
+      setCostKey((k) => k + 1);
       setLoading(false);
       setRefreshing(false);
     }
@@ -1192,6 +1196,12 @@ export default function ColonyDetailScreen() {
             </View>
           )}
 
+          {/* Cost of keeping (expense tracking, 2026-10-22). canKeepRole, not
+              canKeep: the latter also needs the colony to be running, and this
+              card belongs on ended and transferred colonies too. */}
+          {canKeepRole ? (
+            <CostOfKeepingCard kind="colony" id={colony.id} ownerId={colony.user_id} reloadKey={costKey} style={styles.costCard} />
+          ) : null}
 
           {/* Feeding. A communal is fed as a unit, so this is a group log —
               one row per feeding event, not one per animal. ADR-010 deferred
@@ -1930,6 +1940,8 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     archivedPill: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
     archivedText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textSecondary },
     card: { borderWidth: 1, padding: 16, marginBottom: 16 },
+    // CostOfKeepingCard is a shared SectionCard (own horizontal margins); line it up with the cards around it.
+    costCard: { marginHorizontal: 0, marginTop: 0, marginBottom: 16 },
     feedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
     colonyPhotoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
     colonyHeroTag: {

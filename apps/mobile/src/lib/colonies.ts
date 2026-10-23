@@ -203,9 +203,13 @@ export type ColonyEventUpdate = Partial<ColonyEventCreate>;
 // Colony CRUD
 // ---------------------------------------------------------------------------
 
-export async function listColonies(includeInactive = false): Promise<ColonyListItem[]> {
+export async function listColonies(
+  includeInactive = false,
+  /** Owner's user id when reading a collection shared with you. */
+  collection?: string | null,
+): Promise<ColonyListItem[]> {
   const { data } = await apiClient.get<ColonyListItem[]>('/colonies/', {
-    params: { include_inactive: includeInactive },
+    params: { include_inactive: includeInactive, ...(collection ? { collection } : {}) },
   });
   return data;
 }

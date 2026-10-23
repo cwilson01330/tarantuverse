@@ -106,6 +106,11 @@ class AdvancedAnalyticsResponse(BaseModel):
     # own when set, else the 0.50 default. Defaults keep older callers valid.
     cost_per_feeding: float = 0.50
     cost_per_feeding_is_default: bool = True
+    # What the keeper recorded spending this month in expense tracking (the
+    # owner's own Tarantuverse expenses, server UTC month), in their own
+    # currency. `feeders_*` is the feeders category only.
+    spent_this_month: float = 0.0
+    feeders_spent_this_month: float = 0.0
 
     class Config:
         from_attributes = True

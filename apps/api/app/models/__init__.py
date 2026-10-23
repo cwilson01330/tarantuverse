@@ -87,6 +87,8 @@ from app.models.species_shortlist import SpeciesShortlist
 # Per-animal event log (ADR-015). Depends on Invert + Animal above (FK targets).
 from app.models.animal_event import AnimalEvent
 from app.models.card_link import CardLink
+# Expense tracking (exp_20261022). FK targets: users, inverts, colonies, animals.
+from app.models.expense import Expense, ExpenseShare
 
 __all__ = [
     "User",
@@ -158,4 +160,6 @@ __all__ = [
     "SitterGuide",
     "SpeciesShortlist",
     "CardLink",
+    "Expense",
+    "ExpenseShare",
 ]

@@ -514,8 +514,11 @@ export const CARE_LOG_SHORT: Record<CareLogType, string> = {
 // ---------------------------------------------------------------------------
 
 /** List the whole cross-taxon collection (every invert taxon). */
-export async function listInverts(): Promise<Invert[]> {
-  const { data } = await apiClient.get<Invert[]>('/inverts/');
+/** `collection` = the owner's user id when reading a collection shared with you. */
+export async function listInverts(collection?: string | null): Promise<Invert[]> {
+  const { data } = await apiClient.get<Invert[]>('/inverts/', {
+    params: collection ? { collection } : undefined,
+  });
   return data;
 }
 

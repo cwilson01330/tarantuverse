@@ -266,8 +266,12 @@ export interface PreySuggestion {
  * List the keeper's animals. Pass a `taxon` to scope to one taxon — the
  * single-taxon collection views pass it; a unified view omits it.
  */
-export async function listAnimals(taxon?: AnimalTaxon): Promise<Animal[]> {
-  const qs = taxon ? `?taxon=${encodeURIComponent(taxon)}` : '';
+export async function listAnimals(taxon?: AnimalTaxon, collection?: string | null): Promise<Animal[]> {
+  const parts: string[] = [];
+  if (taxon) parts.push(`taxon=${encodeURIComponent(taxon)}`);
+  // Owner's user id when a co-keeper works inside a collection shared with them.
+  if (collection) parts.push(`collection=${encodeURIComponent(collection)}`);
+  const qs = parts.length ? `?${parts.join('&')}` : '';
   const { data } = await apiClient.get<Animal[]>(`/animals/${qs}`);
   return data;
 }

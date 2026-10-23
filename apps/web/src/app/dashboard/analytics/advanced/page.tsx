@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { formatMoney } from "@/lib/expenses";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -65,6 +67,10 @@ interface AdvancedAnalytics {
    *  from older API deploys, which always used 0.50. */
   cost_per_feeding?: number;
   cost_per_feeding_is_default?: boolean;
+  /** Expense tracking (2026-10-22): the owner's logged TV expenses this UTC
+   *  month (the server's calendar month), and the feeders part of it. Absent from older API deploys. */
+  spent_this_month?: number;
+  feeders_spent_this_month?: number;
 }
 
 const COLORS = [
@@ -472,8 +478,38 @@ export default function AdvancedAnalyticsPage() {
                   </button>
                 </p>
               )}
+              {(analytics.feeders_spent_this_month ?? 0) > 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Feeders bought this month: {formatMoney(analytics.feeders_spent_this_month ?? 0)}
+                </p>
+              )}
             </CardContent>
           </Card>
+
+          {typeof analytics.spent_this_month === "number" && (
+            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Spent this month
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {formatMoney(analytics.spent_this_month)}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Everything you logged in Expenses
+                  {" · "}
+                  <Link
+                    href="/dashboard/expenses"
+                    className="font-medium text-primary-700 dark:text-primary-400 hover:underline"
+                  >
+                    View
+                  </Link>
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Charts Row 1 */}

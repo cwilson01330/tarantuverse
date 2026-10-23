@@ -321,6 +321,7 @@ function YouScreen() {
             accessibilityHint="Co-keepers: collections shared with you, and people who help keep yours" />
           <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import' as never)} />
           <MenuRow icon="download-outline" label="Export your data" external onPress={() => openLink(EXPORT_URL)} />
+          <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses' as never)} />
           <MenuRow icon="calculator-variant" label="Morph calculator" detail="Predict offspring from any pairing."
             onPress={() => router.push('/morph-calculator' as never)} />
         </MenuSection>

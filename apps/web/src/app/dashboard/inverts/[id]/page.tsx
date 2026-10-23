@@ -18,6 +18,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import GrowthChart from '@/components/GrowthChart'
 import ShareCardModal from '@/components/ShareCardModal'
 import UpgradeModal from '@/components/UpgradeModal'
+import CostOfKeepingCard from '@/components/CostOfKeepingCard'
 import {
   ANIMAL_EVENT_LABELS,
   DEATH_CAUSE_LABELS,
@@ -883,6 +884,11 @@ export default function InvertDetailPage() {
                 )}
               </Section>
             )}
+
+            {/* Cost of keeping (expense tracking). Keeper role or above only: loggers,
+                viewers and visitors never trigger the request. Shown on died and
+                transferred animals too — it is history. */}
+            {canKeep && <CostOfKeepingCard kind="invert" id={invert.id} ownerId={invert.user_id} />}
 
             {/* Logs */}
             <LogSection

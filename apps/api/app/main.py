@@ -61,6 +61,7 @@ import app.routers.sitter_passes as sitter_passes  # PRD-shared-keeping
 import app.routers.collection_members as collection_members  # PRD-shared-keeping rung 3
 import app.routers.share_cards as share_cards  # share cards (spec 2026-09-29)
 import app.routers.care_sheets as care_sheets  # printable sitter care sheets
+import app.routers.expenses as expenses  # expense tracking (spec 2026-10-22)
 import app.routers.animal_events as animal_events  # ADR-015 per-animal events
 import app.routers.species_shortlist as species_shortlist  # care-sheet bookmarks
 import app.routers.waitlist as waitlist
@@ -104,6 +105,8 @@ app = FastAPI(
 # Attach rate limiter to app state and register 429 handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# Expense tracking's 403 carries a machine-readable `code` next to `detail`.
+app.add_exception_handler(expenses.PremiumRequired, expenses.premium_required_handler)
 
 # Configure CORS
 # Automatically include both www and non-www versions of each origin
@@ -340,6 +343,7 @@ app.include_router(colonies.router, prefix="/api/v1/colonies", tags=["colonies"]
 app.include_router(animal_events.router, prefix="/api/v1", tags=["events"])
 app.include_router(share_cards.router, prefix="/api/v1", tags=["share-cards"])
 app.include_router(care_sheets.router, prefix="/api/v1", tags=["care-sheets"])
+app.include_router(expenses.router, prefix="/api/v1/expenses", tags=["expenses"])
 app.include_router(species_shortlist.router, prefix="/api/v1/species-shortlist", tags=["species"])
 
 print("[STARTUP] Registering waitlist router...")

@@ -244,6 +244,8 @@ function ProfileScreen() {
           accessibilityHint="Co-keepers: collections shared with you, and people who help keep yours" />
         <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import')} />
         <MenuRow icon="download-outline" label="Export your data" onPress={() => router.push('/settings/data-export')} />
+        <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses')}
+          accessibilityHint="Log what you spend on feeders, substrate and supplies" />
       </MenuSection>
 
       <MenuSection title="Premium">

@@ -28,7 +28,7 @@ from app.routers.inverts import create_invert_row
 from app.schemas.colony import ColonyCreate
 from app.schemas.invert import InvertCreate
 from app.models.animal import Animal
-from app.models.tarantula import Sex, Source
+from app.models.tarantula import Sex, Source, Tarantula
 from app.schemas.animal import AnimalCreate
 from app.utils.limits import active_inverts_query, enforce_animal_limit
 from app.utils.access import policy
@@ -672,6 +672,16 @@ async def export_preview(
     feeder_colony_count = db.query(FeederColony).filter(FeederColony.user_id == current_user.id).count()
     feeder_care_log_count = db.query(FeederCareLog).filter(FeederCareLog.feeder_colony_id.in_(feeder_colony_ids)).count()
 
+    # Expense tracking — same owner rule as export_service (owner_id; shares
+    # read through the owner's expenses).
+    from app.models.expense import Expense, ExpenseShare
+    expense_count = db.query(Expense).filter(Expense.owner_id == current_user.id).count()
+    expense_share_count = (
+        db.query(ExpenseShare)
+        .filter(ExpenseShare.expense_id.in_(select(Expense.id).where(Expense.owner_id == current_user.id)))
+        .count()
+    )
+
     counts = {
             # Every TV animal of every taxon (tarantulas included). This key
             # used to be "animals", which the Herpetoverse count below then
@@ -702,6 +712,8 @@ async def export_preview(
             "hv_feeder_logs": hv_feeder_log_count,
             "feeder_colonies": feeder_colony_count,
             "feeder_care_logs": feeder_care_log_count,
+            "expenses": expense_count,
+            "expense_shares": expense_share_count,
     }
     return {
         "username": current_user.username,

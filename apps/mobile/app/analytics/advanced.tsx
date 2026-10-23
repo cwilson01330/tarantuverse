@@ -18,6 +18,7 @@ import UpgradeModal from '../../src/components/UpgradeModal';
 import { isPaymentRequired } from '../../src/utils/errors';
 import { INVERT_TAXA, isInvertTaxon } from '../../src/lib/inverts';
 import { SPACING, TYPE } from '../../src/theme/tokens';
+import { formatMoney } from '../../src/lib/expenses';
 
 interface MoltHeatmapEntry {
   month: string;
@@ -61,6 +62,10 @@ interface AdvancedAnalytics {
    *  from older API deploys, which always used 0.50. */
   cost_per_feeding?: number;
   cost_per_feeding_is_default?: boolean;
+  /** Expense tracking (2026-10-22): the owner's logged TV expenses this UTC
+   *  month (the server's calendar month), and the feeders part of it. Absent from older API deploys. */
+  spent_this_month?: number;
+  feeders_spent_this_month?: number;
 }
 
 const SEX_COLORS: { [key: string]: string } = {
@@ -828,7 +833,40 @@ export default function AdvancedAnalyticsScreen() {
               </TouchableOpacity>
             </View>
           )}
+          {(analytics.feeders_spent_this_month ?? 0) > 0 && (
+            <Text style={[TYPE.caption, { color: colors.textTertiary, marginTop: SPACING.xs }]}>
+              Feeders bought this month: {formatMoney(analytics.feeders_spent_this_month ?? 0)}
+            </Text>
+          )}
         </View>
+
+        {/* Expense tracking: everything logged under Expenses this month, and the way in. */}
+        {typeof analytics.spent_this_month === 'number' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>🧾 Spent This Month</Text>
+            <Text style={[TYPE.display, { color: colors.primary, marginBottom: SPACING.xs }]}>
+              {formatMoney(analytics.spent_this_month)}
+            </Text>
+            <Text style={[TYPE.caption, { color: colors.textTertiary }]}>Everything you logged in Expenses</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/expenses')}
+              accessibilityRole="button"
+              accessibilityLabel="View expenses"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                minHeight: 44,
+                marginTop: SPACING.sm,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: colors.border,
+              }}
+            >
+              <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>View expenses</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>

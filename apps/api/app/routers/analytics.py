@@ -14,6 +14,7 @@ from app.models.invert import Invert
 from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
 from app.models.substrate_change import SubstrateChange
+from app.models.expense import Expense
 from app.schemas.analytics import (
     CollectionAnalytics,
     SpeciesCount,
@@ -415,6 +416,29 @@ def keeper_cost_per_feeding(user) -> tuple:
     return round(float(raw), 2), False
 
 
+def month_spend(db: Session, user_id, today: date) -> tuple:
+    """(everything, feeders only) the keeper spent in `today`'s month, from
+    their own Tarantuverse expenses (`owner_id`, so a co-keeper's logged
+    expenses count for the collection owner). Floats rounded to cents. No
+    `tz_offset_minutes` on the advanced route, so `today` is the server's UTC
+    date."""
+    first = today.replace(day=1)
+    following = (first + timedelta(days=32)).replace(day=1)
+    in_month = [
+        Expense.owner_id == user_id,
+        Expense.app == "tarantuverse",
+        Expense.spent_on >= first,
+        Expense.spent_on < following,
+    ]
+    total = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(*in_month).scalar()
+    feeders = (
+        db.query(func.coalesce(func.sum(Expense.amount), 0))
+        .filter(*in_month, Expense.category == "feeders")
+        .scalar()
+    )
+    return round(float(total or 0), 2), round(float(feeders or 0), 2)
+
+
 def _sex_value(sex) -> str:
     v = getattr(sex, "value", sex)
     return str(v).lower() if v else "unknown"
@@ -465,11 +489,17 @@ async def get_advanced_analytics(
     ids = [a.id for a in owned]
     total_count = len(animals)
 
+    spent_this_month, feeders_spent_this_month = month_spend(
+        db, current_user.id, datetime.now(timezone.utc).date()
+    )
+
     if not owned:
         empty_cost, empty_is_default = keeper_cost_per_feeding(current_user)
         return AdvancedAnalyticsResponse(
             cost_per_feeding=empty_cost,
             cost_per_feeding_is_default=empty_is_default,
+            spent_this_month=spent_this_month,
+            feeders_spent_this_month=feeders_spent_this_month,
             collection_value_total=0.0,
             collection_value_average=0.0,
             most_expensive_name=None,
@@ -590,6 +620,8 @@ async def get_advanced_analytics(
         estimated_monthly_feeding_cost=round(estimated_monthly_feeding_cost, 2),
         cost_per_feeding=cost_per_feeding,
         cost_per_feeding_is_default=cost_is_default,
+        spent_this_month=spent_this_month,
+        feeders_spent_this_month=feeders_spent_this_month,
     )
 
 

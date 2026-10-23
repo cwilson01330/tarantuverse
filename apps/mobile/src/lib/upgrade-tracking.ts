@@ -26,6 +26,8 @@ export const UPGRADE_SOURCES = [
   'settings',
   // The one-time "here's what you get" card after the first Feeding Day batch
   'feeding_day_intro',
+  // Expense tracking is premium: create / update answer 403 premium_required
+  'expenses',
   // Premium Scope features, reserved so their previews slot straight in
   'forecast',
   'benchmark',

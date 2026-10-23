@@ -56,6 +56,7 @@ import {
 } from '../components/reptile-detail/ReptileDetailShared';
 import { AnimalHero } from '../components/reptile-detail/AnimalHero';
 import PhotoTimeline from '../components/PhotoTimeline';
+import CostOfKeepingCard from '../components/CostOfKeepingCard';
 import { AnimalTimeline } from '../components/reptile-detail/AnimalTimeline';
 import { FeedingCard } from '../components/reptile-detail/FeedingCard';
 import { BrumationRow } from '../components/reptile-detail/BrumationRow';
@@ -123,6 +124,12 @@ export function AnimalDetailScreen() {
   const [diedOpen, setDiedOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [reviving, setReviving] = useState(false);
+  // Cost of keeping (expense tracking): bumped once per FULL reload (screen
+  // focus, pull to refresh) so the card refetches exactly then. In-place
+  // refreshes (logging a feeding, pausing, undoing a death...) call onRefresh /
+  // fetchAll directly and never touch it. 0 = the first load hasn't finished,
+  // and the card isn't mounted yet (so its first fetch isn't doubled).
+  const [costKey, setCostKey] = useState(0);
 
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
   // would fail — the API checks every request. Nothing write-shaped shows
@@ -242,7 +249,10 @@ export function AnimalDetailScreen() {
       let cancelled = false;
       setLoading(true);
       fetchAll().finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setCostKey((k) => k + 1);
+          setLoading(false);
+        }
       });
       return () => {
         cancelled = true;
@@ -258,6 +268,12 @@ export function AnimalDetailScreen() {
       setRefreshing(false);
     }
   }, [fetchAll]);
+
+  // Pull to refresh is a full reload, so the cost card reloads with it.
+  const onPullRefresh = useCallback(async () => {
+    await onRefresh();
+    setCostKey((k) => k + 1);
+  }, [onRefresh]);
 
   // ---- Loading + error gates ----
   if (loading && !animal) {
@@ -296,7 +312,7 @@ export function AnimalDetailScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={onPullRefresh}
             tintColor={colors.primary}
           />
         }
@@ -574,6 +590,13 @@ export function AnimalDetailScreen() {
             </TouchableOpacity>
           )}
         </Section>
+
+        {/* Cost of keeping (expense tracking). Keeper and up only, so loggers,
+            viewers and visitors cost no request; shown on died and handed-off
+            animals too (canKeep ignores `closed`). The card hides itself unless
+            the owner can add expenses or this animal has a share. One fetch per
+            full reload via costKey; not part of any in-place refresh. */}
+        {canKeep && costKey > 0 ? <CostOfKeepingCard animalId={animal.id} ownerId={animal.user_id} reloadKey={costKey} /> : null}
 
         {/* Provenance + Transfer/Rehome. The section renders a Provenance
             card only when the animal carries a claimed snapshot, and either a

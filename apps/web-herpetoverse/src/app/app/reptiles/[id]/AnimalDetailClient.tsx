@@ -104,6 +104,7 @@ import {
 } from '@/lib/lifecycle'
 import { useAuth } from '@/lib/auth'
 import { ROLE_HELP, ROLE_LABEL, attribution, can, useCollectionRole } from '@/lib/coKeepers'
+import CostOfKeepingCard from '@/components/CostOfKeepingCard'
 
 // ---------------------------------------------------------------------------
 // What the viewer can do here (co-keepers, PRD-shared-keeping rung 3).
@@ -532,6 +533,12 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           onPhotoAdded={refetchAnimalOnly}
         />
       )}
+
+      {/* Cost of keeping (expense tracking). Keeper and up only, so loggers,
+          viewers and visitors cost no request; shown on died and handed-off
+          animals too (access.canKeep ignores `closed`). The card hides itself
+          unless the owner can add expenses or this animal has a share. */}
+      {access.canKeep && <CostOfKeepingCard animalId={animal.id} ownerId={animal.user_id} />}
 
       <Section title="Weight">
         {weightError && <InlineError message={weightError} />}

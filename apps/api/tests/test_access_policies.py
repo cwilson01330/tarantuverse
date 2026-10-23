@@ -30,6 +30,7 @@ COLLECTION_ROUTERS = [
     "enclosures", "feeder_colonies", "hv_feeder_stocks",
     "pairings", "egg_sacs", "offspring", "clutches", "reptile_pairings", "reptile_offspring",
     "premolt", "analytics", "qr", "transfers", "import_export", "care_sheets",
+    "expenses",
 ]
 
 ACCESS_CALLS = ("load_invert(", "load_colony(", "load_animal(", "load_log_parent(", "require(", "scope_collection(")

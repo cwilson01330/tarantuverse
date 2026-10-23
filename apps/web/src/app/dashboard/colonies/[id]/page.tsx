@@ -17,6 +17,7 @@ import { formatTempRange } from '@/lib/units'
 import { ROLE_LABEL, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 import DashboardLayout from '@/components/DashboardLayout'
 import ColonyPopulationChart from '@/components/ColonyPopulationChart'
+import CostOfKeepingCard from '@/components/CostOfKeepingCard'
 const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
 const ShareCardModal = dynamic(() => import('@/components/ShareCardModal'), { ssr: false })
 import EditPanel, { type EditField, type EditValues } from './EditPanel'
@@ -1224,6 +1225,11 @@ export default function ColonyDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Cost of keeping (expense tracking). Keeper role or above — not canKeep,
+            which also needs the colony running: ended and transferred colonies
+            keep their cost history. Other roles never trigger the request. */}
+        {canKeepRole && <CostOfKeepingCard kind="colony" id={colony.id} ownerId={colony.user_id} />}
 
         {/* Notes */}
         {colony.notes && (
