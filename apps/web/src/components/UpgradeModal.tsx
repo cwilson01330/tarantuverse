@@ -11,6 +11,16 @@ const PLANS: { key: 'monthly' | 'yearly' | 'lifetime'; name: string; price: stri
   { key: 'lifetime', name: 'Lifetime', price: '$149.99', period: 'one-time, forever' },
 ]
 
+// Per-source headline and lead perk. A source without an entry keeps the
+// generic "Premium Feature" title and the standard perk list.
+const SOURCE_TITLES: Partial<Record<UpgradeSource, string>> = {
+  expenses: 'Track what your collection costs',
+}
+const SOURCE_PERKS: Partial<Record<UpgradeSource, string>> = {
+  expenses:
+    'Log feeders, substrate, enclosures and vet bills, split them across your animals, and see what each one costs to keep.',
+}
+
 interface UpgradeModalProps {
   isOpen: boolean
   onClose: () => void
@@ -60,7 +70,7 @@ export default function UpgradeModal({ isOpen, onClose, source, feature, descrip
 
         {/* Title */}
         <h2 className="text-2xl font-bold text-center mb-3 text-gray-900 dark:text-white">
-          Premium Feature
+          {SOURCE_TITLES[source] ?? 'Premium Feature'}
         </h2>
 
         {/* Feature name */}
@@ -77,6 +87,12 @@ export default function UpgradeModal({ isOpen, onClose, source, feature, descrip
         <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 mb-6 border border-purple-200 dark:border-purple-800">
           <p className="font-semibold mb-2 text-gray-900 dark:text-white">Upgrade to Premium for:</p>
           <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+            {SOURCE_PERKS[source] ? (
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                <span>{SOURCE_PERKS[source]}</span>
+              </li>
+            ) : null}
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>
               <span>Unlimited animals</span>

@@ -15,14 +15,25 @@ interface UpgradeModalProps {
   feature?: string;
 }
 
+// Per-source headline and lead perk. A caller-supplied `title` still wins; a
+// source without an entry keeps the generic title and the standard perk list.
+const SOURCE_TITLES: Partial<Record<UpgradeSource, string>> = {
+  expenses: 'Track what your collection costs',
+};
+const SOURCE_PERKS: Partial<Record<UpgradeSource, string>> = {
+  expenses:
+    'Log feeders, substrate, enclosures and vet bills, split them across your animals, and see what each one costs to keep.',
+};
+
 export default function UpgradeModal({
   visible,
   onClose,
   source,
-  title = 'Upgrade to Premium',
+  title,
   message = 'Unlock unlimited tracking and breeding features',
   feature,
 }: UpgradeModalProps) {
+  const shownTitle = title ?? SOURCE_TITLES[source] ?? 'Upgrade to Premium';
   const { colors } = useTheme();
   const router = useRouter();
   // Set when the keeper taps upgrade, so the close that follows isn't also
@@ -90,7 +101,9 @@ export default function UpgradeModal({
     },
   ];
 
+  const sourcePerk = SOURCE_PERKS[source];
   const premiumFeatures = [
+    ...(sourcePerk ? [sourcePerk] : []),
     'Unlimited animals',
     'Unlimited photo uploads',
     'Full breeding module (pairings, egg sacs, offspring)',
@@ -119,7 +132,7 @@ export default function UpgradeModal({
                 <Text style={styles.icon}>✨</Text>
               </View>
               <View style={styles.titleContainer}>
-                <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+                <Text style={[styles.title, { color: colors.textPrimary }]}>{shownTitle}</Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                   {message}
                 </Text>

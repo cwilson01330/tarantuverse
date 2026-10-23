@@ -10,7 +10,7 @@
  * Mirrors feeders/[id].tsx (quick-log panel + history + delete modals) and
  * app/invert/[id].tsx (species care-sheet link, shared InfoGrid).
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -170,8 +170,12 @@ export default function ColonyDetailScreen() {
   const [careNote, setCareNote] = useState('');
   const [careBusy, setCareBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  // Bumped when fetchColony finishes; the cost card refetches on it (not on focus).
+  // The cost card refetches when this changes. Bumped only when a focus reload or a
+  // pull-to-refresh finishes (`costReloadPending`), NOT after the ~15 in-place actions
+  // (events, care logs, photos, end/edit) that also call fetchColony: none of those
+  // change what the animal costs, and each would be an extra request.
   const [costKey, setCostKey] = useState(0);
+  const costReloadPending = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
 
@@ -269,21 +273,31 @@ export default function ColonyDetailScreen() {
           : e?.response?.data?.detail || e?.message || 'Failed to load colony';
       setLoadError(typeof msg === 'string' ? msg : 'Failed to load colony');
     } finally {
-      setCostKey((k) => k + 1);
+      if (costReloadPending.current) {
+        costReloadPending.current = false;
+        setCostKey((k) => k + 1);
+      }
       setLoading(false);
       setRefreshing(false);
     }
   }, [colonyId]);
 
+  // Focus and pull-to-refresh: reload the colony AND the cost card. (A trip to
+  // Expenses and back is a focus reload, so new numbers show up.)
+  const reloadWithCost = useCallback(() => {
+    costReloadPending.current = true;
+    return fetchColony();
+  }, [fetchColony]);
+
   useFocusEffect(
     useCallback(() => {
-      fetchColony();
-    }, [fetchColony]),
+      reloadWithCost();
+    }, [reloadWithCost]),
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchColony();
+    reloadWithCost();
   };
 
   const openForm = (preset: ColonyEventType = 'observation') => {

@@ -159,8 +159,11 @@ function ExpenseEditScreen() {
   }, [collection]);
 
   // The living list: loaded as soon as an existing expense is open (to tell
-  // which saved targets are still living), or when the picker is first opened.
-  const living = useLivingAnimals(collection, !!editing || pickerOpen);
+  // which saved targets are still living), when the picker is first opened, or
+  // whenever the split mode is "animals". The last keeps "Try again" working on
+  // a new expense after the picker is closed (a disabled hook never refetches).
+  // A keeper who never chooses "Pick animals" still makes no request.
+  const living = useLivingAnimals(collection, !!editing || pickerOpen || splitMode === 'animals');
   const seeded = useMemo(
     () =>
       editing && living.data
@@ -175,6 +178,11 @@ function ExpenseEditScreen() {
   const missingNote = missingTargetsNote(seeded?.missing ?? 0);
   // A touched split can't be built from picks until the list that filters them has arrived.
   const splitWaiting = !!editing && splitTouched && living.loading;
+  // The same for a list that FAILED: a split built from picks (new, or touched) has
+  // nothing to filter against, so it can't be saved until "Try again" succeeds. An
+  // untouched saved split is never sent, so a failed list doesn't block that.
+  const listFailed = splitMode === 'animals' && (!editing || splitTouched) && !!living.error;
+  const splitBlocked = splitWaiting || listFailed;
 
   const amount = useMemo(() => parseExpenseAmount(amountText), [amountText]);
   const pickedCount = picked.inverts.length + picked.colonies.length;
@@ -237,7 +245,7 @@ function ExpenseEditScreen() {
   };
 
   const submit = async () => {
-    if (saving || splitWaiting) return;
+    if (saving || splitBlocked) return;
     const desc = description.trim();
     if (!desc) return setError('Add a short description.');
     if (desc.length > EXPENSE_DESCRIPTION_MAX) {
@@ -471,6 +479,15 @@ function ExpenseEditScreen() {
               />
             ) : null}
 
+            {listFailed ? (
+              <>
+                <Text style={[TYPE.body, { color: colors.error }]} accessibilityLiveRegion="polite">
+                  {living.error} The split can&apos;t be saved until your animals load.
+                </Text>
+                <SitterButton label="Try again" variant="secondary" onPress={living.retry} />
+              </>
+            ) : null}
+
             <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]} accessibilityLiveRegion="polite">
               {previewLine()}
             </Text>
@@ -487,7 +504,7 @@ function ExpenseEditScreen() {
           <SitterButton
             label={editing ? 'Save changes' : 'Add expense'}
             busy={saving}
-            disabled={splitWaiting}
+            disabled={splitBlocked}
             onPress={submit}
           />
           <SitterButton label="Cancel" variant="secondary" onPress={() => router.back()} />
@@ -523,8 +540,7 @@ function ExpenseEditScreen() {
         source="expenses"
         visible={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        feature="Expense tracking"
-        message="Log what you spend on feeders, substrate, enclosures and vet visits, and see what each animal costs to keep."
+        message="Expense tracking is a Premium feature."
       />
     </View>
   );
@@ -540,7 +556,7 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  chip: { borderWidth: 1, paddingHorizontal: SPACING.md, minHeight: 36, justifyContent: 'center' },
+  chip: { borderWidth: 1, paddingHorizontal: SPACING.md, minHeight: 44, justifyContent: 'center' },
   panel: { borderWidth: 1, padding: SPACING.lg, gap: SPACING.md },
   field: {
     flexDirection: 'row',

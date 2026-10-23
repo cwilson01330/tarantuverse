@@ -200,7 +200,9 @@ export default function ExpenseForm({ open, collection, editing, onClose, onSave
       getExpense(editing.id)
         .then((d) => {
           if (!alive) return
-          setLocation(d.split_mode === 'location' ? d.split_label : null)
+          // Seed only when no location is set yet: a keeper who already picked one
+          // after "Change split" must not have it overwritten by this late response.
+          setLocation((prev) => prev ?? (d.split_mode === 'location' ? d.split_label : null))
           setSavedShares(d.shares)
         })
         .catch(() => {})

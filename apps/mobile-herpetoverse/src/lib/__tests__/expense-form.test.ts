@@ -1,15 +1,14 @@
-// @ts-nocheck
 /**
  * Expense form rules: the amount parser, the date check, the local "today", the
  * split preview copy and the edit-seeding rule. Same vectors as the Tarantuverse
  * mobile test (apps/mobile/src/lib/__tests__/expense-form.test.ts), animals only.
  *
  * This app has the jest runner (jest + jest-expo, `pnpm test`) but no
- * @types/jest, so `describe` / `expect` / `jest` have no types here and tsc
- * (which includes every .ts file) would reject them. `@ts-nocheck` keeps this
- * one file out of the type check until the types are added to devDependencies,
- * at which point the line can simply be deleted.
+ * @types/jest, so the test API comes from `@jest/globals` (hoisted by the repo's
+ * `shamefully-hoist`; it ships its own types). That keeps this file under the
+ * type check, so every call into `expense-form` is checked.
  */
+import { describe, expect, it, jest } from '@jest/globals';
 import {
   expenseDateError,
   localToday,

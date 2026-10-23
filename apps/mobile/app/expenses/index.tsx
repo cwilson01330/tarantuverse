@@ -91,6 +91,26 @@ function ExpensesScreen() {
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
+  // The collection currently shown, readable from the shared-list loader below
+  // without making that loader re-run on every switch.
+  const collectionRef = useRef<string | null>(null);
+  collectionRef.current = collection;
+
+  // Show a different collection (null = your own). Every path that changes the
+  // collection goes through here, so nothing from the old one lingers while the
+  // new one loads: list, summary, history flag and errors are all cleared.
+  const resetView = useCallback((value: string | null) => {
+    setCollection(value);
+    setCategory('all');
+    setItems([]);
+    setTotal(0);
+    setSummary(null);
+    setAnyHistory(false);
+    setError(null);
+    setActionError(null);
+    setListLoading(true);
+  }, []);
+
   // Collections this keeper may log into: shared TV collections where they are
   // a keeper and the owner's plan hasn't made it read-only.
   useFocusEffect(
@@ -102,22 +122,19 @@ function ExpensesScreen() {
         setShared(list);
         const wanted = wantedCollection.current;
         wantedCollection.current = null;
-        if (wanted && list.some((c) => c.owner.id === wanted)) {
-          setCollection(wanted);
-          setCategory('all');
-          setItems([]);
-          setTotal(0);
-          setSummary(null);
-          setAnyHistory(false);
-          setListLoading(true);
+        const stillShared = (id: string) => list.some((c) => c.owner.id === id);
+        if (wanted && stillShared(wanted)) {
+          resetView(wanted);
+        } else if (collectionRef.current && !stillShared(collectionRef.current)) {
+          // A collection that is no longer shared with us falls back to our own,
+          // cleared exactly like a manual switch.
+          resetView(null);
         }
-        // A collection that is no longer shared with us falls back to our own.
-        setCollection((prev) => (prev && !list.some((c) => c.owner.id === prev) ? null : prev));
       });
       return () => {
         alive = false;
       };
-    }, [user?.id]),
+    }, [user?.id, resetView]),
   );
 
   // Summary (unfiltered by category): totals and the category bar.
@@ -196,16 +213,7 @@ function ExpensesScreen() {
 
   const switchCollection = (value: string | null) => {
     if (value === collection) return;
-    // Nothing from the old collection may linger while the new one loads.
-    setCollection(value);
-    setCategory('all');
-    setItems([]);
-    setTotal(0);
-    setSummary(null);
-    setAnyHistory(false);
-    setError(null);
-    setActionError(null);
-    setListLoading(true);
+    resetView(value);
   };
 
   const pickCategory = (value: ExpenseCategory | 'all') => {
@@ -565,8 +573,7 @@ function ExpensesScreen() {
         source="expenses"
         visible={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        feature="Expense tracking"
-        message="Log what you spend on feeders, substrate, enclosures and vet visits, and see what each animal costs to keep."
+        message="Expense tracking is a Premium feature."
       />
     </View>
   );
@@ -606,7 +613,7 @@ const styles = StyleSheet.create({
   dot: { width: SPACING.sm, height: SPACING.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   chipRowScroll: { flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.xs },
-  chip: { borderWidth: 1, paddingHorizontal: SPACING.md, minHeight: 36, justifyContent: 'center' },
+  chip: { borderWidth: 1, paddingHorizontal: SPACING.md, minHeight: 44, justifyContent: 'center' },
   monthHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   monthLabel: { textTransform: 'uppercase', letterSpacing: 0.5 },
   list: { borderWidth: 1, overflow: 'hidden' },

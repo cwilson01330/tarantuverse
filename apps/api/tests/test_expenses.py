@@ -1172,3 +1172,190 @@ def test_summary_and_animal_cost_routes_carry_the_keeper_policy():
     order = [r.path for r in expenses.router.routes if getattr(r, "endpoint", None)]
     assert order.index("/summary") < order.index("/{expense_id}")
     assert order.index("/animal-cost") < order.index("/{expense_id}")
+
+
+# ── P1 hardening (expense polish) ────────────────────────────────────────────
+
+def raw_put(client, user, expense_id, raw):
+    return client.put(f"{URL}{expense_id}", content=raw,
+                      headers={**hdr(user), "Content-Type": "application/json"})
+
+
+@pytest.mark.parametrize("field, token", [
+    ("description", "NaN"), ("description", "Infinity"), ("description", "-Infinity"),
+    ("notes", "NaN"), ("notes", "Infinity"), ("category", "Infinity"), ("spent_on", "NaN"),
+])
+def test_non_finite_in_other_fields_is_422_never_stored_on_create(client, world, field, token):
+    """Only `amount` is sanitised: a bare NaN/Infinity elsewhere is a plain 422 (not a 500,
+    not stored as the text "nan")."""
+    marker = "__NONFINITE__"
+    raw = json.dumps({**body(), field: marker}).replace(f'"{marker}"', token)
+    r = client.post(URL, content=raw, headers={**hdr(world.owner), "Content-Type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert any(field in e["loc"] for e in r.json()["detail"]), r.text
+    assert world.db.query(Expense).count() == 0
+
+
+def test_non_finite_nested_in_split_is_422(client, world):
+    raw = json.dumps({**body(), "split": {"mode": "location", "location": "__X__"}}).replace('"__X__"', "NaN")
+    r = client.post(URL, content=raw, headers={**hdr(world.owner), "Content-Type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert world.db.query(Expense).count() == 0
+
+
+@pytest.mark.parametrize("field, token", [
+    ("description", "NaN"), ("description", "Infinity"), ("notes", "Infinity"), ("notes", "NaN"),
+    ("category", "-Infinity"),
+])
+def test_non_finite_in_other_fields_is_422_never_stored_on_update(client, world, post, field, token):
+    made = post(world.owner, body(description="Original", notes="keep")).json()
+    marker = "__NONFINITE__"
+    raw = json.dumps({field: marker}).replace(f'"{marker}"', token)
+    r = raw_put(client, world.owner, made["id"], raw)
+    assert r.status_code == 422, r.text
+    world.db.expire_all()
+    row = world.db.get(Expense, uuid.UUID(made["id"]))
+    assert row.description == "Original" and row.notes == "keep"
+
+
+@pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity"])
+def test_non_finite_amount_on_update_is_422(client, world, post, token):
+    made = post(world.owner, body()).json()
+    r = raw_put(client, world.owner, made["id"], '{"amount": %s}' % token)
+    assert r.status_code == 422, r.text
+    world.db.expire_all()
+    assert world.db.get(Expense, uuid.UUID(made["id"])).amount == Decimal("10.00")
+
+
+@pytest.mark.parametrize(
+    "sent",
+    ["1e30", 1e30, "9" * 29, "0.004", "NaN", "-5", "Infinity", "-Infinity", 0, "abc", 100001],
+)
+def test_put_amount_422_list_mirrors_post(client, world, post, sent):
+    made = post(world.owner, body()).json()
+    r = client.put(f"{URL}{made['id']}", json={"amount": sent}, headers=hdr(world.owner))
+    assert r.status_code == 422, r.text
+    world.db.expire_all()
+    assert world.db.get(Expense, uuid.UUID(made["id"])).amount == Decimal("10.00")
+
+
+def test_put_amount_rounds_half_up(client, world, post):
+    made = post(world.owner, body()).json()
+    r = client.put(f"{URL}{made['id']}", json={"amount": "30.005"}, headers=hdr(world.owner))
+    assert r.status_code == 200, r.text
+    assert r.json()["amount"] == "30.01"
+
+
+def _amount_msgs(resp):
+    return [e["msg"] for e in resp.json()["detail"] if "amount" in e["loc"]]
+
+
+@pytest.mark.parametrize("sent", [-5, "-5", "-0.01", -1e30, "-1e30", "-" + "9" * 29])
+def test_negative_amount_message(client, world, post, sent):
+    r = post(world.owner, body(amount=sent))
+    assert r.status_code == 422, r.text
+    assert _amount_msgs(r) == ["Value error, Amount must be more than $0"], r.text
+    made = post(world.owner, body()).json()
+    r = client.put(f"{URL}{made['id']}", json={"amount": sent}, headers=hdr(world.owner))
+    assert r.status_code == 422
+    assert _amount_msgs(r) == ["Value error, Amount must be more than $0"], r.text
+
+
+@pytest.mark.parametrize("sent", [0, "0", "0.004"])
+def test_zero_amount_message(client, world, post, sent):
+    r = post(world.owner, body(amount=sent))
+    assert r.status_code == 422, r.text
+    assert _amount_msgs(r) == ["Value error, Amount must be more than $0"], r.text
+    made = post(world.owner, body()).json()
+    r = client.put(f"{URL}{made['id']}", json={"amount": sent}, headers=hdr(world.owner))
+    assert r.status_code == 422, r.text
+    assert _amount_msgs(r) == ["Value error, Amount must be more than $0"], r.text
+
+
+@pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity"])
+def test_bare_non_finite_split_is_422_on_create(client, world, token):
+    raw = json.dumps({**body(), "split": "__X__"}).replace('"__X__"', token)
+    r = client.post(URL, content=raw, headers={**hdr(world.owner), "Content-Type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert world.db.query(Expense).count() == 0
+
+
+@pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity"])
+def test_bare_non_finite_split_on_update_is_422_and_keeps_the_split(client, world, post, token):
+    db, owner = world.db, world.owner
+    for _ in range(3):
+        mk_invert(db, owner)
+    made = post(owner, body(amount="30", split={"mode": "collection"})).json()
+    assert made["split_mode"] == "collection" and made["share_count"] == 3
+    r = raw_put(client, owner, made["id"], '{"split": %s}' % token)
+    assert r.status_code == 422, r.text
+    db.expire_all()
+    row = db.get(Expense, uuid.UUID(made["id"]))
+    assert row.split_mode == "collection"
+    assert db.query(ExpenseShare).filter(ExpenseShare.expense_id == row.id).count() == 3
+
+
+@pytest.mark.parametrize("raw", ["[NaN]", "NaN", "[Infinity, -Infinity]", "Infinity"])
+def test_non_dict_body_with_non_finite_is_422_not_500(client, world, post, raw):
+    headers = {**hdr(world.owner), "Content-Type": "application/json"}
+    r = client.post(URL, content=raw, headers=headers)
+    assert r.status_code == 422, r.text
+    made = post(world.owner, body()).json()
+    r = raw_put(client, world.owner, made["id"], raw)
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.parametrize("sent", [100001, "100000.005", 1e30, "9" * 29])
+def test_over_the_cap_message_is_unchanged(client, world, post, sent):
+    r = post(world.owner, body(amount=sent))
+    assert r.status_code == 422, r.text
+    assert _amount_msgs(r) == ["Value error, Amount can be at most $100,000.00"], r.text
+
+
+def test_animal_cost_ignores_another_owners_expense_with_a_share_on_my_invert(client, world):
+    db, o = world.db, world.owner
+    t = mk_invert(db, o, name="Rosie")
+    mine = add_expense(db, o, D(2026, 2, 1), "feeders", "5.00", [(t, "5.00")], desc="Mine")
+    intruder = mk_user(db, "intruder")
+    add_expense(db, intruder, D(2026, 2, 2), "health_vet", "70.00", [(t, "70.00")], desc="Planted")
+    out = get_cost(client, o, invert_id=str(t.id)).json()
+    assert out["shares_total"] == "5.00" and out["total"] == "5.00"
+    assert out["by_category"] == {"feeders": "5.00"}
+    assert [s["expense_id"] for s in out["shares"]] == [str(mine.id)]
+
+
+def test_animal_cost_ignores_an_hv_app_expense_with_a_share_on_a_tv_invert(client, world):
+    db, o = world.db, world.owner
+    t = mk_invert(db, o, name="Rosie")
+    colony = mk_colony(db, o, name="Isos")
+    add_expense(db, o, D(2026, 2, 1), "feeders", "5.00", [(t, "5.00")], desc="Mine")
+    add_expense(db, o, D(2026, 2, 3), "shipping", "9.00", [(t, "9.00")], app=HV, desc="WrongApp")
+    add_expense(db, o, D(2026, 2, 3), "shipping", "4.00", [(colony, "4.00")], app=HV, desc="WrongApp")
+    out = get_cost(client, o, invert_id=str(t.id)).json()
+    assert out["shares_total"] == "5.00" and out["by_category"] == {"feeders": "5.00"}
+    assert [s["description"] for s in out["shares"]] == ["Mine"]
+    assert get_cost(client, o, colony_id=str(colony.id)).json()["shares"] == []
+
+
+def test_animal_cost_for_an_hv_animal_ignores_other_owner_and_tv_app_rows(client, world):
+    db = world.db
+    hv_owner = mk_user(db, "hvowner3")
+    make_premium(db, hv_owner, HV)
+    snake = mk_animal(db, hv_owner, name="Noodle")
+    add_expense(db, hv_owner, today(), "heat_lighting", "30.00", [(snake, "30.00")], app=HV, desc="Mine")
+    add_expense(db, hv_owner, today(), "heat_lighting", "11.00", [(snake, "11.00")], app=TV, desc="WrongApp")
+    other = mk_user(db, "hvother")
+    add_expense(db, other, today(), "heat_lighting", "22.00", [(snake, "22.00")], app=HV, desc="Planted")
+    out = get_cost(client, hv_owner, animal_id=str(snake.id)).json()
+    assert out["shares_total"] == "30.00" and out["total"] == "30.00"
+    assert [s["description"] for s in out["shares"]] == ["Mine"]
+
+
+def test_animal_cost_for_a_cokeeper_view_is_pinned_to_the_animals_owner(client, world):
+    """A keeper reads the OWNER's animal; the keeper's own ledger rows never count."""
+    db, o = world.db, world.owner
+    t = mk_invert(db, o, name="Rosie")
+    add_expense(db, o, D(2026, 2, 1), "feeders", "5.00", [(t, "5.00")])
+    add_expense(db, world.keeper, D(2026, 2, 2), "feeders", "6.00", [(t, "6.00")], desc="KeeperOwn")
+    out = get_cost(client, world.keeper, invert_id=str(t.id)).json()
+    assert out["shares_total"] == "5.00"

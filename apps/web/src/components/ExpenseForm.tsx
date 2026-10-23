@@ -183,13 +183,20 @@ export default function ExpenseForm({ open, token, collection, editing, onClose,
       setCategory(editing.category)
       setNotes(editing.notes ?? '')
       setSplitMode(editing.split_mode)
+      // A saved location split starts "Change split" on its own location (the
+      // list item already carries it), so the chip isn't empty.
+      setLocation(editing.split_mode === 'location' ? editing.split_label : null)
       setShowSplit(false)
       // Read the saved shares to seed the split. Failing only means the keeper
       // re-picks if they choose to change it; an untouched split is never sent.
       setSeeding(true)
       getExpense(editing.id)
         .then((d) => {
-          if (alive) setSavedShares(d.shares)
+          if (!alive) return
+          // Seed only when no location is set yet: a keeper who already picked one
+          // after "Change split" must not have it overwritten by this late response.
+          setLocation((prev) => prev ?? (d.split_mode === 'location' ? d.split_label : null))
+          setSavedShares(d.shares)
         })
         .catch(() => {})
         .finally(() => {
@@ -248,6 +255,11 @@ export default function ExpenseForm({ open, token, collection, editing, onClose,
   const missingNote = missingTargetsNote(seeded?.missing ?? 0)
   // A touched split can't be built from picks until the list that filters them has arrived.
   const splitWaiting = !!editing && splitTouched && living.loading
+  // The same for a list that FAILED: a split built from picks (new, or touched) has
+  // nothing to filter against, so it can't be saved until "Try again" succeeds. An
+  // untouched saved split is never sent, so a failed list doesn't block that.
+  const listFailed = splitMode === 'animals' && (!editing || splitTouched) && !!living.error
+  const splitBlocked = splitWaiting || listFailed
 
   const amount = useMemo(() => parseAmount(amountText), [amountText])
   const pickedCount = picked.inverts.length + picked.colonies.length
@@ -291,7 +303,7 @@ export default function ExpenseForm({ open, token, collection, editing, onClose,
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (saving || splitWaiting) return
+    if (saving || splitBlocked) return
     const desc = description.trim()
     if (!desc) return setError('Add a short description.')
     if (desc.length > EXPENSE_DESCRIPTION_MAX) return setError(`Keep the description under ${EXPENSE_DESCRIPTION_MAX} characters.`)
@@ -531,7 +543,7 @@ export default function ExpenseForm({ open, token, collection, editing, onClose,
             </button>
             <button
               type="submit"
-              disabled={saving || splitWaiting}
+              disabled={saving || splitBlocked}
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60"
             >
               {saving ? 'Saving…' : editing ? 'Save changes' : 'Add expense'}

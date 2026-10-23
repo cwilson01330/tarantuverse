@@ -68,8 +68,9 @@ export function useLivingAnimals(collection: string | null, enabled: boolean): L
     setError(null);
     Promise.all([
       listInverts(collection),
-      // Colonies are an extra: a failure shows fewer rows, not a blank picker.
-      listColonies(false, collection).catch(() => []),
+      // No fallback: a colonies failure fails the whole list. A partial list would
+      // make saved colony shares look like "no longer in your collection".
+      listColonies(false, collection),
     ])
       .then(([animals, colonies]) => {
         if (!alive) return;

@@ -516,7 +516,6 @@ export default function ExpensesPage() {
         source="expenses"
         isOpen={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        message="Expense tracking is a Premium feature. Log what you spend on feeders, substrate, enclosures and vet visits, and see what each animal costs to keep."
       />
     </div>
   )

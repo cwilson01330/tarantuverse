@@ -81,15 +81,28 @@ const PREMIUM_PERKS = [
   'Feeding, weight, shed and health logs stay free, always',
 ];
 
+// Per-source headline and lead perk. A caller-supplied `title` still wins; a
+// source without an entry keeps the cap headline and the standard perk list.
+const SOURCE_TITLES: Partial<Record<UpgradeSource, string>> = {
+  expenses: 'Track what your collection costs',
+};
+const SOURCE_PERKS: Partial<Record<UpgradeSource, string>> = {
+  expenses:
+    'Log feeders, substrate, enclosures and vet bills, split them across your animals, and see what each one costs to keep.',
+};
+
 export default function UpgradeModal({
   visible,
   onClose,
   source,
-  title = "You've reached the free limit",
+  title,
   message = 'The free plan tracks up to 5 animals. Premium keepers get unlimited animals.',
   currentCount,
   limit,
 }: UpgradeModalProps) {
+  const shownTitle = title ?? SOURCE_TITLES[source] ?? "You've reached the free limit";
+  const sourcePerk = SOURCE_PERKS[source];
+  const perks = sourcePerk ? [sourcePerk, ...PREMIUM_PERKS] : PREMIUM_PERKS;
   const { colors, layout } = useTheme();
   const insets = useSafeAreaInsets();
   const { token, refreshUser } = useAuth();
@@ -286,7 +299,7 @@ export default function UpgradeModal({
                 <MaterialCommunityIcons name="star-four-points" size={22} color="#0B0B0B" />
               </View>
               <View style={styles.headerText}>
-                <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+                <Text style={[styles.title, { color: colors.textPrimary }]}>{shownTitle}</Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{message}</Text>
               </View>
               <TouchableOpacity
@@ -337,7 +350,7 @@ export default function UpgradeModal({
               <Text style={[styles.perksTitle, { color: colors.textPrimary }]}>
                 What premium unlocks
               </Text>
-              {PREMIUM_PERKS.map((perk) => (
+              {perks.map((perk) => (
                 <View key={perk} style={styles.perkRow}>
                   <MaterialCommunityIcons
                     name="check-circle"

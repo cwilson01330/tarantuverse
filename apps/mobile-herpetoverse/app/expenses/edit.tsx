@@ -470,8 +470,7 @@ function ExpenseEditScreen() {
         source="expenses"
         visible={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        title="Expense tracking is a Premium feature"
-        message="Log what you spend on feeders, substrate, enclosures and vet visits, and see what each animal costs to keep."
+        message="Expense tracking is a Premium feature."
       />
     </View>
   );

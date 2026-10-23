@@ -471,10 +471,15 @@ async def animal_cost(
         app, column, target = "herpetoverse", ExpenseShare.animal_id, animal_id
         purchase = row.price_paid
 
+    # Pin every figure to the animal's OWNER and the app its id kind implies, so
+    # a stray share row (another user's ledger, the other app's) can never leak in.
+    owner_id = access.owner.id
+    pinned = (column == target, Expense.owner_id == owner_id, Expense.app == app)
+
     shares_total = _money(
         db.query(func.sum(ExpenseShare.amount))
         .join(Expense, Expense.id == ExpenseShare.expense_id)
-        .filter(column == target)
+        .filter(*pinned)
         .scalar()
     )
     by_category = {
@@ -482,7 +487,7 @@ async def animal_cost(
         for category, amount in db.query(Expense.category, func.sum(ExpenseShare.amount))
         .select_from(ExpenseShare)
         .join(Expense, Expense.id == ExpenseShare.expense_id)
-        .filter(column == target)
+        .filter(*pinned)
         .group_by(Expense.category)
         .order_by(func.sum(ExpenseShare.amount).desc(), Expense.category)
         .all()
@@ -492,7 +497,7 @@ async def animal_cost(
             Expense.id, Expense.spent_on, Expense.description, Expense.category, ExpenseShare.amount,
         )
         .join(ExpenseShare, ExpenseShare.expense_id == Expense.id)
-        .filter(column == target)
+        .filter(*pinned)
         .order_by(Expense.spent_on.desc(), Expense.created_at.desc(), Expense.id)
         .all()
     )

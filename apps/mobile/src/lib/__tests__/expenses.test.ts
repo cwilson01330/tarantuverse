@@ -57,6 +57,17 @@ describe('splitAmount', () => {
   it('refuses fewer than one share', () => {
     expect(() => splitAmount(10, 0)).toThrow();
   });
+
+  // Explicit rounding vectors (binary floats: 0.29 * 100 = 28.999999999999996,
+  // 1.005 * 100 = 100.49999999999999). The cents must come out as typed.
+  it('keeps a single share at the exact typed amount', () => {
+    expect(splitAmount(0.29, 1)).toEqual([0.29]);
+    expect(splitAmount(1.005, 1)).toEqual([1.01]);
+  });
+
+  it('spreads 9999 cents over 7 as 1428 r3: three shares carry the extra cent', () => {
+    expect(splitAmount(99.99, 7)).toEqual([14.29, 14.29, 14.29, 14.28, 14.28, 14.28, 14.28]);
+  });
 });
 
 describe('formatMoney / categories', () => {
@@ -65,6 +76,10 @@ describe('formatMoney / categories', () => {
     expect(formatMoney(30)).toBe('$30.00');
     expect(formatMoney(3.3)).toBe('$3.30');
     expect(formatMoney(0)).toBe('$0.00');
+  });
+
+  it('rounds a float that sits just under a half cent up, like the split does', () => {
+    expect(formatMoney(1.005)).toBe('$1.01');
   });
 
   it('lists the categories in the API order', () => {
@@ -226,11 +241,11 @@ describe('errors', () => {
     mockRequest.mockRejectedValueOnce({
       response: {
         status: 422,
-        data: { detail: [{ msg: 'Value error, Amount must be more than $0.00' }, { msg: 'Date can\'t be in the future' }] },
+        data: { detail: [{ msg: 'Value error, Amount must be more than $0' }, { msg: 'Date can\'t be in the future' }] },
       },
     });
     const err = await deleteExpense('x').catch((e) => e);
-    expect(err.message).toContain('Amount must be more than $0.00');
+    expect(err.message).toContain('Amount must be more than $0');
     expect(err.message).toContain("Date can't be in the future");
   });
 

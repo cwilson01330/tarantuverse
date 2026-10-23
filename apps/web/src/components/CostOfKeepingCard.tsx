@@ -23,9 +23,11 @@ interface Props {
   id: string
   /** The animal's owner. When it isn't the signed-in keeper, the link opens THAT owner's ledger. */
   ownerId?: string | null
+  /** Bottom margin, to match the neighbouring cards: the invert page's section cards use mb-4, the colony page's mb-6. */
+  spacing?: 'mb-4' | 'mb-6'
 }
 
-export default function CostOfKeepingCard({ kind, id, ownerId }: Props) {
+export default function CostOfKeepingCard({ kind, id, ownerId, spacing = 'mb-4' }: Props) {
   const { user } = useAuth()
   const [cost, setCost] = useState<AnimalCost | null>(null)
   const [expanded, setExpanded] = useState(false)
@@ -51,15 +53,15 @@ export default function CostOfKeepingCard({ kind, id, ownerId }: Props) {
   return (
     <section
       aria-labelledby="cost-of-keeping-heading"
-      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 mb-4"
+      className={`bg-surface border border-theme rounded-2xl p-5 ${spacing}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <h2 id="cost-of-keeping-heading" className="text-lg font-bold text-gray-900 dark:text-white">
+        <h2 id="cost-of-keeping-heading" className="text-lg font-bold text-theme-primary">
           Cost of keeping
         </h2>
         <Link
           href={otherOwner ? `/dashboard/expenses?collection=${encodeURIComponent(otherOwner)}` : '/dashboard/expenses'}
-          className="text-sm font-semibold text-primary-700 dark:text-primary-400 hover:underline"
+          className="text-sm font-semibold text-primary-600 hover:underline"
         >
           {cost.can_add ? 'Add expense' : 'Expenses'}
         </Link>
@@ -67,7 +69,7 @@ export default function CostOfKeepingCard({ kind, id, ownerId }: Props) {
 
       {hasAnything ? (
         <>
-          <dl className="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+          <dl className="text-sm">
             {cost.purchase_price !== null && (
               <Row label="Purchase price" value={formatMoney(cost.purchase_price)} />
             )}
@@ -83,25 +85,25 @@ export default function CostOfKeepingCard({ kind, id, ownerId }: Props) {
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
                 aria-expanded={expanded}
-                className="mt-3 text-sm font-semibold text-primary-700 dark:text-primary-400 hover:underline"
+                className="mt-3 text-sm font-semibold text-primary-600 hover:underline"
               >
                 {expanded
                   ? 'Hide expenses'
                   : `Show the ${cost.shares.length} ${cost.shares.length === 1 ? 'expense' : 'expenses'} behind this`}
               </button>
               {expanded && (
-                <ul className="mt-2 divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+                <ul className="mt-2 text-sm">
                   {cost.shares.map((s) => (
-                    <li key={`${s.expense_id}-${s.spent_on}`} className="flex items-start justify-between gap-3 py-2">
+                    <li key={`${s.expense_id}-${s.spent_on}`} className="flex items-start justify-between gap-3 py-2 border-b border-theme last:border-0">
                       <div className="min-w-0">
-                        <p className="truncate text-gray-900 dark:text-white">{s.description}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="truncate text-theme-primary">{s.description}</p>
+                        <p className="text-xs text-theme-tertiary">
                           {formatLocalDate(s.spent_on, { month: 'short', day: 'numeric', year: 'numeric' })}
                           {' · '}
                           {categoryLabel(s.category)}
                         </p>
                       </div>
-                      <span className="tabular-nums text-gray-900 dark:text-white">{formatMoney(s.amount)}</span>
+                      <span className="tabular-nums text-theme-primary">{formatMoney(s.amount)}</span>
                     </li>
                   ))}
                 </ul>
@@ -110,7 +112,7 @@ export default function CostOfKeepingCard({ kind, id, ownerId }: Props) {
           )}
         </>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-theme-tertiary">
           Nothing logged yet. Split an expense across this {kind === 'colony' ? 'colony' : 'animal'} to see what it
           costs to keep.
         </p>
@@ -121,11 +123,11 @@ export default function CostOfKeepingCard({ kind, id, ownerId }: Props) {
 
 function Row({ label, value, muted, strong }: { label: string; value: string; muted?: boolean; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-1.5">
-      <dt className={muted ? 'text-gray-500 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'}>{label}</dt>
+    <div className="flex items-center justify-between py-1.5 border-b border-theme last:border-0">
+      <dt className={muted ? 'text-theme-tertiary' : 'text-theme-secondary'}>{label}</dt>
       <dd
         className={`tabular-nums ${
-          strong ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
+          strong ? 'font-bold text-theme-primary' : 'text-theme-primary'
         }`}
       >
         {value}

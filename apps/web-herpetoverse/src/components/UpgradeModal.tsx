@@ -35,6 +35,13 @@ const TITLES: Partial<Record<UpgradeSource, string>> = {
   breeding: 'Breeding is a Premium feature',
   feeders: 'Feeder tracking is a Premium feature',
   shared_keeping: 'More sitter links',
+  expenses: 'Track what your collection costs',
+}
+
+// A perk that leads the list only for the source that opened the prompt.
+const SOURCE_PERKS: Partial<Record<UpgradeSource, string>> = {
+  expenses:
+    'Log feeders, substrate, enclosures and vet bills, split them across your animals, and see what each one costs to keep.',
 }
 
 // Matches the server gates: enforce_animal_limit, the reptile_pairings 402,
@@ -78,6 +85,8 @@ export default function UpgradeModal({
         }.`
       : 'Upgrade to Herpetoverse Premium to unlock it.'
   const headline = message && message.trim().length > 0 ? message : fallback
+  const sourcePerk = SOURCE_PERKS[source]
+  const perks = sourcePerk ? [sourcePerk, ...PERKS] : PERKS
 
   return (
     <div
@@ -111,7 +120,7 @@ export default function UpgradeModal({
         <div className="rounded-xl border border-herp-teal/30 bg-herp-teal/10 p-4 mb-6">
           <p className="font-semibold text-white mb-2">Premium keepers get:</p>
           <ul className="space-y-2 text-sm text-neutral-300">
-            {PERKS.map((perk) => (
+            {perks.map((perk) => (
               <li key={perk} className="flex items-start gap-2">
                 <span className="text-herp-lime mt-0.5" aria-hidden="true">✓</span>
                 <span>{perk}</span>

@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { INVERT_TAXA, animalDisplayName, taxonMeta } from '@/lib/inverts'
-import { listColonies, type ColonyListItem } from '@/lib/colonies'
+import { listColonies } from '@/lib/colonies'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -65,6 +65,8 @@ export interface LivingState {
   data: LivingAnimals | null
   loading: boolean
   error: string | null
+  /** Try the load again after a failure. */
+  retry: () => void
 }
 
 /**
@@ -78,6 +80,7 @@ export function useLivingAnimals(token: string, collection: string | null, enabl
   const key = collection ?? 'own'
   const [loaded, setLoaded] = useState<(LivingAnimals & { key: string }) | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!enabled) return
@@ -86,8 +89,9 @@ export function useLivingAnimals(token: string, collection: string | null, enabl
     setError(null)
     Promise.all([
       loadInverts(token, collection),
-      // Colonies are an extra: a failure shows fewer rows, not a blank picker.
-      listColonies(token, false, collection).catch((): ColonyListItem[] => []),
+      // No fallback: a colonies failure fails the whole list. A partial list would
+      // make saved colony shares look like "no longer in your collection".
+      listColonies(token, false, collection),
     ])
       .then(([a, c]) => {
         if (alive) setLoaded({ key, inverts: a, colonies: c.map((x) => ({ id: x.id, name: x.name })) })
@@ -98,10 +102,10 @@ export function useLivingAnimals(token: string, collection: string | null, enabl
     return () => {
       alive = false
     }
-  }, [enabled, token, collection, key, loaded])
+  }, [enabled, token, collection, key, loaded, attempt])
 
   const data = loaded && loaded.key === key ? loaded : null
-  return { data, loading: enabled && !data && !error, error: data ? null : error }
+  return { data, loading: enabled && !data && !error, error: data ? null : error, retry: () => setAttempt((n) => n + 1) }
 }
 
 interface Props {
@@ -170,7 +174,18 @@ export default function ExpenseAnimalPicker({ living, value, onChange }: Props) 
     return <p className="text-sm text-gray-500 dark:text-gray-400">Loading your animals…</p>
   }
   if (error) {
-    return <p role="alert" className="text-sm text-red-700 dark:text-red-400">{error}</p>
+    return (
+      <div className="flex items-center gap-3">
+        <p role="alert" className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        <button
+          type="button"
+          onClick={living.retry}
+          className="text-sm font-semibold text-primary-700 dark:text-primary-400 hover:underline"
+        >
+          Try again
+        </button>
+      </div>
+    )
   }
   if (groups.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">No living animals or open colonies to pick from.</p>

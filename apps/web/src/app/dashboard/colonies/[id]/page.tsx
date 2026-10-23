@@ -1229,7 +1229,7 @@ export default function ColonyDetailPage() {
         {/* Cost of keeping (expense tracking). Keeper role or above — not canKeep,
             which also needs the colony running: ended and transferred colonies
             keep their cost history. Other roles never trigger the request. */}
-        {canKeepRole && <CostOfKeepingCard kind="colony" id={colony.id} ownerId={colony.user_id} />}
+        {canKeepRole && <CostOfKeepingCard kind="colony" id={colony.id} ownerId={colony.user_id} spacing="mb-6" />}
 
         {/* Notes */}
         {colony.notes && (
