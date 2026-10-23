@@ -35,6 +35,7 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { MenuRow, MenuSection } from '../../src/components/YouMenu';
 import { TYPE } from '../../src/theme/tokens';
 import { openStorePage } from '../../src/lib/reviewPrompt';
+import { useWhatsNew } from '../../src/lib/whats-new';
 
 const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
 const DELETE_CONFIRM_WORD = 'DELETE';
@@ -44,6 +45,7 @@ function ProfileScreen() {
   const { theme, toggleTheme, colors, layout } = useTheme();
   const router = useRouter();
   const { isUpdatePending } = Updates.useUpdates();
+  const { unseenCount } = useWhatsNew();
 
   // Refresh user data when screen is focused
   useFocusEffect(
@@ -244,6 +246,16 @@ function ProfileScreen() {
           accessibilityHint="Co-keepers: collections shared with you, and people who help keep yours" />
         <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import')} />
         <MenuRow icon="download-outline" label="Export your data" onPress={() => router.push('/settings/data-export')} />
+        {/* The shared feed is cached for the session, so this adds no request.
+            MenuRow has no badge slot (an accessory would drop the chevron and
+            the button role), so unseen entries show as a "N new" detail line. */}
+        <MenuRow
+          icon="new-box"
+          label="What's new"
+          detail={unseenCount > 0 ? `${unseenCount} new` : undefined}
+          onPress={() => router.push('/whats-new' as never)}
+          accessibilityHint="See recent changes to the app"
+        />
         <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses')}
           accessibilityHint="Log what you spend on feeders, substrate and supplies" />
       </MenuSection>

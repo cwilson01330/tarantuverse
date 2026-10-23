@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useWhatsNew } from '@/lib/whatsNew'
 
 interface SidebarProps {
   isOpen: boolean
@@ -26,11 +27,14 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '👥', label: 'Sharing', path: '/app/sharing' },
   { icon: '↪', label: 'Transfers', path: '/app/transfers' },
   { icon: '🌐', label: 'Community', path: '/app/community', disabled: true },
+  { icon: '✨', label: "What's new", path: '/app/whats-new' },
   { icon: '⚙️', label: 'Settings', path: '/app/settings' },
 ]
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
+  // Shared, cached feed (one GET per session): the dot shows while entries are unseen.
+  const { unseenCount } = useWhatsNew()
 
   const isActive = (path: string) => {
     if (path === '/app') return pathname === '/app'
@@ -112,6 +116,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               >
                 <span className="text-lg flex-shrink-0">{item.icon}</span>
                 <span className="text-sm font-medium">{item.label}</span>
+                {item.path === '/app/whats-new' && unseenCount > 0 && (
+                  <span className="ml-auto flex items-center">
+                    <span className="h-2 w-2 rounded-full bg-herp-lime" aria-hidden="true" />
+                    <span className="sr-only">new</span>
+                  </span>
+                )}
               </Link>
             )
           })}

@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/themeStore'
 import { useAuth } from '@/hooks/useAuth'
 import GlobalSearch from './GlobalSearch'
 import { resolveDeeplink } from '@/lib/deeplinks'
+import { resetWhatsNewCache } from '@/lib/whatsNew'
 
 interface TopBarProps {
   userName?: string
@@ -55,6 +56,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
   const [notifLoading, setNotifLoading] = useState(false)
 
   const handleLogout = async () => {
+    resetWhatsNewCache()
     await signOut({ redirect: false })
     router.push('/')
   }

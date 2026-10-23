@@ -21,6 +21,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { TYPE } from '../../src/theme/tokens';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
+import WhatsNewCard from '../../src/components/WhatsNewCard';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { useBreakpoint } from '../../src/hooks/useBreakpoint';
 import { getImageUrl } from '../../src/utils/image-url';
@@ -1026,6 +1027,10 @@ function DashboardHubScreen() {
       >
         {/* Announcement Banner */}
         <AnnouncementBanner />
+
+        {/* What's new — renders only while the keeper has unseen entries; reads
+            the session-cached feed, so Home focus adds no request. */}
+        <WhatsNewCard />
 
         {/* Stat strip — handoff screen 1, step 4. Three equal cards, compact.
             Collection moved out (it's the header subtitle now) and Needs

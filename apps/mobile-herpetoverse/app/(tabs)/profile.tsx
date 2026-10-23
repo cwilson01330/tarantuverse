@@ -49,6 +49,7 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { MenuRow, MenuSection } from '../../src/components/YouMenu';
 import { getStorePageUrl } from '../../src/lib/reviewPrompt';
 import { TYPE } from '../../src/theme/type';
+import { useWhatsNew } from '../../src/lib/whats-new';
 
 // HV-owned legal pages, served from herpetoverse.com.
 const PRIVACY_URL = 'https://herpetoverse.com/privacy-policy';
@@ -73,6 +74,7 @@ function YouScreen() {
   const { user, logout, token, refreshUser, units, setMeasurementUnits } = useAuth();
   const { colors, layout } = useTheme();
   const { isUpdatePending } = Updates.useUpdates();
+  const { unseenCount } = useWhatsNew();
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -321,6 +323,15 @@ function YouScreen() {
             accessibilityHint="Co-keepers: collections shared with you, and people who help keep yours" />
           <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import' as never)} />
           <MenuRow icon="download-outline" label="Export your data" external onPress={() => openLink(EXPORT_URL)} />
+          {/* The unseen count rides in `detail`, so screen readers get it in the row label.
+              Same shared feed as the Home card: no extra request. */}
+          <MenuRow
+            icon="new-box"
+            label="What's new"
+            detail={unseenCount > 0 ? `${unseenCount} new` : undefined}
+            onPress={() => router.push('/whats-new' as never)}
+            accessibilityHint="Opens the latest changes to the app"
+          />
           <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses' as never)} />
           <MenuRow icon="calculator-variant" label="Morph calculator" detail="Predict offspring from any pairing."
             onPress={() => router.push('/morph-calculator' as never)} />

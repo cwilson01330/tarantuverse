@@ -62,6 +62,7 @@ import app.routers.collection_members as collection_members  # PRD-shared-keepin
 import app.routers.share_cards as share_cards  # share cards (spec 2026-09-29)
 import app.routers.care_sheets as care_sheets  # printable sitter care sheets
 import app.routers.expenses as expenses  # expense tracking (spec 2026-10-22)
+import app.routers.whats_new as whats_new  # What's new card + page (spec 2026-10-23)
 import app.routers.animal_events as animal_events  # ADR-015 per-animal events
 import app.routers.species_shortlist as species_shortlist  # care-sheet bookmarks
 import app.routers.waitlist as waitlist
@@ -344,6 +345,7 @@ app.include_router(animal_events.router, prefix="/api/v1", tags=["events"])
 app.include_router(share_cards.router, prefix="/api/v1", tags=["share-cards"])
 app.include_router(care_sheets.router, prefix="/api/v1", tags=["care-sheets"])
 app.include_router(expenses.router, prefix="/api/v1/expenses", tags=["expenses"])
+app.include_router(whats_new.router, prefix="/api/v1/whats-new", tags=["whats_new"])
 app.include_router(species_shortlist.router, prefix="/api/v1/species-shortlist", tags=["species"])
 
 print("[STARTUP] Registering waitlist router...")

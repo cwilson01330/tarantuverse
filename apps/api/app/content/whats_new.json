@@ -1,0 +1,70 @@
+{
+  "tarantuverse": [
+    {
+      "id": "2026-10-23-expenses",
+      "published_on": "2026-10-23",
+      "title": "Track what your collection costs",
+      "body": "Log feeders, substrate, enclosures and vet bills, split a purchase across the animals it's for, and see what each one costs to keep.",
+      "premium": true,
+      "action": { "label": "Open Expenses", "target": "expenses" }
+    },
+    {
+      "id": "2026-10-23-care-sheets",
+      "published_on": "2026-10-23",
+      "title": "Printable sitter care sheets",
+      "body": "Going away? Print or save a care sheet for the animals you pick, with feeding, water and safety notes for whoever is looking after them.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    },
+    {
+      "id": "2026-10-23-photo-timeline",
+      "published_on": "2026-10-23",
+      "title": "Photo timeline",
+      "body": "Flip through an animal's photos in date order, with each molt marked, and compare the first and latest side by side. Wrong date on a photo? You can fix it now.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    },
+    {
+      "id": "2026-10-23-feeding-cost",
+      "published_on": "2026-10-23",
+      "title": "Your own cost per feeding",
+      "body": "Advanced Analytics can now use what you actually pay per feeding instead of a flat 50¢ guess.",
+      "premium": true,
+      "action": { "label": "Open Advanced Analytics", "target": "analytics_advanced" }
+    },
+    {
+      "id": "2026-10-23-millipede-photos",
+      "published_on": "2026-10-23",
+      "title": "Photos for millipede care guides",
+      "body": "Eleven more millipede care guides now have photos, all openly licensed and credited.",
+      "premium": false,
+      "action": { "label": "Browse species", "target": "species" }
+    }
+  ],
+  "herpetoverse": [
+    {
+      "id": "2026-10-23-expenses",
+      "published_on": "2026-10-23",
+      "title": "Track what your collection costs",
+      "body": "Log feeders, substrate, enclosures, heating and vet bills, split a purchase across the animals it's for, and see what each one costs to keep.",
+      "premium": true,
+      "action": { "label": "Open Expenses", "target": "expenses" }
+    },
+    {
+      "id": "2026-10-23-care-sheets",
+      "published_on": "2026-10-23",
+      "title": "Printable sitter care sheets",
+      "body": "Going away? Print or save a care sheet for the animals you pick, with feeding, water and safety notes for whoever is looking after them.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    },
+    {
+      "id": "2026-10-23-photo-timeline",
+      "published_on": "2026-10-23",
+      "title": "Photo timeline",
+      "body": "Flip through an animal's photos in date order, with each shed marked, and compare the first and latest side by side. Wrong date on a photo? You can fix it now.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    }
+  ]
+}

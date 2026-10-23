@@ -128,6 +128,7 @@ Styling: TV web light + dark (theme classes like neighbouring dashboard cards); 
 
 - Entries are written only for features already live for keepers. Anything that needs an app update to reach phones waits until that update is out (or is dated for the day it will be).
 - Fixes and behind-the-scenes work don't get entries.
+- A new entry's `published_on` must be later than the newest entry already live in that app's feed — never add an entry to a date that has already been published (keepers who dismissed that day would never see it on the card).
 - Free vs premium is checked in the code before an entry is labelled.
 - Copy follows the honesty principle: describes what the app does today, keeper terms, no hype, no prices, never mentions other platforms (App Store rule).
 
@@ -137,7 +138,7 @@ Tarantuverse:
 1. `…-expenses` — **Track what your collection costs** (premium) — "Log feeders, substrate, enclosures and vet bills, split a purchase across the animals it's for, and see what each one costs to keep." → Open Expenses (`expenses`)
 2. `…-care-sheets` — **Printable sitter care sheets** — "Going away? Print or save a care sheet for the animals you pick, with feeding, water and safety notes for whoever is looking after them." → Open your collection (`collection`)
 3. `…-photo-timeline` — **Photo timeline** — "Flip through an animal's photos in date order, with each molt marked, and compare the first and latest side by side. Wrong date on a photo? You can fix it now." → Open your collection (`collection`)
-4. `…-feeding-cost` — **Your own cost per feeding** (premium) — "Advanced Analytics now uses what you actually pay per feeding instead of a flat 50¢ guess." → Open Advanced Analytics (`analytics_advanced`)
+4. `…-feeding-cost` — **Your own cost per feeding** (premium) — "Advanced Analytics can now use what you actually pay per feeding instead of a flat 50¢ guess." → Open Advanced Analytics (`analytics_advanced`)
 5. `…-millipede-photos` — **Photos for millipede care guides** — "Eleven more millipede care guides now have photos, all openly licensed and credited." → Browse species (`species`)
 
 Herpetoverse:

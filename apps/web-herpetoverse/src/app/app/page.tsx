@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import WhatsNewCard from '@/components/WhatsNewCard'
 
 export default function AppHomePage() {
   return (
@@ -15,6 +16,8 @@ export default function AppHomePage() {
           shared with Tarantuverse.
         </p>
       </header>
+
+      <WhatsNewCard />
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <DashCard

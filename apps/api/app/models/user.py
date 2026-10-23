@@ -1,7 +1,7 @@
 """
 User model
 """
-from sqlalchemy import CheckConstraint, Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Numeric
+from sqlalchemy import CheckConstraint, Column, String, Boolean, DateTime, Date, Text, Integer, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -108,6 +108,12 @@ class User(Base):
     # shown after the first completed Feeding Day batch. NULL = never shown.
     # On the user, not the device, so it can't reappear on a second phone.
     premium_intro_seen_at = Column(DateTime(timezone=True), nullable=True)
+
+    # "What's new" card: the published_on of the newest entry this keeper has
+    # dismissed, per app (the highlights file is per app). NULL = never
+    # dismissed. On the user, not the device, so a dismissal follows them.
+    whats_new_seen_tv = Column(Date, nullable=True)
+    whats_new_seen_hv = Column(Date, nullable=True)
 
     # Display units: 'imperial' (in, °F) or 'metric' (cm, °C). NULL = never
     # chosen; clients default from the device/browser region and save it once.

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { TarantuverseLogoTransparent } from './TarantuverseLogo'
 import { useAuth } from '@/hooks/useAuth'
+import { useWhatsNew } from '@/lib/whatsNew'
 
 interface SidebarProps {
   isOpen: boolean
@@ -17,6 +18,23 @@ interface NavItem {
   label: string
   path: string
   badge?: number
+  /** Render the "new" dot slot on the icon (What's new). Signed-in sessions only. */
+  whatsNewDot?: boolean
+}
+
+/**
+ * Red dot on the What's new icon while there are unseen entries. Its own component so the
+ * feed request (an authenticated GET) only happens once the sidebar knows there is a
+ * signed-in session: DashboardLayout also wraps public pages.
+ */
+function WhatsNewDot() {
+  const { unseenCount } = useWhatsNew()
+  if (unseenCount === 0) return null
+  return (
+    <span className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900">
+      <span className="sr-only">new</span>
+    </span>
+  )
 }
 
 export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
@@ -66,6 +84,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
     { icon: '🧳', label: 'Sitter', path: '/dashboard/sitter' },
     { icon: '👥', label: 'Sharing', path: '/dashboard/sharing' },
     { icon: '🏆', label: 'Achievements', path: '/dashboard/achievements' },
+    { icon: '✨', label: "What's new", path: '/dashboard/whats-new', whatsNewDot: true },
     { icon: '✨', label: 'Discover', path: '/community/discover' },
     { icon: '🌐', label: 'Community', path: '/community' },
     { icon: '💬', label: 'Forums', path: '/community/forums' },
@@ -167,7 +186,10 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
                 `}
                 title={isCollapsed ? item.label : undefined}
               >
-                <span className="text-xl flex-shrink-0">{item.icon}</span>
+                <span className="relative text-xl flex-shrink-0">
+                  {item.icon}
+                  {item.whatsNewDot && token && <WhatsNewDot />}
+                </span>
                 {!isCollapsed && (
                   <span className="font-medium text-sm">{item.label}</span>
                 )}

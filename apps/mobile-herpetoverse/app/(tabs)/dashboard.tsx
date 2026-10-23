@@ -55,6 +55,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { GradientBand } from '../../src/components/GradientBand';
 import { NotificationBell } from '../../src/components/NotificationBell';
+import { WhatsNewCard } from '../../src/components/WhatsNewCard';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -368,6 +369,9 @@ function DashboardScreen() {
           />
         }
       >
+        {/* ---------- What's new (renders nothing unless there is something unseen) ---------- */}
+        <WhatsNewCard />
+
         {/* ---------- Feeding hero ---------- */}
         <View
           style={[

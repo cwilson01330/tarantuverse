@@ -12,6 +12,8 @@ import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
+import WhatsNewCard from '@/components/WhatsNewCard'
+import { resetWhatsNewCache } from '@/lib/whatsNew'
 import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload, Utensils } from 'lucide-react'
 import type { ColonyListItem } from '@/lib/colonies'
 
@@ -134,6 +136,7 @@ export default function DashboardHub() {
   /** If any core API call returns 401, the token is dead — force re-login */
   const handleExpiredToken = useCallback(async () => {
     localStorage.removeItem('auth_token')
+    resetWhatsNewCache()
     await signOut({ redirect: false })
     router.push('/login')
   }, [router])
@@ -417,6 +420,9 @@ export default function DashboardHub() {
 
         {/* Announcement Banner */}
         <AnnouncementBanner />
+
+        {/* What's new — only when there are unseen entries */}
+        <WhatsNewCard />
 
         {/* Premolt Alerts Card */}
         <PremoltAlertsCard />
