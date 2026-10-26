@@ -118,7 +118,10 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    # Off unless set. When it defaulted to True, production (which never sets
+    # it) logged every SQL statement with its values — emails, notes,
+    # messages — into Render's logs. Local dev turns it on in .env.
+    DEBUG: bool = False
 
     class Config:
         env_file = "../../.env"  # Point to root .env file
