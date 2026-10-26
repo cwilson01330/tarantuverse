@@ -85,7 +85,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
     { icon: '👥', label: 'Sharing', path: '/dashboard/sharing' },
     { icon: '🏆', label: 'Achievements', path: '/dashboard/achievements' },
     { icon: '✨', label: "What's new", path: '/dashboard/whats-new', whatsNewDot: true },
-    { icon: '✨', label: 'Discover', path: '/community/discover' },
+    { icon: '🧭', label: 'Discover', path: '/community/discover' },
     { icon: '🌐', label: 'Community', path: '/community' },
     { icon: '💬', label: 'Forums', path: '/community/forums' },
     { icon: '⚙️', label: 'Settings', path: '/dashboard/settings' },
@@ -121,14 +121,14 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
+          fixed top-0 left-0 h-full flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
           shadow-xl transition-all duration-300 z-50
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${isCollapsed ? 'w-20' : 'w-64'}
         `}
       >
         {/* Logo / Brand */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="h-16 shrink-0 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
           {!isCollapsed && (
             <div className="flex items-center gap-3">
               <TarantuverseLogoTransparent className="w-8 h-8" />
@@ -169,7 +169,9 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
         </div>
 
         {/* Navigation */}
-        <nav data-tour="sidebar-nav" className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+        {/* flex-1 + min-h-0 inside the flex-column aside: the list scrolls
+            instead of running off the bottom of the screen. */}
+        <nav data-tour="sidebar-nav" className="flex-1 min-h-0 py-4 px-3 space-y-1 overflow-y-auto overscroll-contain">
           {navItems.map((item) => {
             const active = isActive(item.path)
             return (
@@ -204,7 +206,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
         </nav>
 
         {/* Footer - User Section */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+        <div className="shrink-0 p-4 border-t border-gray-200 dark:border-gray-800">
           {!isCollapsed ? (
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
               Tarantuverse v0.5.1

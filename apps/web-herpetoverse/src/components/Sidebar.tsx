@@ -54,13 +54,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       <aside
         className={`
-          fixed top-0 left-0 h-full w-64 bg-neutral-950 border-r border-neutral-800
+          fixed top-0 left-0 h-full w-64 flex flex-col bg-neutral-950 border-r border-neutral-800
           transition-transform duration-300 z-50
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
         {/* Brand */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-neutral-800">
+        <div className="h-16 shrink-0 flex items-center justify-between px-4 border-b border-neutral-800">
           <Link href="/app" className="flex items-center gap-2.5" onClick={onClose}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.svg" alt="" width={32} height={33} className="select-none" draggable={false} />
@@ -81,7 +81,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Nav */}
-        <nav className="p-3 space-y-1">
+        {/* Scrolls inside the full-height column when the list outgrows the screen. */}
+        <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 space-y-1">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item.path)
 
@@ -128,7 +129,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800">
+        <div className="shrink-0 p-4 border-t border-neutral-800">
           <p className="text-[10px] uppercase tracking-widest text-neutral-500">
             Herpetoverse
           </p>
