@@ -130,13 +130,17 @@ class TestInvite:
     def test_creates_a_pending_invite_with_only_the_token_hash_stored(self, quiet):
         owner = person()
         db = DB()
+        # Bracket the call: module-level NOW is set at import, which can be
+        # many seconds earlier in a full-suite run.
+        before = datetime.now(timezone.utc)
         out = self.call(owner, db)
+        after = datetime.now(timezone.utc)
         (row,) = db.added
         (_, raw) = quiet[0]
         assert row.status == "pending" and row.invited_email == "alex@example.com"
         assert row.invite_token_hash == cm._hash(raw) and raw not in (row.invite_token_hash or "")
         assert out.accept_url.endswith(f"/invite#{raw}") and "?" not in out.accept_url
-        assert row.invite_expires_at - NOW <= cm.INVITE_TTL + timedelta(seconds=5)
+        assert before + cm.INVITE_TTL <= row.invite_expires_at <= after + cm.INVITE_TTL
 
     def test_the_cap_is_ten_live_members_and_invites(self):
         owner = person()

@@ -78,14 +78,21 @@ def test_global_feed_excludes_private_accounts(client, db_session):
 def test_following_a_private_keeper_does_not_expose_their_activity(
     client, db_session, test_user, auth_headers
 ):
+    follower, _ = test_user  # the fixture returns (user, raw_password)
     private_user = _make_user(db_session, visibility="private")
+    public_user = _make_user(db_session, visibility="public")
     _log_activity(db_session, private_user, "SECRET-SPIDER")
-    db_session.add(Follow(follower_id=test_user.id, followed_id=private_user.id))
+    _log_activity(db_session, public_user, "SHARED-SPIDER")
+    db_session.add(Follow(follower_id=follower.id, followed_id=private_user.id))
+    db_session.add(Follow(follower_id=follower.id, followed_id=public_user.id))
     db_session.commit()
 
     response = client.get("/api/v1/activity/feed", headers=auth_headers)
     assert response.status_code == 200
 
+    # Positive control: the feed does show followed activity, so the check
+    # below can't pass just because the feed came back empty.
+    assert "SHARED-SPIDER" in response.text
     assert "SECRET-SPIDER" not in response.text, (
         "Following is not consent — a private keeper's activity reached a follower."
     )
