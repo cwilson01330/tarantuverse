@@ -390,6 +390,87 @@ export default function InvertDetailPage() {
     fetchAll()
   }, [isLoading, isAuthenticated, token, fetchAll, router])
 
+  // The premolt card loads its own prediction once; bumping this remounts it
+  // after a feeding or molt changes, so it re-reads instead of going stale.
+  const [premoltKey, setPremoltKey] = useState(0)
+
+  /**
+   * Re-read only what an in-place action changed — quietly, without the
+   * full-page loading state. fetchAll (first load, focus, died/revive,
+   * transfer, species link) still reloads everything; a log or photo delete,
+   * a new hero or a new pairing used to rerun all ~12 requests and blank the
+   * page for it. Mirrors mobile's refreshSlices.
+   */
+  type Slice = 'invert' | 'feedings' | 'molts' | 'substrate' | 'photos' | 'care' | 'events' | 'growth' | 'stats' | 'pairings'
+  const refreshSlices = async (slices: Slice[]) => {
+    if (!id || !token) return
+    const headers = { Authorization: `Bearer ${token}` }
+    const want = new Set(slices)
+    const list = async (path: string): Promise<{ data: any[]; state: LoadState }> => {
+      try {
+        const r = await fetch(`${API_URL}/api/v1/inverts/${id}/${path}`, { headers })
+        if (!r.ok) return { data: [], state: 'error' }
+        return { data: await r.json(), state: 'ok' }
+      } catch {
+        return { data: [], state: 'error' }
+      }
+    }
+    let taxon = invert?.taxon
+    if (want.has('invert')) {
+      try {
+        const r = await fetch(`${API_URL}/api/v1/inverts/${id}`, { headers })
+        if (r.ok) {
+          const fresh: Invert = await r.json()
+          setInvert(fresh)
+          taxon = fresh.taxon
+        }
+      } catch { /* keep what's on screen */ }
+    }
+    const tasks: Promise<void>[] = []
+    const listSlices: [Slice, string, (d: any[]) => void, keyof typeof logState][] = [
+      ['feedings', 'feedings', setFeedings, 'feedings'],
+      ['molts', 'molts', setMolts, 'molts'],
+      ['substrate', 'substrate-changes', setSubstrate, 'substrate'],
+      ['photos', 'photos', setPhotos, 'photos'],
+      ['care', 'care-logs', setCareLogs, 'care'],
+      ['events', 'events', setEvents, 'events'],
+    ]
+    for (const [slice, path, set, stateKey] of listSlices) {
+      if (!want.has(slice)) continue
+      tasks.push(list(path).then(({ data, state }) => {
+        set(data)
+        setLogState((prev) => ({ ...prev, [stateKey]: state }))
+      }))
+    }
+    if (want.has('growth') && taxon && taxonHasModule(taxon, 'growth')) {
+      tasks.push(
+        fetch(`${API_URL}/api/v1/inverts/${id}/growth`, { headers })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          .then((g) => setGrowth(g)),
+      )
+    }
+    if (want.has('stats') && taxon) {
+      const t = taxon
+      tasks.push((async () => {
+        const [fs, ts] = await Promise.all([
+          taxonHasModule(t, 'feedingStats') ? fetchInvertStats(id, headers) : Promise.resolve(null),
+          t === 'tarantula' ? fetchTarantulaStats(id, headers) : Promise.resolve(null),
+        ])
+        setFeedingStats(fs)
+        setTarantulaStats(ts)
+      })())
+    }
+    if (want.has('pairings') && taxon && taxonHasModule(taxon, 'breeding')) {
+      tasks.push(
+        fetch(`${API_URL}/api/v1/inverts/${id}/pairings`, { headers })
+          .then((r) => (r.ok ? r.json() : [])).catch(() => [])
+          .then((pr) => setPairings(Array.isArray(pr) ? pr : [])),
+      )
+    }
+    await Promise.all(tasks)
+    if (want.has('feedings') || want.has('molts')) setPremoltKey((k) => k + 1)
+  }
+
   const openDied = () => {
     // Default to today, but leave it editable — backdating is normal, because
     // most people log this once they've dealt with it.
@@ -517,14 +598,17 @@ export default function InvertDetailPage() {
   }
 
   // ── Inline log + photo management (ADR-008) ─────────────────────────────
-  const deleteLog = async (path: string, label: string) => {
+  // `slices` = what this delete can change. A feeding moves the feeding
+  // stats and last-fed date; a molt moves growth and the instar count on the
+  // animal; a substrate change moves the animal's current substrate.
+  const deleteLog = async (path: string, label: string, slices: Slice[]) => {
     if (!token) return
     if (!confirm(`Delete this ${label} entry? This cannot be undone.`)) return
     try {
       const res = await fetch(`${API_URL}/api/v1/${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok && res.status !== 204) throw new Error()
-      fetchAll()
-    } catch { alert('Could not delete. Please try again.') }
+    } catch { alert('Could not delete. Please try again.'); return }
+    await refreshSlices(slices)
   }
 
   const setHeroPhoto = async (photoId: string) => {
@@ -532,8 +616,8 @@ export default function InvertDetailPage() {
     try {
       const res = await fetch(`${API_URL}/api/v1/photos/${photoId}/set-main`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error()
-      fetchAll()
-    } catch { alert('Could not set hero photo.') }
+    } catch { alert('Could not set hero photo.'); return }
+    await refreshSlices(['invert', 'photos'])
   }
 
   // Photo timeline "Change date": the keeper sets the day a photo was taken
@@ -559,8 +643,9 @@ export default function InvertDetailPage() {
     try {
       const res = await fetch(`${API_URL}/api/v1/photos/${photoId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok && res.status !== 204) throw new Error()
-      fetchAll()
-    } catch { alert('Could not delete photo.') }
+    } catch { alert('Could not delete photo.'); return }
+    // The API promotes the next photo to hero, so the animal is re-read too.
+    await refreshSlices(['invert', 'photos'])
   }
 
   const createPairing = async () => {
@@ -591,7 +676,7 @@ export default function InvertDetailPage() {
       if (saved?.warnings?.length) alert(saved.warnings.join('\n\n'))
       setPairOpen(false)
       setPairMateId('')
-      fetchAll()
+      refreshSlices(['pairings'])
     } catch {
       alert('Could not create the pairing. Please try again.')
     } finally {
@@ -816,7 +901,7 @@ export default function InvertDetailPage() {
                 fetches its own data from the canonical premolt endpoint. */}
             {taxonHasModule(invert.taxon, 'premolt') && !invert.died_at && (
               <div className="mb-6">
-                <PremoltPredictionSection tarantulaId={invert.id} />
+                <PremoltPredictionSection key={premoltKey} tarantulaId={invert.id} />
               </div>
             )}
 
@@ -904,7 +989,7 @@ export default function InvertDetailPage() {
                 right: formatLocalDate(x.fed_at),
                 sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`) : undefined,
-                onDelete: canChange(x) ? () => deleteLog(`feedings/${x.id}`, 'feeding') : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`feedings/${x.id}`, 'feeding', ['feedings', 'stats', 'invert']) : undefined,
               }))}
             />
             {/* Tarantula feeding analytics: streak, longest gap, refusals and
@@ -927,7 +1012,7 @@ export default function InvertDetailPage() {
               rows={molts.map((x) => ({
                 key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at), sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`) : undefined,
-                onDelete: canChange(x) ? () => deleteLog(`molts/${x.id}`, 'molt') : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`molts/${x.id}`, 'molt', ['molts', 'growth', 'invert']) : undefined,
                 onShare: canKeep ? () => setShareMolt(x.id) : undefined,
               }))}
             />
@@ -953,7 +1038,7 @@ export default function InvertDetailPage() {
                 // The keeper's own words are the record; attribution after.
                 sub: [e.notes, attribution(e)].filter(Boolean).join(' · ') || undefined,
                 onEdit: canChange(e) ? () => { setEditingEvent(e); setEventOpen(true) } : undefined,
-                onDelete: canChange(e) ? () => deleteLog(`animal-events/${e.id}`, 'event') : undefined,
+                onDelete: canChange(e) ? () => deleteLog(`animal-events/${e.id}`, 'event', ['events']) : undefined,
               }))}
             />
 
@@ -1156,7 +1241,7 @@ export default function InvertDetailPage() {
                 right: formatLocalDate(x.logged_at),
                 sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-care-log?${qp({ logId: x.id, log_type: x.log_type, logged_at: x.logged_at, notes: x.notes })}`) : undefined,
-                onDelete: canChange(x) ? () => deleteLog(`care-logs/${x.id}`, 'water log') : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`care-logs/${x.id}`, 'water log', ['care']) : undefined,
               }))}
             />
 
@@ -1170,7 +1255,7 @@ export default function InvertDetailPage() {
               rows={substrate.map((x) => ({
                 key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at), sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-substrate-change?${qp({ logId: x.id, changed_at: x.changed_at, substrate_type: x.substrate_type, substrate_depth: x.substrate_depth, reason: x.reason, notes: x.notes })}`) : undefined,
-                onDelete: canChange(x) ? () => deleteLog(`substrate-changes/${x.id}`, 'substrate change') : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`substrate-changes/${x.id}`, 'substrate change', ['substrate', 'invert']) : undefined,
               }))}
             />
 
