@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants from 'expo-constants';
+import { detailMessage, makeNoAccountError, parseNoAccountDetail } from '../lib/session';
 
 // Check if running in Expo Go (where native modules aren't available)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -128,11 +129,8 @@ export const getAppleIdentity = async (): Promise<ProviderIdentity> => {
   };
 };
 
-/**
- * Sign in with Google using @react-native-google-signin/google-signin
- * This properly handles Android OAuth with package name + SHA-1
- */
-export const signInWithGoogle = async (): Promise<{
+
+export type OAuthLoginResult = {
   accessToken: string;
   // True when this sign-in CREATED the account. The server has always sent
   // this (`is_new_user` in schemas/oauth.py) and we used to drop it on the
@@ -152,7 +150,67 @@ export const signInWithGoogle = async (): Promise<{
     is_superuser?: boolean;
     is_admin?: boolean;
   };
-}> => {
+};
+
+export type SocialSignInOptions = {
+  /**
+   * false (the LOGIN screen): the server refuses with 409 `oauth_no_account`
+   * instead of silently creating an account, and the thrown error carries
+   * `createAccount()` which re-sends the same credentials with true. This is
+   * how a keeper who tapped the wrong button stops ending up with an empty
+   * second account. true (the REGISTER screen, and the default) = old behaviour.
+   */
+  allowCreate?: boolean;
+};
+
+/**
+ * POST /auth/oauth-login. The body (provider token + Apple's single-use
+ * authorization_code) is built by the caller once and reused verbatim for the
+ * "Create account" retry; only `allow_create` changes.
+ */
+async function postOAuthLogin(
+  body: Record<string, unknown>,
+  allowCreate: boolean,
+  failureMessage: string,
+): Promise<OAuthLoginResult> {
+  const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...body, allow_create: allowCreate }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    // The other 409 on this route ("account exists but is not verified") has a
+    // STRING detail, so only an object with code oauth_no_account is this case.
+    const noAccount = response.status === 409 ? parseNoAccountDetail(error?.detail) : null;
+    if (noAccount) {
+      throw makeNoAccountError(noAccount, () => postOAuthLogin(body, true, failureMessage));
+    }
+    throw new Error(detailMessage(error?.detail, failureMessage));
+  }
+
+  const data = await response.json();
+  return {
+    accessToken: data.access_token,
+    // Defaults to false on an older server that omits the field — erring
+    // toward "existing user" keeps the carousel away from people who don't
+    // need it, which is the safer direction to be wrong in.
+    isNewUser: data.is_new_user === true,
+    user: data.user,
+  };
+}
+
+/**
+ * Sign in with Google using @react-native-google-signin/google-signin
+ * This properly handles Android OAuth with package name + SHA-1
+ */
+export const signInWithGoogle = async (
+  options: SocialSignInOptions = {},
+): Promise<OAuthLoginResult> => {
+  const allowCreate = options.allowCreate !== false;
   // Check if Google Sign-In is available
   if (!GoogleSignin) {
     throw new Error(
@@ -180,34 +238,7 @@ export const signInWithGoogle = async (): Promise<{
       throw new Error('Google did not return an ID token. Please try again.');
     }
 
-    const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        provider: 'google',
-        id_token: idToken,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'OAuth login failed');
-    }
-
-    const data = await response.json();
-
-    console.log('[GoogleSignIn] Login successful!');
-
-    return {
-      accessToken: data.access_token,
-      // Defaults to false on an older server that omits the field — erring
-      // toward "existing user" keeps the carousel away from people who don't
-      // need it, which is the safer direction to be wrong in.
-      isNewUser: data.is_new_user === true,
-      user: data.user,
-    };
+    return await postOAuthLogin({ provider: 'google', id_token: idToken }, allowCreate, 'OAuth login failed');
   } catch (error: any) {
     console.error('[GoogleSignIn] Error:', error);
 
@@ -243,23 +274,10 @@ export const signOutFromGoogle = async (): Promise<void> => {
  * Sign in with Apple
  * iOS only - Apple Sign In is required for App Store
  */
-export const signInWithApple = async (): Promise<{
-  accessToken: string;
-  /** See signInWithGoogle — same field, same reason. */
-  isNewUser: boolean;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    display_name: string;
-    avatar_url?: string;
-    // Server always returns collection_visibility on auth responses;
-    // typed here so the AuthContext User shape lines up without a cast.
-    collection_visibility: string;
-    is_superuser?: boolean;
-    is_admin?: boolean;
-  };
-}> => {
+export const signInWithApple = async (
+  options: SocialSignInOptions = {},
+): Promise<OAuthLoginResult> => {
+  const allowCreate = options.allowCreate !== false;
   try {
     console.log('[AppleSignIn] Starting Apple Sign-In flow...');
 
@@ -299,35 +317,21 @@ export const signInWithApple = async (): Promise<{
       throw new Error('Apple did not return an identity token. Please try again.');
     }
 
-    const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    // The body is built ONCE and reused if the keeper confirms "Create
+    // account": Apple's authorization_code is single-use, and a refusal for
+    // "no account" does not consume it, so the same code goes with the retry.
+    return await postOAuthLogin(
+      {
         provider: 'apple',
         identity_token: credential.identityToken,
         // One-time code the server exchanges for a refresh token, so deleting
         // the account can revoke Sign in with Apple (App Store 5.1.1(v)).
         authorization_code: credential.authorizationCode ?? undefined,
         name: name || 'Apple User',
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Apple OAuth login failed');
-    }
-
-    const data = await response.json();
-
-    console.log('[AppleSignIn] Login successful!');
-
-    return {
-      accessToken: data.access_token,
-      isNewUser: data.is_new_user === true,
-      user: data.user,
-    };
+      },
+      allowCreate,
+      'Apple OAuth login failed',
+    );
   } catch (error: any) {
     console.error('[AppleSignIn] Error:', error);
 

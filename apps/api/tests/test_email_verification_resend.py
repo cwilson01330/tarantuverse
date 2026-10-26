@@ -41,6 +41,13 @@ class _Query:
         self.filters.extend(criteria)
         return self
 
+    def order_by(self, *_criteria):
+        return self
+
+    def all(self):
+        # find_users_by_email (case-insensitive lookup, 2026-10-26) lists matches.
+        return [self._user] if self._user is not None else []
+
     def first(self):
         return self._user
 

@@ -16,9 +16,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { shouldRefreshToken } from './tokenRefresh'
 
 const TOKEN_KEY = 'hv_token'
 const USER_KEY = 'hv_user'
+// Same default as apiClient.ts. Not imported from there: apiClient imports this
+// module, and a cycle for one string isn't worth it.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
 export interface AuthUser {
   id: string
@@ -51,7 +56,12 @@ export function getCachedUser(): AuthUser | null {
   }
 }
 
-export function setSession(token: string, user: AuthUser): void {
+// Bumped by every sign-in and sign-out in this tab. A token refresh takes it
+// before it starts and saves its result only if it is unchanged, so a refresh
+// that lands just after sign-out can't put the old session back.
+let sessionEpoch = 0
+
+function writeSession(token: string, user: AuthUser): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(TOKEN_KEY, token)
@@ -63,7 +73,13 @@ export function setSession(token: string, user: AuthUser): void {
   }
 }
 
+export function setSession(token: string, user: AuthUser): void {
+  sessionEpoch++
+  writeSession(token, user)
+}
+
 export function clearSession(): void {
+  sessionEpoch++
   if (typeof window === 'undefined') return
   try {
     window.localStorage.removeItem(TOKEN_KEY)
@@ -72,6 +88,74 @@ export function clearSession(): void {
   } catch {
     // ignore
   }
+}
+
+// ---------------------------------------------------------------------------
+// Token refresh. The API token lasts 14 days; swap it for a fresh one once it
+// is a day old (on app load and when the tab comes back) so a keeper who keeps
+// using the app is never signed out by the clock.
+// ---------------------------------------------------------------------------
+
+let refreshInFlight: Promise<void> | null = null
+let lastRefreshFailedAt: number | null = null
+// A cold API can take 30 s+ to answer; don't leave the refresh (and its
+// single-flight slot) hanging that long. A timeout is a non-401 failure: the
+// keeper keeps the token and the normal backoff applies.
+const REFRESH_TIMEOUT_MS = 15_000
+
+export function refreshTokenIfStale(): Promise<void> {
+  const token = getToken()
+  if (!token || !shouldRefreshToken(token, Date.now(), lastRefreshFailedAt)) {
+    return Promise.resolve()
+  }
+  if (refreshInFlight) return refreshInFlight
+
+  const epoch = sessionEpoch
+  refreshInFlight = (async () => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
+    // Another tab may have refreshed, or this tab signed out / in again, while
+    // the request was in flight; only act if the session we asked about is
+    // still the current one. Always re-checked synchronously before a write.
+    const stillCurrent = () => sessionEpoch === epoch && getToken() === token
+    try {
+      const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+      if (res.status === 401) {
+        // Expired or revoked: it can never recover. Same effect as any other
+        // 401 in apiFetch — the app guard sends the keeper to sign in.
+        if (stillCurrent()) clearSession()
+        return
+      }
+      if (!res.ok) {
+        // 429, API asleep, 5xx: not a verdict on the token. Keep it and don't
+        // ask again for a few minutes.
+        lastRefreshFailedAt = Date.now()
+        return
+      }
+      const data = (await res.json()) as { access_token?: unknown; user?: AuthUser }
+      // The body read above is the last await: no sign-out can slip in between
+      // this check and the write.
+      if (typeof data.access_token !== 'string' || !stillCurrent()) return
+      const user = data.user ?? getCachedUser()
+      if (user) {
+        writeSession(data.access_token, user)
+      } else {
+        window.localStorage.setItem(TOKEN_KEY, data.access_token)
+        window.dispatchEvent(new Event('hv-auth-change'))
+      }
+    } catch {
+      // Offline / blocked / timed out: keep the token, retry later.
+      lastRefreshFailedAt = Date.now()
+    } finally {
+      clearTimeout(timer)
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
 }
 
 // ---------------------------------------------------------------------------

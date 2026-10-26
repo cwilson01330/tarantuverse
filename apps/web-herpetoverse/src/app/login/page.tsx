@@ -17,9 +17,20 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { AuthUser, getToken, setSession } from '@/lib/auth'
-import GoogleSignInButton, { googleSignInEnabled } from '@/components/GoogleSignInButton'
+import GoogleSignInButton, {
+  googleSignInEnabled,
+  type NoAccountInfo,
+} from '@/components/GoogleSignInButton'
+import NoAccountConfirm from '@/components/NoAccountConfirm'
 import ResendVerification from '@/components/ResendVerification'
 import { safeRedirect } from '@/lib/safeRedirect'
+import {
+  PASSWORD_FAILURE_HINT,
+  type SignInMethod,
+  getLastSignInMethod,
+  lastSignInLine,
+  setLastSignInMethod,
+} from '@/lib/lastSignInMethod'
 
 interface LoginResponse {
   access_token: string
@@ -44,17 +55,41 @@ function LoginForm() {
   // Set when sign-in is refused because the address isn't verified yet —
   // shown as a way forward rather than a red error.
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+  // Shown under a wrong-password error: the keeper may have used Google.
+  const [showPasswordHint, setShowPasswordHint] = useState(false)
+  const [lastMethod, setLastMethod] = useState<SignInMethod | null>(null)
+  // Set when Google's email has no account: we ask before creating one.
+  const [noAccount, setNoAccount] = useState<NoAccountInfo | null>(null)
+  const [creatingAccount, setCreatingAccount] = useState(false)
 
   // Already signed in? Bounce straight through.
   useEffect(() => {
     if (getToken()) router.replace(next)
   }, [next, router])
 
+  // localStorage isn't readable during SSR; read the hint after mount.
+  useEffect(() => {
+    setLastMethod(getLastSignInMethod())
+  }, [])
+
+  async function handleCreateAccount() {
+    if (!noAccount || creatingAccount) return
+    setCreatingAccount(true)
+    setError(null)
+    // On success the page navigates away. On failure the message shows above
+    // and the confirm stays, so they can retry or go back.
+    const failure = await noAccount.createAccount()
+    if (failure) setError(failure)
+    setCreatingAccount(false)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
     setError(null)
+    setShowPasswordHint(false)
     setUnverifiedEmail(null)
+    setNoAccount(null)
     setSubmitting(true)
     try {
       const data = await apiFetch<LoginResponse>('/api/v1/auth/login', {
@@ -63,12 +98,14 @@ function LoginForm() {
         auth: false,
       })
       setSession(data.access_token, data.user)
+      setLastSignInMethod('password')
       router.replace(next)
     } catch (err) {
       if (err instanceof ApiError && isUnverified(err)) {
         setUnverifiedEmail(email.trim())
       } else if (err instanceof ApiError) {
         setError(err.status === 401 ? 'Incorrect email or password.' : err.message)
+        if (err.status === 401) setShowPasswordHint(true)
       } else {
         setError('Could not sign in. Check your connection and try again.')
       }
@@ -101,6 +138,9 @@ function LoginForm() {
           <p className="text-sm text-neutral-400">
             Your Tarantuverse account works here too.
           </p>
+          {lastMethod && (
+            <p className="mt-2 text-sm text-neutral-400">{lastSignInLine(lastMethod)}</p>
+          )}
         </div>
 
         <form
@@ -163,10 +203,22 @@ function LoginForm() {
               className="p-3 rounded-md border border-red-500/40 bg-red-500/10 text-sm text-red-300"
             >
               {error}
+              {showPasswordHint && (
+                <p className="mt-1 text-red-300/80">{PASSWORD_FAILURE_HINT}</p>
+              )}
             </div>
           )}
 
           {unverifiedEmail && <ResendVerification email={unverifiedEmail} />}
+
+          {noAccount && (
+            <NoAccountConfirm
+              email={noAccount.email}
+              busy={creatingAccount}
+              onGoBack={() => setNoAccount(null)}
+              onCreate={handleCreateAccount}
+            />
+          )}
 
           <button
             type="submit"
@@ -183,7 +235,20 @@ function LoginForm() {
               <div className="h-px flex-1 bg-neutral-800" />
             </div>
           )}
-          <GoogleSignInButton next={next} onError={setError} />
+          <GoogleSignInButton
+            next={next}
+            onError={(message) => {
+              setNoAccount(null)
+              setShowPasswordHint(false)
+              setError(message)
+            }}
+            mode="login"
+            onNoAccount={(info) => {
+              setError(null)
+              setShowPasswordHint(false)
+              setNoAccount(info)
+            }}
+          />
 
           <p className="text-center text-xs text-neutral-500 pt-2">
             New here?{' '}

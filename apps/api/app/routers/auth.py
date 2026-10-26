@@ -1,7 +1,7 @@
 """
 Authentication routes
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -18,8 +18,9 @@ from app.models.user import User
 from app.models.user_oauth_account import UserOAuthAccount
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest, UsernameChangeRequest, UsernameAvailabilityResponse, ResendVerificationRequest
 from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest, LinkAccountDirectRequest
-from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token, new_email_verification_token
+from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token, new_email_verification_token, MAX_SESSION_AGE
 from app.utils.dependencies import get_current_user
+from app.utils.emails import normalize_email, find_users_by_email, pick_oauth_match, prefer_active
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.utils.oauth import (
     exchange_google_code_for_token,
@@ -37,7 +38,7 @@ from app.services.oauth_verification import (
 from app.services import apple_siwa
 from app.config import settings
 from app.utils.username_validation import validate_username
-from app.utils.rate_limit import limiter
+from app.utils.rate_limit import limiter, user_or_ip
 from app.utils.frontend_origin import resolve_frontend_origin, brand_for_origin
 from app.utils.file_validation import validate_image_bytes
 from app.utils.photo_cleanup import collect_for_user, delete_files
@@ -98,9 +99,11 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     - **display_name**: Optional display name
     - **referral_code**: Optional referral code from a premium subscriber
     """
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
+    # Check if email already exists, in ANY letter case: "Cory@x.com" and
+    # "cory@x.com" are one mailbox, and two accounts for it is how keepers got
+    # locked out of the one that holds their animals.
+    email = normalize_email(user_data.email)
+    if find_users_by_email(db, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
@@ -150,7 +153,7 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
         verification_token, verification_token_expires_at = new_email_verification_token()
 
     new_user = User(
-        email=user_data.email,
+        email=email,
         username=user_data.username,
         hashed_password=get_password_hash(user_data.password),
         display_name=user_data.display_name or user_data.username,
@@ -201,17 +204,23 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
     - **email**: User's email
     - **password**: User's password
     """
-    # Find user by email
-    user = db.query(User).filter(User.email == credentials.email).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Verify password
-    if not verify_password(credentials.password, user.hashed_password):
+    # Find user(s) by email, ignoring case. Production has a few keepers with
+    # two accounts whose addresses differ only in case; the one whose password
+    # verifies is the one they mean. Social-only accounts (no password) can
+    # never match here. Every failure is the same generic 401.
+    candidates = find_users_by_email(db, credentials.email)
+    # An inactive twin must not hide the live account behind the same mailbox:
+    # among the accounts whose password verifies, the first ACTIVE one wins;
+    # only if none is active does the first match (and its 403) apply.
+    user = None
+    for c in candidates:
+        if c.hashed_password and verify_password(credentials.password, c.hashed_password):
+            if c.is_active:
+                user = c
+                break
+            if user is None:
+                user = c
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -241,13 +250,68 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
         db.commit()
         db.refresh(user)
 
-    # Create access token
-    access_token = create_access_token(data={"sub": str(user.id)})
+    return _token_response(user)
 
+
+def _token_response(user: User, auth_time: Optional[int] = None) -> Token:
+    """The one place a `Token` is minted (fresh jti + iat) — login and refresh.
+
+    `auth_time` is the Unix second of the ORIGINAL sign-in. Sign-in leaves it
+    None (the token is stamped "now"); refresh passes the old value forward.
+    """
+    data = {"sub": str(user.id)}
+    if auth_time is not None:
+        data["auth_time"] = auth_time
     return Token(
-        access_token=access_token,
-        user=UserResponse.from_orm(user)
+        access_token=create_access_token(data=data),
+        user=UserResponse.from_orm(user),
     )
+
+
+# Keyed per ACCOUNT, not per address: the TV website refreshes from the server
+# (NextAuth on Vercel), so every web keeper shares Vercel's egress addresses.
+@router.post("/refresh", response_model=Token)
+@limiter.limit("30/hour", key_func=user_or_ip)
+async def refresh_access_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    current_user: User = Depends(get_current_user),
+):
+    """Swap a still-valid token for a fresh one (same shape as /login).
+
+    Keepers were silently signed out when their 14-day token ran out; clients
+    now call this when their token is older than a day. `get_current_user`
+    has already rejected expired, revoked (logged-out) and unknown-user
+    tokens, so a dead token can never mint a new one. The old token is NOT
+    revoked: if the response is lost in transit the client still holds a
+    working token, and a restarted web session keeps its cookie.
+
+    Maximum session age: renewing never resets the clock. The new token
+    carries the ORIGINAL sign-in time (`auth_time`; tokens issued before that
+    claim existed use their `iat`), and once that is older than
+    MAX_SESSION_AGE the answer is 401 so the client asks for a real sign-in.
+    Without the ceiling a leaked token could be renewed indefinitely.
+    """
+    payload = decode_access_token(credentials.credentials) or {}
+    auth_time = payload.get("auth_time")
+    if auth_time is None:
+        auth_time = payload.get("iat")
+    try:
+        auth_time = int(auth_time)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session too old, please sign in again",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    age = datetime.now(timezone.utc) - datetime.fromtimestamp(auth_time, tz=timezone.utc)
+    if age > MAX_SESSION_AGE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session too old, please sign in again",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _token_response(current_user, auth_time=auth_time)
 
 
 @router.post("/logout")
@@ -635,6 +699,40 @@ async def change_username(
 # OAuth Endpoints
 # ============================================================================
 
+def _flag_default_true(value) -> bool:
+    """`allow_create` from a free-form JSON body: only an explicit false-ish
+    value turns it off, so every older client (field absent) keeps creating."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() not in ("false", "0", "no", "off")
+    return bool(value)
+
+
+def _oauth_no_account(provider: str, email: Optional[str]) -> HTTPException:
+    """409 for a sign-in-only request with no account behind the identity.
+
+    Machine-readable on purpose: clients show a "No account for {email}"
+    confirm and, if the keeper agrees, repeat the request with
+    allow_create=true. `email` is the address from the VERIFIED token.
+    """
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={"code": "oauth_no_account", "provider": provider, "email": email or None},
+    )
+
+
+def _refuse_inactive(user: Optional[User]) -> None:
+    """Social sign-in gets the same answer as /auth/login for a deactivated
+    account (403), before any link, Apple code exchange or commit — rather
+    than minting a token every authenticated call then rejects with 401."""
+    if user is not None and not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive",
+        )
+
+
 @router.post("/oauth-login", response_model=OAuthLoginResponse)
 @limiter.limit("20/minute")
 async def oauth_login(
@@ -701,6 +799,7 @@ async def oauth_login(
 
         is_new_user = False
         user = None
+        allow_create = _flag_default_true(oauth_data.get("allow_create"))
 
         # First, check if this OAuth account is already linked
         oauth_account = db.query(UserOAuthAccount).filter(
@@ -716,7 +815,8 @@ async def oauth_login(
             # SECURITY: Only auto-link if the existing account's email is verified.
             # Linking to an unverified account could let an attacker pre-register an email
             # and then hijack a legitimate user's OAuth sign-in.
-            existing_user = db.query(User).filter(User.email == email).first()
+            # Case-insensitive: "Cory@x.com" and "cory@x.com" are one mailbox.
+            existing_user = pick_oauth_match(find_users_by_email(db, email))
 
             if existing_user and existing_user.is_verified:
                 # Verified email match — safe to auto-link
@@ -738,7 +838,15 @@ async def oauth_login(
                            "Please verify that account first, or log in with your password.",
                 )
             else:
-                # No existing user - create new user and link OAuth account
+                # No account to sign in to or link. A client that is only
+                # SIGNING IN (allow_create=false) must not mint a new empty
+                # account — the keeper most likely tapped the wrong provider.
+                # Refused HERE, before any user row or Apple code exchange
+                # (the authorization code is single-use).
+                if not allow_create:
+                    raise _oauth_no_account(provider, email)
+
+                # Create new user and link OAuth account
                 is_new_user = True
 
                 # Generate username from email
@@ -751,7 +859,7 @@ async def oauth_login(
 
                 user = User(
                     id=uuid.uuid4(),
-                    email=email,
+                    email=normalize_email(email),
                     username=username,
                     display_name=name or username,
                     avatar_url=picture,
@@ -773,6 +881,8 @@ async def oauth_login(
                     provider_avatar=picture,
                 )
                 db.add(oauth_account)
+
+        _refuse_inactive(user)
 
         # Update avatar if not set
         if user and not user.avatar_url and picture:
@@ -864,7 +974,7 @@ async def google_oauth_callback(
             oauth_account.refresh_token = refresh_token_from_google
         else:
             # OAuth account not found - check if email matches a verified existing user
-            existing_user = db.query(User).filter(User.email == email).first()
+            existing_user = pick_oauth_match(find_users_by_email(db, email))
 
             if existing_user and existing_user.is_verified:
                 # Verified email match — safe to auto-link
@@ -887,6 +997,10 @@ async def google_oauth_callback(
                            "Please verify that account first, or log in with your password.",
                 )
             else:
+                # Sign-in-only request: never create (see oauth_login).
+                if not callback_data.allow_create:
+                    raise _oauth_no_account("google", email)
+
                 # No existing user - create new user and link OAuth account
                 is_new_user = True
 
@@ -900,7 +1014,7 @@ async def google_oauth_callback(
 
                 user = User(
                     id=uuid.uuid4(),
-                    email=email,
+                    email=normalize_email(email),
                     username=username,
                     display_name=name or username,
                     avatar_url=picture,
@@ -926,6 +1040,8 @@ async def google_oauth_callback(
                     provider_avatar=picture,
                 )
                 db.add(oauth_account)
+
+        _refuse_inactive(user)
 
         # Update avatar if not set
         if user and not user.avatar_url and picture:
@@ -953,6 +1069,10 @@ async def google_oauth_callback(
             is_new_user=is_new_user,
         )
 
+    except HTTPException:
+        # The 409s above (unverified match, oauth_no_account) must reach the
+        # client as written, not be re-wrapped as a 400.
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1001,7 +1121,7 @@ async def apple_oauth_callback(
             user = db.query(User).filter(User.id == oauth_account.user_id).first()
         else:
             # OAuth account not found - check if email matches a verified existing user
-            existing_user = db.query(User).filter(User.email == email).first()
+            existing_user = pick_oauth_match(find_users_by_email(db, email))
 
             if existing_user and existing_user.is_verified:
                 # Verified email match — safe to auto-link
@@ -1021,6 +1141,10 @@ async def apple_oauth_callback(
                            "Please verify that account first, or log in with your password.",
                 )
             else:
+                # Sign-in-only request: never create (see oauth_login).
+                if not callback_data.allow_create:
+                    raise _oauth_no_account("apple", email)
+
                 # No existing user - create new user and link OAuth account
                 is_new_user = True
 
@@ -1034,7 +1158,7 @@ async def apple_oauth_callback(
 
                 user = User(
                     id=uuid.uuid4(),
-                    email=email,
+                    email=normalize_email(email),
                     username=username,
                     display_name=name or username,
                     oauth_provider="apple",  # Keep for backwards compatibility
@@ -1054,6 +1178,8 @@ async def apple_oauth_callback(
                     provider_name=name,
                 )
                 db.add(oauth_account)
+
+        _refuse_inactive(user)
 
         db.commit()
         if user:
@@ -1077,6 +1203,8 @@ async def apple_oauth_callback(
             is_new_user=is_new_user,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1406,31 +1534,78 @@ async def unlink_account(
 async def forgot_password(
     request: Request,
     forgot_data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
     Send a password reset email if the account exists and supports password login.
-    Always returns a success message to avoid user enumeration.
+    An account WITHOUT a password (it signs in with Google/Apple) gets an email
+    saying so instead of a reset link — before, it silently got nothing and the
+    keeper waited for mail that never came.
+    Always returns the same success message to avoid user enumeration.
+
+    The address is matched ignoring case. If case-variant duplicates exist,
+    each matching account gets the email that fits it (deactivated twins are
+    skipped when an active one exists).
+
+    Every email is sent from a BACKGROUND task, after the response: the
+    response time and status must not depend on whether the address has an
+    account, and a mail outage must not become a 500 for existing accounts
+    only.
     """
-    user = db.query(User).filter(User.email == forgot_data.email).first()
+    users = prefer_active(find_users_by_email(db, forgot_data.email))
 
-    if user and user.hashed_password:
-        token = secrets.token_urlsafe(32)
-        expires = datetime.now(timezone.utc) + timedelta(hours=24)
+    # Allowlisted in one place (utils/frontend_origin.py) and shared with
+    # verification, so HV keepers are routed back to herpetoverse.com.
+    base_url = resolve_frontend_origin(forgot_data.frontend_url)
+    brand = brand_for_origin(base_url)
 
-        user.reset_token = token
-        user.reset_token_expires_at = expires
-        db.commit()
+    for user in users:
+        if user.hashed_password:
+            token = secrets.token_urlsafe(32)
+            expires = datetime.now(timezone.utc) + timedelta(hours=24)
 
-        # Allowlisted in one place (utils/frontend_origin.py) and shared with
-        # verification, so HV keepers are routed back to herpetoverse.com.
-        base_url = resolve_frontend_origin(forgot_data.frontend_url)
-        reset_link = f"{base_url}/reset-password?token={token}"
-        await EmailService.send_password_reset_email(
-            user.email, reset_link, brand=brand_for_origin(base_url)
-        )
+            user.reset_token = token
+            user.reset_token_expires_at = expires
+            db.commit()
+
+            reset_link = f"{base_url}/reset-password?token={token}"
+            background_tasks.add_task(
+                _send_quietly, EmailService.send_password_reset_email,
+                user.email, reset_link, brand=brand,
+            )
+        else:
+            providers = _social_provider_labels(db, user)
+            if not providers:
+                continue  # nothing true to tell them
+            background_tasks.add_task(
+                _send_quietly, EmailService.send_social_signin_email,
+                user.email, providers, brand=brand,
+            )
 
     return {"message": "If an account exists for that email, a password reset link has been sent."}
+
+
+async def _send_quietly(sender, *args, **kwargs) -> None:
+    """Run an email send as a background task; a failure is logged, never raised."""
+    try:
+        await sender(*args, **kwargs)
+    except Exception:
+        logger.exception("forgot-password email failed")
+
+
+_PROVIDER_LABELS = {"google": "Google", "apple": "Apple"}
+
+
+def _social_provider_labels(db: Session, user: User) -> List[str]:
+    """Display names of the providers this account signs in with, from the
+    linked-accounts table plus the legacy `users.oauth_provider` column.
+    Providers we don't offer a button for are left out."""
+    rows = db.query(UserOAuthAccount.provider).filter(UserOAuthAccount.user_id == user.id).all()
+    found = {(r[0] or "").lower() for r in rows}
+    if user.oauth_provider:
+        found.add(user.oauth_provider.lower())
+    return [label for key, label in _PROVIDER_LABELS.items() if key in found]
 
 
 @router.post("/reset-password")
@@ -1564,9 +1739,11 @@ async def resend_verification(
             detail="Email is required",
         )
 
-    user = db.query(User).filter(User.email == address).first()
-
-    if user and not user.is_verified:
+    # Any letter case; every still-unverified account behind the address gets
+    # its own fresh link.
+    for user in find_users_by_email(db, address):
+        if user.is_verified:
+            continue
         verification_token, verification_token_expires_at = new_email_verification_token()
         user.verification_token = verification_token
         user.verification_token_expires_at = verification_token_expires_at

@@ -89,6 +89,34 @@ class EmailService:
         await EmailService.send_email(to_email, subject, html_content)
 
     @staticmethod
+    async def send_social_signin_email(to_email: str, providers: "list[str]", brand: "Brand | None" = None):
+        """Sent instead of a reset link when "Forgot password" is used on an
+        account that has no password because it signs in with Google/Apple.
+
+        Deliberately has NO link and no token: there is nothing to reset, and
+        the keeper just needs to tap the right button. `providers` are display
+        labels ("Google", "Apple").
+        """
+        brand = brand or TARANTUVERSE
+        subject = f"How you sign in to {brand.name}"
+        names = [p for p in providers if p]
+        joined = " and ".join(names) if len(names) <= 2 else ", ".join(names[:-1]) + f" and {names[-1]}"
+        which = " or ".join(names) if names else "sign-in"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>How you sign in to {brand.name}</h2>
+            <p>Hello,</p>
+            <p>Someone asked to reset the password for this email address. Your {brand.name} account has no password
+               because it signs in with {joined}.</p>
+            <p>Open the {brand.name} app and use the {which} button on the login screen to sign in. There is nothing to reset.</p>
+            <p>If you did not ask for this, you can ignore this email.</p>
+            <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
+            <p style="color: #666; font-size: 12px;">{brand.name} Team</p>
+        </div>
+        """
+        await EmailService.send_email(to_email, subject, html_content)
+
+    @staticmethod
     async def send_verification_email(to_email: str, verify_link: str, brand: "Brand | None" = None):
         # Named after the app the keeper actually signed up in. Tarantuverse
         # and Herpetoverse share one API; a reptile keeper getting a

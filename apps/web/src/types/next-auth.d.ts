@@ -36,5 +36,7 @@ declare module "next-auth/jwt" {
     isNewUser?: boolean
     is_admin?: boolean
     is_superuser?: boolean
+    /** ms epoch of the last failed (non-401) API token refresh; throttles retries. */
+    refreshFailedAt?: number
   }
 }

@@ -142,7 +142,7 @@ export default function RegisterScreen() {
   const handleGoogleRegister = async () => {
     setOauthLoading('google');
     try {
-      const isNewUser = await loginWithGoogle();
+      const isNewUser = await loginWithGoogle({ allowCreate: true });
       router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
       Alert.alert('Google Sign-In Failed', error.message);
@@ -154,7 +154,7 @@ export default function RegisterScreen() {
   const handleAppleRegister = async () => {
     setOauthLoading('apple');
     try {
-      const isNewUser = await loginWithApple();
+      const isNewUser = await loginWithApple({ allowCreate: true });
       router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
       Alert.alert('Apple Sign-In Failed', error.message);

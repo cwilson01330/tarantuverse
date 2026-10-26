@@ -53,4 +53,26 @@ def client_ip(request: Request) -> str:
     return ip
 
 
+def user_or_ip(request: Request) -> str:
+    """Key a limit per signed-in account, falling back to the client address.
+
+    For endpoints the TV website calls from the server (NextAuth runs on
+    Vercel): every web keeper then arrives from Vercel's shared egress
+    addresses, so an IP key would give all of them one budget. The bearer
+    token's `sub` is only trusted after its signature checks out
+    (`decode_access_token`); an unreadable, forged or expired token falls back
+    to `client_ip`, so it can't be used to dodge a limit.
+    """
+    from app.utils.auth import decode_access_token  # local: keep this module import-light
+
+    auth = (request.headers.get("authorization") or "").strip()
+    scheme, _, token = auth.partition(" ")
+    if scheme.lower() == "bearer" and token.strip():
+        payload = decode_access_token(token.strip())
+        sub = payload.get("sub") if payload else None
+        if sub:
+            return f"user:{sub}"
+    return client_ip(request)
+
+
 limiter = Limiter(key_func=client_ip, default_limits=["200/minute"])

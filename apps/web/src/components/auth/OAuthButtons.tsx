@@ -2,35 +2,38 @@
 
 import { signIn } from "next-auth/react"
 import { useState } from "react"
+import { setLoginOnly } from "@/lib/oauthNoAccount"
+import { markPendingSignInMethod } from "@/lib/lastSignInMethod"
 
-export default function OAuthButtons() {
+/**
+ * `login`: an email with no account is NOT turned into a new account — the
+ * login page asks first (see lib/oauthNoAccount.ts for how that reaches the
+ * server). `register` (default, the old behaviour): create it.
+ */
+export default function OAuthButtons({ mode = "register" }: { mode?: "login" | "register" }) {
   const [loading, setLoading] = useState<string | null>(null)
 
-  const handleGoogleSignIn = async () => {
-    setLoading("google")
+  const start = async (provider: "google" | "apple") => {
+    setLoading(provider)
     try {
-      await signIn("google", { callbackUrl: "/dashboard" })
+      setLoginOnly(mode === "login")
+      markPendingSignInMethod(provider)
+      await signIn(provider, { callbackUrl: "/dashboard" })
     } catch (error) {
-      console.error("Google sign in error:", error)
+      console.error(`${provider} sign in error:`, error)
       setLoading(null)
     }
   }
 
-  const handleAppleSignIn = async () => {
-    setLoading("apple")
-    try {
-      await signIn("apple", { callbackUrl: "/dashboard" })
-    } catch (error) {
-      console.error("Apple sign in error:", error)
-      setLoading(null)
-    }
-  }
+  const handleGoogleSignIn = () => start("google")
+  const handleAppleSignIn = () => start("apple")
 
   return (
     <div className="flex flex-col gap-3">
       {/* Google Sign In - Following official Google branding guidelines */}
       <button
         onClick={handleGoogleSignIn}
+        data-signin-first
         disabled={loading !== null}
         className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-surface border border-theme rounded-xl hover:bg-surface-elevated hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >

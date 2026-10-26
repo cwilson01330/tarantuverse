@@ -5,8 +5,24 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
+import NoAccountConfirm from '@/components/auth/NoAccountConfirm'
 import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
 import { safeRedirect } from '@/lib/safeRedirect'
+import {
+  OAuthProvider,
+  isOAuthProvider,
+  setLoginOnly,
+  takePendingNoAccount,
+} from '@/lib/oauthNoAccount'
+import {
+  PASSWORD_FAILURE_HINT,
+  SignInMethod,
+  clearPendingSignInMethod,
+  getLastSignInMethod,
+  lastSignInLine,
+  markPendingSignInMethod,
+  setLastSignInMethod,
+} from '@/lib/lastSignInMethod'
 
 function LoginForm() {
   const router = useRouter()
@@ -17,9 +33,15 @@ function LoginForm() {
     password: ''
   })
   const [error, setError] = useState('')
+  const [showPasswordHint, setShowPasswordHint] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showResend, setShowResend] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
+  const [lastMethod, setLastMethod] = useState<SignInMethod | null>(null)
+  // Set when a Google/Apple sign-in used an email with no account: the page
+  // asks before creating one. `email` is null if it couldn't be carried over.
+  const [noAccount, setNoAccount] = useState<{ email: string | null; provider: OAuthProvider } | null>(null)
+  const [creatingAccount, setCreatingAccount] = useState(false)
 
   // Kick the Render container awake the moment the login page loads so
   // the first real request hits a warm worker. Keeps first-visit logins
@@ -28,19 +50,68 @@ function LoginForm() {
     warmupApi()
   }, [])
 
+  // localStorage isn't readable during SSR; read the hint after mount.
+  useEffect(() => {
+    setLastMethod(getLastSignInMethod())
+  }, [])
+
+  // Back from a Google/Apple sign-in that found no account (the NextAuth
+  // `signIn` callback redirects here). The email arrives in a one-shot cookie,
+  // not the URL; read it, drop it, and tidy the query so a refresh is clean.
+  const oauthResult = searchParams.get('oauth')
+  const oauthProvider = searchParams.get('provider')
+  useEffect(() => {
+    if (oauthResult !== 'no_account' || !isOAuthProvider(oauthProvider)) return
+    const pending = takePendingNoAccount()
+    clearPendingSignInMethod() // that press didn't sign anyone in
+    const found = {
+      email: pending && pending.provider === oauthProvider ? pending.email : null,
+      provider: oauthProvider,
+    }
+    // `prev ??`: React strict mode runs this effect twice in dev, and the
+    // second pass finds the (already deleted) cookie empty.
+    setNoAccount((prev) => prev ?? found)
+    const params = new URLSearchParams(window.location.search)
+    params.delete('oauth')
+    params.delete('provider')
+    const query = params.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+  }, [oauthResult, oauthProvider])
+
+  const handleGoBack = () => {
+    // Nothing is pending any more: don't leave the "login only" cookie behind
+    // for the next OAuth entry point to trip over.
+    setLoginOnly(false)
+    setNoAccount(null)
+  }
+
+  const handleCreateAccount = async () => {
+    if (!noAccount || creatingAccount) return
+    setCreatingAccount(true)
+    try {
+      setLoginOnly(false) // this time the server may create the account
+      markPendingSignInMethod(noAccount.provider)
+      await signIn(noAccount.provider, { callbackUrl: '/dashboard' })
+    } catch (err) {
+      console.error(`${noAccount.provider} sign in error:`, err)
+      setCreatingAccount(false)
+    }
+  }
+
   // If login takes >3s, surface a friendly "waking up server" message.
   const showColdStartHint = useColdStartIndicator(loading, 3000)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setShowPasswordHint(false)
     setShowResend(false)
     setLoading(true)
 
     try {
       // Use NextAuth signIn with credentials provider
       const result = await signIn('credentials', {
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
         redirect: false, // Handle redirect manually to show errors
       })
@@ -48,11 +119,17 @@ function LoginForm() {
       if (result?.error) {
         if (result.error.includes('Email not verified')) {
           setShowResend(true)
+        } else if (/incorrect|invalid/i.test(result.error)) {
+          // A keeper who signed up with Google/Apple has no password — point
+          // them at the button they actually need.
+          setShowPasswordHint(true)
         }
         throw new Error(result.error)
       }
 
       if (result?.ok) {
+        clearPendingSignInMethod() // an abandoned Google/Apple press isn't this sign-in
+        setLastSignInMethod('password')
         router.push(redirectTo)
         router.refresh()
       }
@@ -97,6 +174,7 @@ function LoginForm() {
         {error && (
           <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl flex flex-col gap-2">
             <span>{error}</span>
+            {showPasswordHint && <span className="text-sm">{PASSWORD_FAILURE_HINT}</span>}
             {showResend && (
               <button
                 onClick={handleResendVerification}
@@ -109,8 +187,22 @@ function LoginForm() {
           </div>
         )}
 
-        {/* OAuth Buttons */}
-        <OAuthButtons />
+        {noAccount && (
+          <NoAccountConfirm
+            email={noAccount.email}
+            busy={creatingAccount}
+            onGoBack={handleGoBack}
+            onCreate={handleCreateAccount}
+            fallbackFocus={() => document.querySelector<HTMLElement>('[data-signin-first]')}
+          />
+        )}
+
+        {lastMethod && (
+          <p className="mb-3 text-center text-sm text-theme-secondary">{lastSignInLine(lastMethod)}</p>
+        )}
+
+        {/* OAuth Buttons — on this page an unknown email asks before it creates an account */}
+        <OAuthButtons mode="login" />
 
         {/* Divider */}
         <div className="relative my-6">

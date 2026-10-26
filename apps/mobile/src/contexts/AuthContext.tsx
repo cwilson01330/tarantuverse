@@ -1,11 +1,20 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
-import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
+import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable, type OAuthLoginResult } from '../services/google-signin';
 import { getExpoPushToken } from '../services/notifications';
 import { getErrorMessage } from '../utils/errors';
 import { clearSharedCache } from '../lib/co-keepers';
 import { deviceDefaultUnits, isUnits, type Units } from '../lib/units';
+import {
+  isNoAccountError,
+  createSessionEpoch,
+  isSignInMethod,
+  makeNoAccountError,
+  shouldRefresh,
+  type SignInMethod,
+} from '../lib/session';
 
 // Re-export for convenience so login screens can import from one place
 export { isGoogleSignInAvailable };
@@ -55,8 +64,13 @@ interface AuthContextType {
   // Resolve to true when the sign-in created the account — the caller uses it
   // to route a new keeper through onboarding. A password login can't be new
   // (registration is a separate screen), which is why only these two return it.
-  loginWithGoogle: () => Promise<boolean>;
-  loginWithApple: () => Promise<boolean>;
+  //
+  // `allowCreate: false` (the LOGIN screen) makes the server refuse to create
+  // an account: the call then throws a NoAccountError (lib/session) whose
+  // `createAccount()` finishes the sign-in with the same credentials if the
+  // keeper confirms. Default true = the REGISTER screen / old behaviour.
+  loginWithGoogle: (options?: { allowCreate?: boolean }) => Promise<boolean>;
+  loginWithApple: (options?: { allowCreate?: boolean }) => Promise<boolean>;
   register: (
     email: string,
     username: string,
@@ -66,6 +80,9 @@ interface AuthContextType {
   ) => Promise<RegisterResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** How this device last signed in (kept across sign-out), for the login
+   *  screen's "Last time you signed in with ..." line. null = never/unknown. */
+  lastSignInMethod: SignInMethod | null;
   /** The keeper's display units, resolved: their saved choice, else the
    *  device region. Display only — storage never changes. */
   units: Units;
@@ -78,16 +95,95 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 /** Longest launch waits on GET /auth/me before opening on the cached user. */
 const AUTH_CHECK_MAX_WAIT_MS = 8000;
 
+/** How the keeper last signed in. Deliberately NOT removed by logout() - it is
+ *  the whole point of the login-screen hint. */
+const LAST_METHOD_KEY = 'last_sign_in_method';
+/** Epoch ms of the last /auth/refresh attempt (success or failure). */
+const LAST_REFRESH_ATTEMPT_KEY = 'last_token_refresh_attempt';
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastSignInMethod, setLastSignInMethod] = useState<SignInMethod | null>(null);
+
+  const rememberMethod = async (method: SignInMethod) => {
+    setLastSignInMethod(method);
+    try {
+      await AsyncStorage.setItem(LAST_METHOD_KEY, method);
+    } catch {
+      // a hint only - never block a sign-in on it
+    }
+  };
+
+  // Trade the stored token for a fresh one once it is more than a day old, so
+  // an active keeper's 14-day clock keeps restarting instead of ending in a
+  // forced sign-out. Reads the token from storage (not state) so it always acts
+  // on what the next request would send, and so it does nothing after a 401 has
+  // already cleared the session.
+  //   - 401  -> the token is dead; the api interceptor signs the keeper out
+  //            (/auth/refresh is deliberately NOT in its no-auto-logout list).
+  //   - any other failure (offline, 5xx, timeout) -> keep the current token.
+  //
+  // Session epoch: sign-in, sign-out and a forced logout bump it as their very
+  // first step. The refresh takes it before it starts and saves its result only
+  // if it is unchanged, so a refresh that resolves just after logout can't
+  // write the old session back.
+  const sessionEpoch = useRef(createSessionEpoch()).current;
+  const refreshInFlight = useRef(false);
+  const refreshSession = useCallback(async () => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    const epoch = sessionEpoch.snapshot();
+    try {
+      const current = await AsyncStorage.getItem('auth_token');
+      if (!current) return;
+      const lastRaw = await AsyncStorage.getItem(LAST_REFRESH_ATTEMPT_KEY);
+      const last = lastRaw ? Number(lastRaw) : null;
+      const now = Date.now();
+      if (!sessionEpoch.isCurrent(epoch)) return;
+      if (!shouldRefresh(current, Number.isFinite(last as number) ? last : null, now)) return;
+      await AsyncStorage.setItem(LAST_REFRESH_ATTEMPT_KEY, String(now));
+
+      const response = await apiClient.post('/auth/refresh');
+      const fresh: string | undefined = response.data?.access_token;
+      if (!fresh) return;
+      // Signed out / signed in as someone else while the request was in flight:
+      // that session owns the storage and state now - don't overwrite them.
+      // Everything below is synchronous up to the writes being queued, so a
+      // logout that starts after this check queues its removal behind ours.
+      if (!sessionEpoch.isCurrent(epoch)) return;
+      const freshUser = response.data?.user;
+      const writes: Promise<void>[] = [AsyncStorage.setItem('auth_token', fresh)];
+      setToken(fresh);
+      if (freshUser && typeof freshUser === 'object') {
+        writes.push(AsyncStorage.setItem('user', JSON.stringify(freshUser)));
+        setUser(freshUser);
+      }
+      await Promise.all(writes);
+    } catch {
+      // Non-401 failure: keep the token we have. (A 401 was handled by the
+      // interceptor before it got here.)
+    } finally {
+      refreshInFlight.current = false;
+    }
+  }, [sessionEpoch]);
+
+  // App returning to the foreground: refresh if the token has gone stale.
+  // (App start is covered at the end of loadStoredAuth.)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshSession();
+    });
+    return () => sub.remove();
+  }, [refreshSession]);
 
   // Force logout when the API interceptor detects a 401 (expired/revoked token)
   const handleAuthExpired = useCallback(() => {
+    sessionEpoch.bump();
     setToken(null);
     setUser(null);
-  }, []);
+  }, [sessionEpoch]);
 
   useEffect(() => {
     loadStoredAuth();
@@ -103,8 +199,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // this only happened if a user opened Settings > Notifications, so almost no
   // tokens were ever stored (ADR-009). Fire-and-forget; returns null in Expo Go
   // or if permission is denied, and never blocks the app.
+  // Keyed on "signed in as this user", not on the token string, so the daily
+  // token refresh doesn't re-post the push token.
+  const hasToken = !!token;
+  const userId = user?.id ?? null;
   useEffect(() => {
-    if (!token) return;
+    if (!hasToken) return;
     let cancelled = false;
     (async () => {
       try {
@@ -122,7 +222,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [hasToken, userId]);
 
   // A keeper who has never chosen units gets the device region's default,
   // saved once so it follows them to the web and other devices. Only when the
@@ -168,6 +268,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loadStoredAuth = async () => {
     try {
+      try {
+        const method = await AsyncStorage.getItem(LAST_METHOD_KEY);
+        if (isSignInMethod(method)) setLastSignInMethod(method);
+      } catch {
+        // hint only
+      }
+
       const storedToken = await AsyncStorage.getItem('auth_token');
       const storedUser = await AsyncStorage.getItem('user');
 
@@ -206,6 +313,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         validate,
         new Promise<void>((resolve) => setTimeout(resolve, AUTH_CHECK_MAX_WAIT_MS)),
       ]);
+      // Hydrated and validated: renew the token if it is more than a day old.
+      // Not awaited - launch never waits on it.
+      void refreshSession();
     } catch (error) {
       // AsyncStorage read failed — show login screen.
     } finally {
@@ -214,19 +324,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const login = async (email: string, password: string) => {
+    sessionEpoch.bump();
     try {
       const response = await apiClient.post('/auth/login', { email, password });
       const { access_token, user: userData } = response.data;
-      
+      sessionEpoch.bump();
+
       await AsyncStorage.setItem('auth_token', access_token);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       
       setToken(access_token);
       setUser(userData);
+      await rememberMethod('password');
     } catch (error: any) {
       const err: Error & { code?: string } = new Error(
         error.response?.data?.detail || 'Login failed',
       );
+      // Wrong email/password. The login screen adds the "signed up with
+      // Google or Apple?" hint to this case only.
+      if (error.response?.status === 401) {
+        err.code = 'invalid_credentials';
+      }
       // Tagged so the login screen can offer a fresh link instead of a
       // dead-end alert. Keyed on status + wording because the API reports
       // this case as a plain 403 detail string.
@@ -271,6 +389,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    sessionEpoch.bump();
     clearSharedCache();
     // Sign out from Google if user was signed in with OAuth
     try {
@@ -285,41 +404,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  // Persist a finished social sign-in (shared by the first attempt and the
+  // "Create account" retry) and report whether it created the account.
+  const finishSocialLogin = async (method: 'google' | 'apple', result: OAuthLoginResult): Promise<boolean> => {
+    sessionEpoch.bump();
+    await AsyncStorage.setItem('auth_token', result.accessToken);
+    await AsyncStorage.setItem('user', JSON.stringify(result.user));
+    setToken(result.accessToken);
+    setUser(result.user as User);
+    await rememberMethod(method);
+    return result.isNewUser;
+  };
+
+  const runSocialLogin = async (
+    method: 'google' | 'apple',
+    signIn: (o: { allowCreate: boolean }) => Promise<OAuthLoginResult>,
+    failure: string,
+    options?: { allowCreate?: boolean },
+  ): Promise<boolean> => {
+    sessionEpoch.bump();
+    try {
+      const result = await signIn({ allowCreate: options?.allowCreate !== false });
+      return await finishSocialLogin(method, result);
+    } catch (error: any) {
+      if (isNoAccountError(error)) {
+        // Hand the screen a retry that also persists the session.
+        throw makeNoAccountError(
+          { provider: error.provider, email: error.email },
+          async () => finishSocialLogin(method, (await error.createAccount()) as OAuthLoginResult),
+        );
+      }
+      throw new Error(error.message || failure);
+    }
+  };
+
   /**
    * Returns whether this sign-in created the account, so the caller can route
    * a genuinely new keeper to the welcome carousel. Deliberately a return
    * value rather than state: it's true for exactly one navigation and would be
    * stale (and re-trigger onboarding) if it lived on the context.
    */
-  const loginWithGoogle = async (): Promise<boolean> => {
-    try {
-      const { accessToken, user: userData, isNewUser } = await signInWithGoogle();
+  const loginWithGoogle = (options?: { allowCreate?: boolean }): Promise<boolean> =>
+    runSocialLogin('google', signInWithGoogle, 'Google login failed', options);
 
-      await AsyncStorage.setItem('auth_token', accessToken);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-
-      setToken(accessToken);
-      setUser(userData);
-      return isNewUser;
-    } catch (error: any) {
-      throw new Error(error.message || 'Google login failed');
-    }
-  };
-
-  const loginWithApple = async (): Promise<boolean> => {
-    try {
-      const { accessToken, user: userData, isNewUser } = await signInWithApple();
-
-      await AsyncStorage.setItem('auth_token', accessToken);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-
-      setToken(accessToken);
-      setUser(userData);
-      return isNewUser;
-    } catch (error: any) {
-      throw new Error(error.message || 'Apple login failed');
-    }
-  };
+  const loginWithApple = (options?: { allowCreate?: boolean }): Promise<boolean> =>
+    runSocialLogin('apple', signInWithApple, 'Apple login failed', options);
 
   const refreshUser = async () => {
     try {
@@ -333,7 +462,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser, units, setMeasurementUnits }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser, lastSignInMethod, units, setMeasurementUnits }}>
       {children}
     </AuthContext.Provider>
   );

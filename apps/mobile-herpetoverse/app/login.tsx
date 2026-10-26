@@ -9,6 +9,7 @@ import { Link, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -32,12 +33,23 @@ import {
 import { apiClient } from '../src/services/api';
 import { HV_WEB_ORIGIN } from '../src/lib/web-origin';
 import { takePostAuthRoute } from '../src/lib/claim';
+import {
+  NO_ACCOUNT_BODY,
+  NO_ACCOUNT_CREATE,
+  NO_ACCOUNT_GO_BACK,
+  isNoAccountError,
+  lastMethodLine,
+  noAccountTitle,
+  withPasswordHint,
+  type NoAccountError,
+} from '../src/lib/session';
 
 type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithApple } = useAuth();
+  const { login, loginWithGoogle, loginWithApple, lastSignInMethod } = useAuth();
+  const lastMethodText = lastMethodLine(lastSignInMethod);
   const { colors, layout } = useTheme();
 
   const [email, setEmail] = useState('');
@@ -110,11 +122,39 @@ export default function LoginScreen() {
         setUnverifiedEmail(email.trim());
       } else {
         captureEvent('login_failed', { method: 'email' });
-        setError(err.message || 'Could not sign in.');
+        // Wrong email/password: remind that a Google/Apple account has no
+        // password to type. Other failures (offline, 5xx) get the plain message.
+        const message = err.message || 'Could not sign in.';
+        setError(err?.code === 'invalid_credentials' ? withPasswordHint(message) : message);
       }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // LOGIN never creates an account by accident: the server refuses with "no
+  // account" and we ask. "Go back" leaves everything as it was; "Create
+  // account" re-sends the SAME Google/Apple credentials with creation allowed.
+  function confirmCreateAccount(provider: 'google' | 'apple', noAccount: NoAccountError) {
+    Alert.alert(noAccountTitle(noAccount.email, noAccount.provider), NO_ACCOUNT_BODY, [
+      { text: NO_ACCOUNT_GO_BACK, style: 'cancel' },
+      {
+        text: NO_ACCOUNT_CREATE,
+        onPress: async () => {
+          setSubmitting(true);
+          try {
+            await noAccount.createAccount();
+            captureEvent('login_success', { method: provider });
+            router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
+          } catch (err: any) {
+            captureEvent('login_failed', { method: provider });
+            setError(err?.message || 'Could not sign in.');
+          } finally {
+            setSubmitting(false);
+          }
+        },
+      },
+    ]);
   }
 
   async function handleOAuth(provider: 'google' | 'apple') {
@@ -123,14 +163,18 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       if (provider === 'google') {
-        await loginWithGoogle();
+        await loginWithGoogle({ allowCreate: false });
       } else {
-        await loginWithApple();
+        await loginWithApple({ allowCreate: false });
       }
       captureEvent('login_success', { method: provider });
       // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
       router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
     } catch (err: any) {
+      if (isNoAccountError(err)) {
+        confirmCreateAccount(provider, err);
+        return;
+      }
       const msg = err?.message || '';
       // Swallow user-cancelled flows quietly.
       if (!/cancel/i.test(msg)) {
@@ -160,6 +204,15 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.form}>
+            {/* Above every sign-in button, so it covers all three methods. */}
+            {lastMethodText && (
+              <Text
+                style={[styles.lastMethod, { color: colors.textSecondary }]}
+                accessibilityLiveRegion="polite"
+              >
+                {lastMethodText}
+              </Text>
+            )}
             <Text style={[styles.label, { color: colors.textSecondary }]}>Email</Text>
             <TextInput
               value={email}
@@ -397,6 +450,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, marginTop: 8 },
   form: { gap: 4 },
   label: { fontSize: 13, fontWeight: '500', marginBottom: 6 },
+  lastMethod: { fontSize: 13, lineHeight: 18, textAlign: 'center', marginBottom: 16 },
   input: {
     borderWidth: 1,
     paddingHorizontal: 14,

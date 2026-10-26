@@ -27,6 +27,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 EMAIL_VERIFICATION_TTL = timedelta(hours=72)
 
 
+# Longest a session can be kept alive by /auth/refresh, counted from the
+# ORIGINAL sign-in (`auth_time` claim), not from the latest refresh. Each
+# refresh mints a token with a fresh jti, so logging out only kills one link
+# of a chain; without a ceiling a leaked token could be renewed forever.
+MAX_SESSION_AGE = timedelta(days=180)
+
+
 def new_email_verification_token() -> tuple[str, datetime]:
     """Mint a verification token and its expiry.
 
@@ -71,10 +78,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
+    now = datetime.now(timezone.utc)
+    # auth_time = Unix seconds of the ORIGINAL sign-in. Every sign-in path
+    # (password, OAuth) gets "now" here; /auth/refresh passes the old value
+    # forward so renewing never extends the session past MAX_SESSION_AGE.
+    to_encode.setdefault("auth_time", int(now.timestamp()))
+
     # jti (JWT ID) allows individual tokens to be revoked
     to_encode.update({
         "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "iat": now,
         "jti": str(uuid.uuid4()),
     })
     encoded_jwt = jwt.encode(to_encode, settings.API_SECRET_KEY, algorithm=settings.API_ALGORITHM)

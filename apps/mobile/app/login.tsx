@@ -19,12 +19,23 @@ import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
 import { resolvePostAuthRoute } from '../src/lib/onboarding';
 import { apiClient } from '../src/services/api';
 import { TYPE } from '../src/theme/tokens';
+import {
+  NO_ACCOUNT_BODY,
+  NO_ACCOUNT_CREATE,
+  NO_ACCOUNT_GO_BACK,
+  isNoAccountError,
+  lastMethodLine,
+  noAccountTitle,
+  withPasswordHint,
+  type NoAccountError,
+} from '../src/lib/session';
 
 type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithGoogle, loginWithApple } = useAuth();
+  const { login, loginWithGoogle, loginWithApple, lastSignInMethod } = useAuth();
+  const lastMethodText = lastMethodLine(lastSignInMethod);
   const { colors, theme, layout } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -93,20 +104,56 @@ export default function LoginScreen() {
         // Inline card with a way forward, not a dismissible dead end.
         setUnverifiedEmail(trimmedEmail);
       } else {
-        Alert.alert('Login Failed', error.message);
+        // Wrong email/password: remind that a Google/Apple account has no
+        // password to type. Other failures (offline, 5xx) get the plain message.
+        Alert.alert(
+          'Login Failed',
+          error?.code === 'invalid_credentials' ? withPasswordHint(error.message) : error.message,
+        );
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // LOGIN never creates an account by accident: the server refuses with
+  // "no account" and we ask. "Go back" leaves everything as it was; "Create
+  // account" re-sends the SAME Google/Apple credentials with creation allowed.
+  const confirmCreateAccount = (provider: 'google' | 'apple', noAccount: NoAccountError) => {
+    Alert.alert(
+      noAccountTitle(noAccount.email, noAccount.provider),
+      NO_ACCOUNT_BODY,
+      [
+        { text: NO_ACCOUNT_GO_BACK, style: 'cancel' },
+        {
+          text: NO_ACCOUNT_CREATE,
+          onPress: async () => {
+            setOauthLoading(provider);
+            try {
+              const isNewUser = (await noAccount.createAccount()) as boolean;
+              router.replace(await resolvePostAuthRoute(isNewUser));
+            } catch (error: any) {
+              Alert.alert(provider === 'google' ? 'Google Login Failed' : 'Apple Login Failed', error.message);
+            } finally {
+              setOauthLoading(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleGoogleLogin = async () => {
     setOauthLoading('google');
     try {
-      const isNewUser = await loginWithGoogle();
+      const isNewUser = await loginWithGoogle({ allowCreate: false });
       router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
-      Alert.alert('Google Login Failed', error.message);
+      if (isNoAccountError(error)) {
+        confirmCreateAccount('google', error);
+      } else {
+        Alert.alert('Google Login Failed', error.message);
+      }
     } finally {
       setOauthLoading(null);
     }
@@ -115,10 +162,14 @@ export default function LoginScreen() {
   const handleAppleLogin = async () => {
     setOauthLoading('apple');
     try {
-      const isNewUser = await loginWithApple();
+      const isNewUser = await loginWithApple({ allowCreate: false });
       router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
-      Alert.alert('Apple Login Failed', error.message);
+      if (isNoAccountError(error)) {
+        confirmCreateAccount('apple', error);
+      } else {
+        Alert.alert('Apple Login Failed', error.message);
+      }
     } finally {
       setOauthLoading(null);
     }
@@ -254,6 +305,14 @@ export default function LoginScreen() {
       alignItems: 'center',
     },
     verifyButtonText: { ...TYPE.bodyStrong, color: '#fff' },
+    lastMethod: {
+      width: '100%',
+      textAlign: 'center',
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      marginBottom: 12,
+    },
     warmingText: {
       flex: 1,
       color: colors.textSecondary,
@@ -273,6 +332,13 @@ export default function LoginScreen() {
         <Text style={styles.subtitle}>Track your collection</Text>
 
         <View style={styles.form}>
+          {/* Above every sign-in button, so it covers all three methods. */}
+          {lastMethodText && (
+            <Text style={styles.lastMethod} accessibilityLiveRegion="polite">
+              {lastMethodText}
+            </Text>
+          )}
+
           <TextInput
             style={styles.input}
             placeholder="Email"

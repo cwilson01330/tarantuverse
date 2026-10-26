@@ -8,6 +8,7 @@ import OAuthButtons from '@/components/auth/OAuthButtons'
 import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
 import { readApiError } from '@/lib/api-error'
 import { safeRedirect } from '@/lib/safeRedirect'
+import { clearPendingSignInMethod, setLastSignInMethod } from '@/lib/lastSignInMethod'
 import {
   classifySignupFailure,
   trackSignupFailed,
@@ -132,6 +133,8 @@ function RegisterForm() {
       })
 
       if (signInResult?.ok) {
+        clearPendingSignInMethod()
+        setLastSignInMethod('password')
         // Prefer the ?redirect=... param when present (e.g. user clicked
         // Sign up from a gated page); otherwise drop them at the dashboard.
         const target = redirectTo || '/dashboard'

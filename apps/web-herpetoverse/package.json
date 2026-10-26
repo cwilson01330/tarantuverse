@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:auth": "node --test --experimental-strip-types tests/*.test.mts"
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.1",

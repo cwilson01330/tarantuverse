@@ -107,9 +107,9 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       if (provider === 'google') {
-        await loginWithGoogle();
+        await loginWithGoogle({ allowCreate: true });
       } else {
-        await loginWithApple();
+        await loginWithApple({ allowCreate: true });
       }
       captureEvent('signup_success', { method: provider });
       // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.

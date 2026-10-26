@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
+    "test:auth": "node --test --experimental-strip-types tests/*.test.mts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

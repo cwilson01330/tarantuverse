@@ -39,6 +39,12 @@ export const AUTH_EXPIRED_EVENT = 'auth:expired'
  * Endpoints where a 401 means "bad credentials" or "bad token supplied manually"
  * (login, register, forgot-password, reset-password). Getting a 401 from these
  * does NOT mean the user's current session has expired, so we must not auto-logout.
+ *
+ * `/auth/refresh` is deliberately NOT listed: it authenticates with the stored
+ * token, so a 401 there means that token is revoked or expired - the session
+ * really is over, and the same forced sign-out as any other 401 is correct.
+ * (Any other failure of a refresh - offline, 5xx - never reaches this branch
+ * and the token is kept; see AuthContext.refreshSession.)
  */
 const AUTH_ENDPOINTS_NO_AUTO_LOGOUT = [
   '/auth/login',

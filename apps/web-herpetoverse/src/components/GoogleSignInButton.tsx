@@ -17,6 +17,8 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { type AuthUser, setSession } from '@/lib/auth'
+import { detailOfBody, noAccountFromDetail } from '@/lib/oauthNoAccount'
+import { setLastSignInMethod } from '@/lib/lastSignInMethod'
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
@@ -35,12 +37,33 @@ interface OAuthLoginResponse {
   user: AuthUser
 }
 
+/** Handed to the page when Google's email has no account (login mode only). */
+export interface NoAccountInfo {
+  email: string
+  /**
+   * Repeat the sign-in with account creation allowed (the "Create account"
+   * button). Resolves to an error message when it failed, or null on success
+   * (the page is navigating away) - it does NOT go through `onError`, which
+   * dismisses the confirm.
+   */
+  createAccount: () => Promise<string | null>
+}
+
 export default function GoogleSignInButton({
   next,
   onError,
+  mode = 'register',
+  onNoAccount,
 }: {
   next: string
   onError?: (message: string) => void
+  /**
+   * `login`: an email with no account is NOT turned into a new account — the
+   * API refuses (`allow_create: false`) and `onNoAccount` lets the page ask.
+   * `register` (default, the old behaviour): create it.
+   */
+  mode?: 'login' | 'register'
+  onNoAccount?: (info: NoAccountInfo) => void
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -49,25 +72,56 @@ export default function GoogleSignInButton({
   // email/password until NEXT_PUBLIC_GOOGLE_CLIENT_ID is set in the env).
   if (!CLIENT_ID) return null
 
+  async function postCredential(credential: string, allowCreate: boolean | undefined) {
+    // Send the RAW signed ID token. The backend verifies it against Google's
+    // JWKS (signature, issuer, audience, expiry) and derives the identity
+    // from the verified claims — we deliberately send no email/sub of our
+    // own, because anything the client asserts is attacker-controllable.
+    const data = await apiFetch<OAuthLoginResponse>('/api/v1/auth/oauth-login', {
+      method: 'POST',
+      auth: false,
+      json: {
+        provider: 'google',
+        id_token: credential,
+        // Omitted = the API's default (create), which old pages relied on.
+        ...(allowCreate === undefined ? {} : { allow_create: allowCreate }),
+      },
+    })
+    setSession(data.access_token, data.user)
+    setLastSignInMethod('google')
+    router.replace(next)
+  }
+
   async function handleCredential(resp: CredentialResponse) {
     if (busy || !resp.credential) return
+    const credential = resp.credential
     setBusy(true)
     try {
-      // Send the RAW signed ID token. The backend verifies it against Google's
-      // JWKS (signature, issuer, audience, expiry) and derives the identity
-      // from the verified claims — we deliberately send no email/sub of our
-      // own, because anything the client asserts is attacker-controllable.
-      const data = await apiFetch<OAuthLoginResponse>('/api/v1/auth/oauth-login', {
-        method: 'POST',
-        auth: false,
-        json: {
-          provider: 'google',
-          id_token: resp.credential,
-        },
-      })
-      setSession(data.access_token, data.user)
-      router.replace(next)
+      await postCredential(credential, mode === 'login' && onNoAccount ? false : undefined)
     } catch (err) {
+      const missing =
+        mode === 'login' && onNoAccount && err instanceof ApiError && err.status === 409
+          ? noAccountFromDetail(detailOfBody(err.body))
+          : null
+      if (missing) {
+        // The same Google token is reused if they choose to create the
+        // account (nothing was consumed by the refusal).
+        onNoAccount?.({
+          email: missing.email,
+          createAccount: async () => {
+            setBusy(true)
+            try {
+              await postCredential(credential, true)
+              return null
+            } catch (retryErr) {
+              setBusy(false)
+              return retryErr instanceof ApiError ? retryErr.message : 'Google sign-in failed.'
+            }
+          },
+        })
+        setBusy(false)
+        return
+      }
       onError?.(err instanceof ApiError ? err.message : 'Google sign-in failed.')
       setBusy(false)
     }

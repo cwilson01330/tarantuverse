@@ -34,6 +34,31 @@ const UNAUTHED_PATHS = [
 // Guard against multiple parallel 401s all trying to kick off a redirect.
 let redirectingToLogin = false
 
+/**
+ * Keep `localStorage.auth_token` in step with the NextAuth session.
+ *
+ * The request interceptor below prefers `auth_token` over the session, so a
+ * stale copy (written by older versions of the site, or left behind after the
+ * session's API token was refreshed) would keep sending a token the session no
+ * longer holds. Called by `SessionTokenSync` whenever the session settles:
+ * a signed-in session overwrites an existing copy (it never creates one — the
+ * session is the source of truth), a signed-out one removes it.
+ */
+export function syncStoredAuthToken(sessionToken: string | null): void {
+  if (typeof window === 'undefined') return
+  try {
+    const stored = window.localStorage.getItem('auth_token')
+    if (stored === null) return
+    if (sessionToken) {
+      if (stored !== sessionToken) window.localStorage.setItem('auth_token', sessionToken)
+    } else {
+      window.localStorage.removeItem('auth_token')
+    }
+  } catch {
+    // private mode / blocked storage — the interceptor falls back to the session
+  }
+}
+
 export const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
@@ -95,7 +120,15 @@ apiClient.interceptors.response.use(
         redirectingToLogin = true
         localStorage.removeItem('auth_token')
         localStorage.removeItem('user')
-        window.location.href = '/login'
+        // End the NextAuth session too: it now lasts 14 days, so a token that
+        // died early (deactivated account, revoked elsewhere) would otherwise
+        // keep reporting "signed in" until the next refresh check.
+        import('next-auth/react')
+          .then(({ signOut }) => signOut({ redirect: false }))
+          .catch(() => undefined)
+          .finally(() => {
+            window.location.href = '/login'
+          })
       }
     }
     return Promise.reject(error)

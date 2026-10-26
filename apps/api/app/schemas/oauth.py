@@ -19,6 +19,10 @@ class GoogleOAuthCallback(BaseModel):
     code: str
     redirect_uri: Optional[str] = None  # Mobile apps need to send their redirect_uri
     state: Optional[str] = None
+    # False = sign in only; when no account exists (or can be linked) answer
+    # 409 {"code": "oauth_no_account"} instead of creating one. Default True
+    # keeps older clients exactly as they were.
+    allow_create: bool = True
 
 
 class AppleOAuthCallback(BaseModel):
@@ -26,6 +30,7 @@ class AppleOAuthCallback(BaseModel):
     code: str
     id_token: str
     user: Optional[dict] = None  # Apple sends user info on first login only
+    allow_create: bool = True  # see GoogleOAuthCallback.allow_create
 
 
 class OAuthLoginResponse(BaseModel):

@@ -13,6 +13,18 @@ from app.utils.auth import decode_access_token, is_token_revoked
 security = HTTPBearer()
 
 
+def _inactive_account_error() -> HTTPException:
+    """401 (not 403) for a signed-in session whose account was deactivated or
+    retired (e.g. by merge_case_duplicate_accounts.py). The mobile and web
+    clients only sign out on 401, so a 403 left such a device stuck with errors
+    on every screen. Same shape as the other 401s in this module."""
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Account is no longer active",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
@@ -63,10 +75,7 @@ def get_current_user(
         )
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
-        )
+        raise _inactive_account_error()
 
     return user
 
@@ -78,10 +87,7 @@ def get_current_active_user(
     Get current active user (additional check for is_active)
     """
     if not current_user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
-        )
+        raise _inactive_account_error()
     return current_user
 
 

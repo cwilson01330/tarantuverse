@@ -14,6 +14,7 @@
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants from 'expo-constants';
+import { detailMessage, makeNoAccountError, parseNoAccountDetail } from '../lib/session';
 
 const isExpoGo = Constants.appOwnership === 'expo';
 
@@ -58,22 +59,48 @@ export interface OAuthResult {
   };
 }
 
-async function exchangeWithBackend(body: Record<string, unknown>): Promise<OAuthResult> {
+export interface SocialSignInOptions {
+  /**
+   * false (the LOGIN screen): the server refuses with 409 `oauth_no_account`
+   * instead of silently creating an account, and the thrown error carries
+   * `createAccount()` which re-sends the same credentials with true. This is
+   * how a keeper who tapped the wrong button stops ending up with an empty
+   * second account. true (the REGISTER screen, and the default) = old behaviour.
+   */
+  allowCreate?: boolean;
+}
+
+/**
+ * POST /auth/oauth-login. The body (provider token + Apple's single-use
+ * authorization_code) is built by the caller once and reused verbatim for the
+ * "Create account" retry; only `allow_create` changes.
+ */
+async function exchangeWithBackend(
+  body: Record<string, unknown>,
+  allowCreate: boolean,
+): Promise<OAuthResult> {
   const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, allow_create: allowCreate }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'OAuth login failed');
+    // The other 409 on this route ("account exists but is not verified") has a
+    // STRING detail, so only an object with code oauth_no_account is this case.
+    const noAccount = response.status === 409 ? parseNoAccountDetail(err?.detail) : null;
+    if (noAccount) {
+      throw makeNoAccountError(noAccount, () => exchangeWithBackend(body, true));
+    }
+    throw new Error(detailMessage(err?.detail, 'OAuth login failed'));
   }
   const data = await response.json();
   return { accessToken: data.access_token, user: data.user };
 }
 
 /** Native Google sign-in → shared backend → session tokens. */
-export async function signInWithGoogle(): Promise<OAuthResult> {
+export async function signInWithGoogle(options: SocialSignInOptions = {}): Promise<OAuthResult> {
+  const allowCreate = options.allowCreate !== false;
   if (!GoogleSignin) {
     throw new Error(
       'Google Sign-In needs a dev/production build (not available in Expo Go).',
@@ -89,10 +116,13 @@ export async function signInWithGoogle(): Promise<OAuthResult> {
     if (!idToken) {
       throw new Error('Google did not return an ID token. Please try again.');
     }
-    return await exchangeWithBackend({
-      provider: 'google',
-      id_token: idToken,
-    });
+    return await exchangeWithBackend(
+      {
+        provider: 'google',
+        id_token: idToken,
+      },
+      allowCreate,
+    );
   } catch (error) {
     try {
       await GoogleSignin.signOut();
@@ -104,7 +134,8 @@ export async function signInWithGoogle(): Promise<OAuthResult> {
 }
 
 /** Native Apple sign-in (iOS) → shared backend → session tokens. */
-export async function signInWithApple(): Promise<OAuthResult> {
+export async function signInWithApple(options: SocialSignInOptions = {}): Promise<OAuthResult> {
+  const allowCreate = options.allowCreate !== false;
   const available = await AppleAuthentication.isAvailableAsync();
   if (!available) {
     throw new Error('Apple Sign In is not available on this device.');
@@ -122,18 +153,24 @@ export async function signInWithApple(): Promise<OAuthResult> {
   if (!credential.identityToken) {
     throw new Error('Apple did not return an identity token. Please try again.');
   }
-  return exchangeWithBackend({
-    provider: 'apple',
-    // Raw signed token — backend verifies against Apple's JWKS and reads the
-    // `sub`/`email` from the verified claims.
-    identity_token: credential.identityToken,
-    // One-time code the server exchanges for a refresh token, so deleting
-    // the account can revoke Sign in with Apple (App Store 5.1.1(v)).
-    authorization_code: credential.authorizationCode ?? undefined,
-    // Cosmetic only. Apple omits the name from the token and sends it just
-    // once, on first consent.
-    name: name || 'Apple User',
-  });
+  // The body is built ONCE and reused if the keeper confirms "Create account":
+  // Apple's authorization_code is single-use, and a refusal for "no account"
+  // does not consume it, so the same code goes with the retry.
+  return exchangeWithBackend(
+    {
+      provider: 'apple',
+      // Raw signed token — backend verifies against Apple's JWKS and reads the
+      // `sub`/`email` from the verified claims.
+      identity_token: credential.identityToken,
+      // One-time code the server exchanges for a refresh token, so deleting
+      // the account can revoke Sign in with Apple (App Store 5.1.1(v)).
+      authorization_code: credential.authorizationCode ?? undefined,
+      // Cosmetic only. Apple omits the name from the token and sends it just
+      // once, on first consent.
+      name: name || 'Apple User',
+    },
+    allowCreate,
+  );
 }
 
 /** True on iOS 13+ where Apple sign-in is offered (required by App Store 4.8). */
