@@ -28,6 +28,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.photo import Photo
+from app.utils.storage_urls import key_for_url, photo_bases, url_variants
 
 logger = logging.getLogger(__name__)
 
@@ -95,20 +96,25 @@ def collect_for_user(db: Session, user_id) -> list[FilePair]:
     return pairs
 
 
-def _is_deletable(url: str, public_base: Optional[str]) -> bool:
-    """True only for a URL that is exactly one of our generated keys under our
-    own storage root — so the URL IS the canonical form, and an exact-match
-    "still referenced?" query is sound."""
-    if public_base:
-        prefix = public_base.rstrip("/") + "/"
-        if not url.startswith(prefix):
-            return False
-        key = url[len(prefix):]
+def _deletable_key(url: str, bases: list[str]) -> Optional[str]:
+    """The storage key, only for a URL that is exactly one of our generated
+    keys under one of our own storage roots (or /uploads/ in local dev) — so
+    the "still referenced?" query can match it exactly, under every address."""
+    if bases:
+        key = key_for_url(url, bases)
+        if key is None:
+            return None
     else:
         if not url.startswith("/uploads/"):
-            return False
+            return None
         key = url[len("/uploads/"):]
-    return bool(KEY_RE.match(key))
+    return key if KEY_RE.match(key) else None
+
+
+def _legacy_bases() -> str:
+    from app.config import settings
+
+    return settings.R2_LEGACY_PUBLIC_URLS
 
 
 async def delete_files(db: Session, pairs: Iterable[FilePair], storage=None) -> int:
@@ -120,6 +126,7 @@ async def delete_files(db: Session, pairs: Iterable[FilePair], storage=None) -> 
         from app.services.storage import storage_service as storage
 
     base = getattr(storage, "public_url_base", None) if getattr(storage, "use_r2", False) else None
+    bases = photo_bases(base, _legacy_bases()) if base else []
     urls: list[str] = []
     for url, thumb in pairs:
         for u in (url, thumb):
@@ -129,11 +136,14 @@ async def delete_files(db: Session, pairs: Iterable[FilePair], storage=None) -> 
     deleted = 0
     for u in urls:
         try:
-            if not _is_deletable(u, base):
+            key = _deletable_key(u, bases)
+            if key is None:
                 continue
+            # A row may store the same object under the old or the new address.
+            refs = url_variants(key, bases) if bases else [u]
             still_used = (
-                db.query(Photo.id).filter(or_(Photo.url == u, Photo.thumbnail_url == u)).first()
-                or db.query(User.id).filter(User.avatar_url == u).first()
+                db.query(Photo.id).filter(or_(Photo.url.in_(refs), Photo.thumbnail_url.in_(refs))).first()
+                or db.query(User.id).filter(User.avatar_url.in_(refs)).first()
             )
             if still_used:
                 continue

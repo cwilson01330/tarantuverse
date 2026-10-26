@@ -211,13 +211,21 @@ def size_text(taxon: str, latest_span_in, length_mm, units: Optional[str] = None
 
 def allowed_photo_url(url: Optional[str], base: Optional[str] = None) -> Optional[str]:
     """photo_url is user-editable free text; only emit it when it lives under
-    our own storage public base (the renderer fetches it server-side)."""
+    our own storage public base (the renderer fetches it server-side). With no
+    `base` given, both the bucket's current address and its earlier r2.dev
+    address count (old links are moved by rewrite_photo_urls.py)."""
+    from app.utils.storage_urls import is_our_photo_url, photo_bases
+
     if base is None:
+        from app.config import settings
         from app.services.storage import storage_service
         base = getattr(storage_service, "public_url_base", None) if getattr(storage_service, "use_r2", False) else None
-    if not url or not base:
+        bases = photo_bases(base, settings.R2_LEGACY_PUBLIC_URLS) if base else []
+    else:
+        bases = [base] if base else []
+    if not url or not bases:
         return None
-    return url if url.startswith(base.rstrip("/") + "/") else None
+    return url if is_our_photo_url(url, bases) else None
 
 
 def _weight(g: float) -> str:

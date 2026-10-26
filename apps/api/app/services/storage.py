@@ -322,9 +322,20 @@ class StorageService:
             )
             return new_photo_url, new_thumb_url
 
+    def _bucket_bases(self) -> list[str]:
+        """Every public address of this bucket — current, then earlier ones
+        (stored links may still use the old r2.dev address)."""
+        from app.utils.storage_urls import photo_bases
+
+        return photo_bases(self.public_url_base, settings.R2_LEGACY_PUBLIC_URLS)
+
     def _copy_in_r2(self, source_url: str, dest_key: str) -> str:
         """Server-side copy of one R2 object to a new key. Returns its public URL."""
-        source_key = source_url.replace(f"{self.public_url_base}/", "")
+        from app.utils.storage_urls import key_for_url
+
+        source_key = key_for_url(source_url, self._bucket_bases())
+        if source_key is None:
+            raise ValueError(f"Not a photo in our bucket: {source_url}")
         self.s3_client.copy_object(
             Bucket=self.bucket_name,
             CopySource={"Bucket": self.bucket_name, "Key": source_key},
@@ -370,14 +381,16 @@ class StorageService:
     async def _delete_from_r2(self, url: str) -> None:
         """Delete file from R2."""
         try:
-            # Only a URL that STARTS with our public base maps to a key.
-            # (`str.replace` used to strip the base anywhere in the string, so
-            # a crafted URL could be steered at any object in the bucket.)
-            prefix = f"{self.public_url_base}/"
-            if not url.startswith(prefix):
+            # Only a URL that STARTS with one of our public bases maps to a
+            # key. (`str.replace` used to strip the base anywhere in the
+            # string, so a crafted URL could be steered at any object in the
+            # bucket.) Old links on the r2.dev address still count.
+            from app.utils.storage_urls import key_for_url
+
+            key = key_for_url(url, self._bucket_bases())
+            if key is None:
                 print(f"⚠️  Refusing to delete non-R2 URL: {url}")
                 return
-            key = url[len(prefix):]
 
             self.s3_client.delete_object(
                 Bucket=self.bucket_name,

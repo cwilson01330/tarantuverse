@@ -891,12 +891,16 @@ def _photo_ext(url: str) -> str:
 MAX_EXPORT_PHOTO_BYTES = 25 * 1024 * 1024
 
 
-def _is_our_photo_url(url: str, base: str) -> bool:
+def _is_our_photo_url(url: str, base) -> bool:
     """Only fetch from our own storage bucket. `photos.url` is written by the
     server, but the export must never become a way to make the API fetch an
-    arbitrary address (SSRF)."""
-    base = (base or "").rstrip("/")
-    return bool(base) and base.startswith("https://") and url.startswith(base + "/")
+    arbitrary address (SSRF). `base` is one address or a list (the bucket's
+    current address plus its earlier r2.dev one); only https ones count."""
+    from app.utils.storage_urls import is_our_photo_url
+
+    bases = [base] if isinstance(base, str) else list(base or [])
+    bases = [b for b in (x.rstrip("/") for x in bases if x) if b.startswith("https://")]
+    return bool(bases) and is_our_photo_url(url, bases)
 
 
 async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, out=None) -> Optional[bytes]:
@@ -906,8 +910,8 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, 
     otherwise returns the ZIP bytes."""
     client: Optional[httpx.AsyncClient] = None
     if fetch_photo is None:
-        from app.config import settings
-        storage_base = settings.R2_PUBLIC_URL
+        from app.utils.storage_urls import photo_bases
+        storage_base = photo_bases()
         client = httpx.AsyncClient(timeout=15.0, follow_redirects=False)
 
         async def fetch_photo(url: str) -> Optional[bytes]:

@@ -71,7 +71,13 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID: str = ""
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET_NAME: str = "tarantuverse-photos"
-    R2_PUBLIC_URL: str = ""  # e.g., https://pub-xxx.r2.dev
+    R2_PUBLIC_URL: str = ""  # e.g., https://photos.tarantuverse.com
+    # Earlier public addresses of the SAME bucket (comma-separated). Stored
+    # links that still use one are treated as ours — deletable, exportable,
+    # allowed on share cards — until rewrite_photo_urls.py has moved them to
+    # R2_PUBLIC_URL. The default is the bucket's r2.dev address, which every
+    # photo link used before 2026-10 (it is public: it is in every old link).
+    R2_LEGACY_PUBLIC_URLS: str = "https://pub-739a81bdc01a40bb8cfce4a58b122d17.r2.dev"
 
     # Email (Resend)
     RESEND_API_KEY: str = ""
