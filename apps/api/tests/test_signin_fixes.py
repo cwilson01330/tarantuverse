@@ -675,65 +675,33 @@ def test_oauth_allow_create_string_false_is_honoured(client, db_session, monkeyp
     assert r.json()["detail"]["code"] == "oauth_no_account"
 
 
-# Website NextAuth routes ----------------------------------------------------
+# Removed code-exchange routes ----------------------------------------------
 
-def _patch_google_code(monkeypatch, email, sub="g-web-1"):
-    async def fake(code, redirect_uri=None):
-        return {"provider_id": sub, "email": email, "name": "Web Keeper", "picture": None,
-                "access_token": "at", "refresh_token": "rt"}
-    monkeypatch.setattr(auth_router, "exchange_google_code_for_token", fake)
+def test_unused_code_exchange_routes_are_gone():
+    """/auth/oauth/google, /auth/oauth/apple and /auth/link-account were
+    removed on 2026-10-27: no client called them, and the Apple ones decoded
+    identity tokens without checking the signature. Every sign-in goes
+    through /auth/oauth-login (and linking through /auth/link-account-direct),
+    which verify the token."""
+    from app.main import app
 
-
-def _patch_apple_code(monkeypatch, email, sub="a-web-1"):
-    async def fake(id_token):
-        return {"provider_id": sub, "email": email}
-    monkeypatch.setattr(auth_router, "verify_apple_id_token", fake)
-
-
-def test_web_google_default_creates_lowercase_and_allow_create_false_refuses(client, db_session, monkeypatch):
-    _patch_google_code(monkeypatch, "Web.Google@Example.com")
-    refused = client.post("/api/v1/auth/oauth/google", json={"code": "c", "allow_create": False})
-    assert refused.status_code == 409, refused.text
-    assert refused.json() == {"detail": {
-        "code": "oauth_no_account", "provider": "google", "email": "Web.Google@Example.com",
-    }}
-    assert _count_users(db_session, "web.google@example.com") == 0
-
-    created = client.post("/api/v1/auth/oauth/google", json={"code": "c"})
-    assert created.status_code == 200, created.text
-    assert created.json()["is_new_user"] is True
-    assert db_session.query(User).filter(User.email == "web.google@example.com").count() == 1
+    paths = {getattr(r, "path", None) for r in app.routes}
+    for gone in ("/api/v1/auth/oauth/google", "/api/v1/auth/oauth/apple", "/api/v1/auth/link-account"):
+        assert gone not in paths, gone
+    # The verified routes that replace them are still there.
+    assert "/api/v1/auth/oauth-login" in paths
+    assert "/api/v1/auth/link-account-direct" in paths
 
 
-def test_web_google_matches_existing_account_case_insensitively(client, db_session, monkeypatch):
-    user = _make_user(db_session, "Web.Existing@example.com")
-    _patch_google_code(monkeypatch, "web.existing@example.com", sub="g-web-existing")
-    r = client.post("/api/v1/auth/oauth/google", json={"code": "c", "allow_create": False})
-    assert r.status_code == 200, r.text
-    assert r.json()["user"]["id"] == str(user.id)
-    assert _count_users(db_session, "web.existing@example.com") == 1
-
-
-def test_web_apple_default_creates_and_allow_create_false_refuses(client, db_session, monkeypatch):
-    _patch_apple_code(monkeypatch, "Web.Apple@Example.com")
-    refused = client.post("/api/v1/auth/oauth/apple", json={"code": "c", "id_token": "t", "allow_create": False})
-    assert refused.status_code == 409, refused.text
-    assert refused.json()["detail"] == {
-        "code": "oauth_no_account", "provider": "apple", "email": "Web.Apple@Example.com",
-    }
-    assert _count_users(db_session, "web.apple@example.com") == 0
-
-    created = client.post("/api/v1/auth/oauth/apple", json={"code": "c", "id_token": "t"})
-    assert created.status_code == 200, created.text
-    assert db_session.query(User).filter(User.email == "web.apple@example.com").count() == 1
-
-
-def test_web_apple_matches_existing_account_case_insensitively(client, db_session, monkeypatch):
-    user = _make_user(db_session, "Web.AppleExisting@example.com")
-    _patch_apple_code(monkeypatch, "web.appleexisting@example.com", sub="a-web-existing")
-    r = client.post("/api/v1/auth/oauth/apple", json={"code": "c", "id_token": "t", "allow_create": False})
-    assert r.status_code == 200, r.text
-    assert r.json()["user"]["id"] == str(user.id)
+def test_no_unverified_apple_token_decoding_left():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1] / "app"
+    offenders = [
+        str(f.relative_to(root)) for f in root.rglob("*.py")
+        if '"verify_signature": False' in f.read_text(encoding="utf-8")
+        and "apple" in f.read_text(encoding="utf-8").lower()
+    ]
+    assert offenders == [], offenders
 
 
 # ── resend-verification + static guard ───────────────────────────────────────
