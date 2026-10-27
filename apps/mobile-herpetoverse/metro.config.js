@@ -1,11 +1,19 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const fs = require('fs');
 const path = require('path');
 
+// The folder's REAL spelling (2026-10-27). On Windows a terminal opened at
+// "C:\users\..." gives __dirname that casing, while pnpm's links (and
+// tools/metro-singletons.js, which follows them) resolve to "C:\Users\...".
+// Metro's file map is case-sensitive, so the two spellings miss each other:
+// "Failed to get the SHA-1 for ... @expo/cli/.../metro-require/require.js"
+// during `eas update`. realpathSync.native returns the on-disk casing.
+const projectRoot = fs.realpathSync.native(__dirname);
+
 /** @type {import('expo/metro-config').MetroConfig} */
-const config = getDefaultConfig(__dirname);
+const config = getDefaultConfig(projectRoot);
 
 // Monorepo support: Allow Metro to access workspace root
-const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
 config.projectRoot = projectRoot;
