@@ -70,7 +70,7 @@ function EmptyCard() {
 export default function AnalyticsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { units } = useUnits();
-  const { isPremium, limits } = useSubscription();
+  const { isPremium, limits, failed: planFailed } = useSubscription();
 
   const [collection, setCollection] = useState<CollectionAnalytics | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
@@ -135,11 +135,13 @@ export default function AnalyticsPage() {
   const userId = user?.id ?? "";
   const advancedFetchedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (planKnown && isPremium && advancedFetchedFor.current !== userId) {
+    // planFailed: the plan check fell back to "free", which may be wrong for a
+    // paying keeper — ask /advanced/ itself (200 = member, 402 = preview).
+    if (planKnown && (isPremium || planFailed) && advancedFetchedFor.current !== userId) {
       advancedFetchedFor.current = userId;
       void loadAdvanced();
     }
-  }, [planKnown, isPremium, userId, loadAdvanced]);
+  }, [planKnown, isPremium, planFailed, userId, loadAdvanced]);
 
   // "updated just now" / "3 minutes ago" follows the clock.
   useEffect(() => {
@@ -159,7 +161,7 @@ export default function AnalyticsPage() {
         ? { kind: "sample" }
         : { kind: "preview", collection, onSeePremium: () => handleSeePremium() };
     if (!planKnown) premium = { kind: "loading" };
-    else if (!isPremium) premium = showPreview();
+    else if (!isPremium && !planFailed) premium = showPreview();
     else if (advanced.status === "ready") {
       premium = { kind: "member", advanced: advanced.data, onSaveCost: saveFeedingCost };
     } else if (advanced.status === "gated") premium = showPreview();

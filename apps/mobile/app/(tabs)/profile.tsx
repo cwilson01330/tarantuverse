@@ -58,13 +58,17 @@ function AnalyticsRow({ animals, onPress }: { animals: number | null; onPress: (
       accessibilityLabel={count ? `Analytics. ${count}` : 'Analytics'}
       accessibilityHint="Opens your collection analytics"
     >
-      <MaterialCommunityIcons
-        name="chart-line"
-        size={20}
-        color={colors.accent}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
+      {/* 20pt glyph in MenuRow's 22pt icon slot, so the label lines up with
+          the other rows and with the dividers (inset 16 + 22 + 12). */}
+      <View style={styles.analyticsIcon}>
+        <MaterialCommunityIcons
+          name="chart-line"
+          size={20}
+          color={colors.accent}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+      </View>
       <Text style={[styles.analyticsLabel, { color: colors.textPrimary }]}>Analytics</Text>
       {count ? <Text style={[styles.analyticsCount, { color: colors.textTertiary }]}>{count}</Text> : null}
       <MaterialCommunityIcons
@@ -453,7 +457,8 @@ const styles = StyleSheet.create({
   },
   center: { textAlign: 'center' },
   gap: { marginTop: 8 },
-  analyticsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 52 },
+  analyticsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, minHeight: 52 },
+  analyticsIcon: { width: 22, alignItems: 'center' },
   analyticsLabel: { flex: 1, ...TYPE.bodyStrong },
   analyticsCount: { ...TYPE.note },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },

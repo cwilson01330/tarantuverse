@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -191,6 +191,12 @@ function StatChip({
 function DashboardHubScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  // Read inside async fetches so a fetch started before sign-in settles (or
+  // across an account switch) still files the count under the current user.
+  const userIdRef = useRef(user?.id);
+  userIdRef.current = user?.id;
+  // When the dashboard data was last loaded — gates the on-focus refresh.
+  const lastLoadedAtRef = useRef(0);
   const { colors, layout } = useTheme();
   const insets = useSafeAreaInsets();
   const { unreadCount } = useUnreadMessages();
@@ -253,6 +259,20 @@ function DashboardHubScreen() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Coming back to Home after logging a feeding or a molt elsewhere: refresh
+  // the two reads that answer "who needs me" (the Insights card + the Profile
+  // count read /analytics/collection; the feeding widget reads feeding-status).
+  // Only when the last load is over a minute old, so tab-hopping doesn't
+  // multiply requests (see CLAUDE.md "Request budget").
+  useFocusEffect(
+    useCallback(() => {
+      if (!lastLoadedAtRef.current) return; // first load is the effect above
+      if (Date.now() - lastLoadedAtRef.current < 60_000) return;
+      lastLoadedAtRef.current = Date.now();
+      refreshWhoNeedsMe();
+    }, []),
+  );
 
   // Re-check tour state when screen regains focus (e.g. after "Replay Tutorial")
   useFocusEffect(
@@ -340,12 +360,7 @@ function DashboardHubScreen() {
         setEnclosures(enclosuresRes.data);
       }
 
-      if (statsRes?.data) {
-        setCollectionStats(statsRes.data);
-        // Hand the count to the You tab's Analytics row (no request there).
-        const stats = statsRes.data as CollectionAnalytics;
-        setCollectionAnimalCount(user?.id, stats.total_animals || stats.total_tarantulas || 0);
-      }
+      if (statsRes?.data) applyCollectionStats(statsRes.data as CollectionAnalytics);
 
       if (Array.isArray(invertsRes?.data)) {
         setTotalAnimals(invertsRes.data.length);
@@ -383,8 +398,26 @@ function DashboardHubScreen() {
     } catch {
       // Dashboard data fetch failed
     } finally {
+      lastLoadedAtRef.current = Date.now();
       setLoading(false);
     }
+  };
+
+  const applyCollectionStats = (stats: CollectionAnalytics) => {
+    setCollectionStats(stats);
+    // Hand the count to the You tab's Analytics row (no request there).
+    setCollectionAnimalCount(userIdRef.current, stats.total_animals || stats.total_tarantulas || 0);
+  };
+
+  // The focus refresh: two reads, no loading state. A failure keeps what's on
+  // screen (it was right a minute ago) rather than blanking the card.
+  const refreshWhoNeedsMe = async () => {
+    const tzOffset = new Date().getTimezoneOffset();
+    const [statsRes] = await Promise.all([
+      apiClient.get('/analytics/collection', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
+      fetchAllFeedingStatuses(),
+    ]);
+    if (statsRes?.data) applyCollectionStats(statsRes.data as CollectionAnalytics);
   };
 
   const fetchAllFeedingStatuses = async () => {

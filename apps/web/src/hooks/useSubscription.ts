@@ -17,6 +17,10 @@ export function useSubscription() {
   const { token } = useAuth()
   const [limits, setLimits] = useState<SubscriptionLimits | null>(null)
   const [loading, setLoading] = useState(true)
+  // True while `limits` is the free-tier fallback below rather than the
+  // server's answer — callers that must not mistake a paying keeper for a free
+  // one (the Analytics Premium block) can ask the gated endpoint instead.
+  const [failed, setFailed] = useState(false)
 
   const fetchLimits = useCallback(async () => {
     if (!token) {
@@ -36,6 +40,7 @@ export function useSubscription() {
       if (response.ok) {
         const data = await response.json()
         setLimits(data)
+        setFailed(false)
       } else {
         // Default to free tier if endpoint fails.
         //
@@ -50,6 +55,7 @@ export function useSubscription() {
         // consumer of this hook falls back to 15, so on an API failure the
         // dashboard told a free keeper they had "X of 20" and then the server
         // refused their 16th animal.
+        setFailed(true)
         setLimits({
           is_premium: false,
           max_tarantulas: 15,
@@ -62,6 +68,7 @@ export function useSubscription() {
     } catch (error) {
       console.error('Failed to fetch subscription limits:', error)
       // Default to free tier on error — see the note above on 15 vs 20.
+      setFailed(true)
       setLimits({
         is_premium: false,
         max_tarantulas: 15,
@@ -115,6 +122,8 @@ export function useSubscription() {
   return {
     limits,
     loading,
+    /** `limits` is the fallback, not the server's answer. */
+    failed,
     isPremium: limits?.is_premium ?? false,
     canAddTarantula,
     canUseBreeding,
