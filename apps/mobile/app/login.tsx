@@ -309,8 +309,7 @@ export default function LoginScreen() {
       width: '100%',
       textAlign: 'center',
       color: colors.textSecondary,
-      fontSize: 13,
-      lineHeight: 18,
+      ...TYPE.small,
       marginBottom: 12,
     },
     warmingText: {

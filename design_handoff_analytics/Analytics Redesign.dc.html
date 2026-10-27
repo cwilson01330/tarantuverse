@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; background:#eceff4; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; }
+  a { color:#0066FF; text-decoration:none; }
+  a:hover { color:#0052cc; text-decoration:underline; }
+  @keyframes shimmer { 0%{opacity:.55} 50%{opacity:1} 100%{opacity:.55} }
+</style>
+</helmet>
+
+<template id="__bundler_thumbnail">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#0a0a0f"/><rect x="110" y="230" width="36" height="60" rx="6" fill="#0066FF"/><rect x="166" y="190" width="36" height="100" rx="6" fill="#0066FF"/><rect x="222" y="150" width="36" height="140" rx="6" fill="#FF0099"/><rect x="278" y="210" width="36" height="80" rx="6" fill="#0066FF"/></svg>
+</template>
+
+<section style="display:flex; flex-direction:column; gap:64px; padding:56px 64px 120px;">
+
+  <div style="max-width:940px; display:flex; flex-direction:column; gap:16px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#0066FF; background:#dbeafe; padding:5px 10px; border-radius:6px;">TURN 1</span>
+      <span style="font-size:13px; font-weight:500; color:#64748b;">Tarantuverse analytics · web + mobile · 2026-10-26</span>
+    </div>
+    <h1 style="margin:0; font-size:34px; line-height:40px; font-weight:700; color:#0f172a; letter-spacing:-.02em;">One Analytics page, built for three animals</h1>
+    <p style="margin:0; font-size:16px; line-height:26px; color:#475569; max-width:760px; text-wrap:pretty;">The median keeper has three animals, so the page leads with sentences a small collection can answer (who is due, who molted last, the longest gap since a meal) and keeps distributions for the nine keepers with more than fifteen. Premium lives on the same page as a blurred preview of the keeper's own data. Sections: <a href="#1a">1a</a> recommendation + entry points · <a href="#1b">1b</a> the page in four theme combos · <a href="#1c">1c</a> every state · <a href="#1d">1d</a> web · <a href="#1e">1e</a> two-page variant for comparison · <a href="#1f">1f</a> chart grammar.</p>
+  </div>
+
+  <!-- ══ 1a ══ -->
+  <div id="1a" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <span style="font-size:12px; font-weight:700; color:#fff; background:#0f172a; padding:5px 10px; border-radius:6px;">1a</span>
+      <h2 style="margin:0; font-size:24px; font-weight:700; color:#0f172a;">Recommendation and entry points</h2>
+      <span style="font-size:14px; color:#64748b;">§6 decisions, then how people get there</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; max-width:1180px;">
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#64748b;">6.1 PAGES</span>
+        <span style="font-size:16px; font-weight:700; color:#0f172a;">One page. Premium inline.</span>
+        <p style="margin:0; font-size:13px; line-height:20px; color:#475569;">Sex split, species and paid total were on both pages. One page removes the overlap, and a free keeper sees Premium every time they open analytics instead of behind a button nobody finds. The two-page version is in <a href="#1e">1e</a> for comparison.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#64748b;">6.2 NAVIGATION</span>
+        <span style="font-size:16px; font-weight:700; color:#0f172a;">An Insights card on Home, a row in You, a sidebar row on web.</span>
+        <p style="margin:0; font-size:13px; line-height:20px; color:#475569;">No new tab: the five-tab spine from the redesign handoff stays. The Home card rotates to whatever changed most recently, computed from <code style="font-size:12px; background:#f1f5f9; padding:1px 4px; border-radius:4px;">recent_activity[0]</code>, which the Home already fetches. It gives analytics a reason to be opened, not just a place to be found.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#64748b;">6.3 CARDS</span>
+        <span style="font-size:16px; font-weight:700; color:#0f172a;">Keep 6, merge 4, drop 3.</span>
+        <p style="margin:0; font-size:13px; line-height:20px; color:#475569;">New first row: Right now (due, last molt, longest gap). Keep Collection, Feeding, Molts, Recent activity, Premium set. Notable Animals merges into Molts; Top Species merges into Collection and only expands past 5 species; Total Activity, Average Price and Species Diversity go. Breeding is not on the page.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px 20px; display:flex; flex-direction:column; gap:8px;">
+        <span style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#64748b;">6.4 CHARTS</span>
+        <span style="font-size:16px; font-weight:700; color:#0f172a;">One grammar, three shapes, both platforms.</span>
+        <p style="margin:0; font-size:13px; line-height:20px; color:#475569;">Bars, a line, and a segmented bar. Mobile moves to <code style="font-size:12px; background:#f1f5f9; padding:1px 4px; border-radius:4px;">react-native-svg</code> (already in the binary); web keeps recharts but styled to the same spec in <a href="#1f">1f</a>. No axes grid, no legends that repeat the labels, every chart has a 0 / 1 / many rule.</p>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start;">
+
+      <!-- Mobile Home with Insights card -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div data-screen-label="Home · Insights card" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:flex-end; justify-content:space-between;">
+              <div><div style="font-size:20px; font-weight:700;">Good morning, Cory</div><div style="font-size:12px; color:rgba(255,255,255,.72);">3 animals · 2 species</div></div>
+              <div style="display:flex; gap:16px; font-size:22px;"><i class="mdi mdi-magnify"></i><i class="mdi mdi-bell-outline"></i></div>
+            </div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:18px; padding:14px 16px; display:flex; align-items:center; gap:12px;">
+              <div style="width:44px; height:44px; border-radius:14px; background:rgba(239,68,68,.14); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-silverware-fork-knife" style="font-size:24px; color:#ef4444;"></i></div>
+              <div style="flex:1;"><span style="font-size:28px; font-weight:700;">1</span> <span style="font-size:15px; font-weight:600;">due today</span><div style="font-size:13px; color:#9ca3af;">Rosie · 19 days since fed</div></div>
+              <div style="padding:9px 16px; border-radius:12px; background:linear-gradient(135deg,#0066FF,#FF0099); font-size:14px; font-weight:700;">Start</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:18px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; outline:2px solid #FF0099; outline-offset:3px;">
+              <div style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; letter-spacing:.1em; color:#9ca3af;"><i class="mdi mdi-chart-line" style="font-size:15px; color:#3385FF;"></i>INSIGHTS</div>
+              <div style="font-size:16px; font-weight:600; line-height:22px;">Juniper molted 3 days ago, her 4th with you.</div>
+              <div style="font-size:13px; color:#9ca3af; line-height:18px;">That's one every 112 days on average.</div>
+              <div style="font-size:13px; font-weight:600; color:#3385FF;">See analytics →</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-butterfly-outline" style="color:#8b5cf6;"></i> Premolt</div><div style="font-size:22px; font-weight:700;">0</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-arrow-expand-vertical" style="color:#3385FF;"></i> Molts</div><div style="font-size:22px; font-weight:700;">5</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-fridge-outline" style="color:#22c55e;"></i> Feeders</div><div style="font-size:22px; font-weight:700;">38</div></div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af; padding-top:4px;"><span>EVERYTHING ELSE</span><span style="color:#3385FF; letter-spacing:0;">Customize</span></div>
+            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:6px;"><div style="width:38px; height:38px; border-radius:19px; background:rgba(0,102,255,.12); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-plus" style="font-size:20px; color:#3385FF;"></i></div><span style="font-size:10.5px; font-weight:600;">Add</span></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:6px;"><div style="width:38px; height:38px; border-radius:19px; background:rgba(0,102,255,.12); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-chart-line" style="font-size:20px; color:#3385FF;"></i></div><span style="font-size:10.5px; font-weight:600;">Analytics</span></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:6px;"><div style="width:38px; height:38px; border-radius:19px; background:rgba(0,102,255,.12); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-fridge-outline" style="font-size:20px; color:#3385FF;"></i></div><span style="font-size:10.5px; font-weight:600;">Feeders</span></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:6px;"><div style="width:38px; height:38px; border-radius:19px; background:rgba(0,102,255,.12); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-tray-arrow-down" style="font-size:20px; color:#3385FF;"></i></div><span style="font-size:10.5px; font-weight:600;">Import</span></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;"><strong>Home · Insights card.</strong> Second card, under the feeding hero. One sentence, one supporting line, one link. Rotation rule in the README (§4). Falls back to "3 animals, 24 feedings logged. See how they compare →" when there's no recent activity; hidden entirely with zero animals.</p>
+      </div>
+
+      <!-- Profile row -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div data-screen-label="You · Analytics row" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><div style="width:44px; height:44px; border-radius:22px; background:rgba(255,255,255,.22); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-account" style="font-size:26px;"></i></div><div><div style="font-size:20px; font-weight:700;">Cory</div><div style="font-size:12px; color:rgba(255,255,255,.72);">@cory · Free plan</div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af;">YOUR COLLECTION</div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px; height:52px; border-bottom:1px solid #2a2a3a; outline:2px solid #FF0099; outline-offset:-2px; border-radius:14px 14px 0 0;"><i class="mdi mdi-chart-line" style="font-size:20px; color:#3385FF;"></i><span style="font-size:14px; font-weight:600; flex:1;">Analytics</span><span style="font-size:12px; color:#9ca3af;">3 animals</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px; height:52px; border-bottom:1px solid #2a2a3a;"><i class="mdi mdi-fridge-outline" style="font-size:20px; color:#9ca3af;"></i><span style="font-size:14px; font-weight:600; flex:1;">Feeders</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px; height:52px; border-bottom:1px solid #2a2a3a;"><i class="mdi mdi-cash-multiple" style="font-size:20px; color:#9ca3af;"></i><span style="font-size:14px; font-weight:600; flex:1;">Expenses</span><span style="font-size:11px; font-weight:700; color:#c9a2ff; background:rgba(139,92,246,.18); padding:2px 7px; border-radius:6px;">Premium</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px; height:52px;"><i class="mdi mdi-tray-arrow-up" style="font-size:20px; color:#9ca3af;"></i><span style="font-size:14px; font-weight:600; flex:1;">Export</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+            </div>
+            <div style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af; padding-top:4px;">ACCOUNT</div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px; height:52px; border-bottom:1px solid #2a2a3a;"><i class="mdi mdi-palette-outline" style="font-size:20px; color:#9ca3af;"></i><span style="font-size:14px; font-weight:600; flex:1;">Appearance</span><span style="font-size:12px; color:#9ca3af;">Hobbyist · Dark</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+              <div style="display:flex; align-items:center; gap:12px; padding:0 14px; height:52px;"><i class="mdi mdi-ruler" style="font-size:20px; color:#9ca3af;"></i><span style="font-size:14px; font-weight:600; flex:1;">Units</span><span style="font-size:12px; color:#9ca3af;">Inches · °F</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;"><strong>You · Analytics row.</strong> First row of a "Your collection" group in <code style="font-size:12px; background:#e2e8f0; padding:1px 4px; border-radius:4px;">(tabs)/profile.tsx</code>. Trailing text is the animal count, so the row is never a dead end.</p>
+      </div>
+
+      <!-- Web dashboard card + sidebar -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:760px;">
+        <div data-screen-label="Web dashboard · sidebar + Insights card" style="width:760px; height:430px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:14px; overflow:hidden; display:flex; color:#e5e7eb;">
+          <div style="width:200px; border-right:1px solid #2a2a3a; padding:18px 12px; display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
+            <div style="font-size:15px; font-weight:700; padding:0 10px 14px; background:linear-gradient(90deg,#3385FF,#FF0099); -webkit-background-clip:text; background-clip:text; color:transparent;">Tarantuverse</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-view-dashboard-outline" style="font-size:18px; color:#9ca3af;"></i>Dashboard</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-spider" style="font-size:18px; color:#9ca3af;"></i>Collection</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:#9ca3af;"></i>Feeding day</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; background:rgba(0,102,255,.14); color:#fff; outline:2px solid #FF0099; outline-offset:2px;"><i class="mdi mdi-chart-line" style="font-size:18px; color:#3385FF;"></i>Analytics</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-book-open-variant" style="font-size:18px; color:#9ca3af;"></i>Species</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-fridge-outline" style="font-size:18px; color:#9ca3af;"></i>Feeders</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-account-multiple-outline" style="font-size:18px; color:#9ca3af;"></i>Community</div>
+          </div>
+          <div style="flex:1; padding:24px 28px; display:flex; flex-direction:column; gap:16px; min-width:0;">
+            <div><div style="font-size:22px; font-weight:700;">Good morning, Cory</div><div style="font-size:13px; color:#9ca3af;">3 animals · 2 species</div></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:16px; display:flex; align-items:center; gap:12px;">
+                <div style="width:44px; height:44px; border-radius:14px; background:rgba(239,68,68,.14); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-silverware-fork-knife" style="font-size:24px; color:#ef4444;"></i></div>
+                <div style="flex:1;"><span style="font-size:26px; font-weight:700;">1</span> <span style="font-size:14px; font-weight:600;">due today</span><div style="font-size:12px; color:#9ca3af;">Rosie · 19 days since fed</div></div>
+                <div style="padding:8px 14px; border-radius:10px; background:linear-gradient(135deg,#0066FF,#FF0099); font-size:13px; font-weight:700;">Start</div>
+              </div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:8px; outline:2px solid #FF0099; outline-offset:3px;">
+                <div style="display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; letter-spacing:.1em; color:#9ca3af;"><i class="mdi mdi-chart-line" style="font-size:15px; color:#3385FF;"></i>INSIGHTS</div>
+                <div style="font-size:15px; font-weight:600; line-height:21px;">Juniper molted 3 days ago, her 4th with you.</div>
+                <div style="font-size:12px; color:#9ca3af;">That's one every 112 days on average. <span style="color:#3385FF; font-weight:600;">See analytics →</span></div>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:12px 14px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-butterfly-outline" style="color:#8b5cf6;"></i> Premolt</div><div style="font-size:22px; font-weight:700;">0</div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:12px 14px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-arrow-expand-vertical" style="color:#3385FF;"></i> Molts</div><div style="font-size:22px; font-weight:700;">5</div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:12px 14px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-fridge-outline" style="color:#22c55e;"></i> Feeders</div><div style="font-size:22px; font-weight:700;">38</div></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;"><strong>Web.</strong> "Analytics" becomes a first-level sidebar row (it is already there; the Advanced sub-route is removed). The same Insights card sits beside the feeding card on the dashboard. The "✨ Advanced Analytics" gradient button and the "← Back to Dashboard" link are deleted.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 1b ══ -->
+  <div id="1b" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <span style="font-size:12px; font-weight:700; color:#fff; background:#0f172a; padding:5px 10px; border-radius:6px;">1b</span>
+      <h2 style="margin:0; font-size:24px; font-weight:700; color:#0f172a;">The page · free keeper, 3 animals</h2>
+      <span style="font-size:14px; color:#64748b;">the common case, in all four theme combos</span>
+    </div>
+    <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start;">
+      <sc-for list="{{ themes }}" as="t" hint-placeholder-count="4">
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">{{ t.label }}</div>
+        <div data-screen-label="Analytics · {{ t.label }}" style="width:380px; background:{{ t.bg }}; border:1px solid {{ t.frame }}; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:{{ t.t1 }};">
+          <div style="height:{{ t.headerH }}; background:{{ t.headerBg }}; border-bottom:1px solid {{ t.headerBorder }}; display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px {{ t.headerPad }};">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; color:{{ t.headerText }};"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px; color:{{ t.headerText }};">
+              <i class="mdi mdi-arrow-left" style="font-size:24px;"></i>
+              <div style="flex:1;"><div style="font-size:{{ t.titleSize }}; font-weight:700;">Analytics</div><div style="font-size:12px; opacity:.75;">3 animals · 2 species</div></div>
+            </div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rMd }}; padding:10px 12px; box-shadow:{{ t.shadow }};"><div style="font-size:11px; font-weight:600; color:{{ t.t2 }};"><i class="mdi mdi-silverware-fork-knife" style="color:#ef4444;"></i> Due to eat</div><div style="font-size:22px; font-weight:700;">1</div><div style="font-size:11px; color:{{ t.t3 }};">Rosie, 19d</div></div>
+              <div style="flex:1; background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rMd }}; padding:10px 12px; box-shadow:{{ t.shadow }};"><div style="font-size:11px; font-weight:600; color:{{ t.t2 }};"><i class="mdi mdi-butterfly-outline" style="color:#8b5cf6;"></i> Last molt</div><div style="font-size:22px; font-weight:700;">3d</div><div style="font-size:11px; color:{{ t.t3 }};">Juniper</div></div>
+              <div style="flex:1; background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rMd }}; padding:10px 12px; box-shadow:{{ t.shadow }};"><div style="font-size:11px; font-weight:600; color:{{ t.t2 }};"><i class="mdi mdi-clock-alert-outline" style="color:#eab308;"></i> Longest gap</div><div style="font-size:22px; font-weight:700;">19d</div><div style="font-size:11px; color:{{ t.t3 }};">Rosie</div></div>
+            </div>
+
+            <div style="background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rLg }}; padding:14px 16px; display:flex; flex-direction:column; gap:12px; box-shadow:{{ t.shadow }};">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-spider" style="font-size:18px; color:{{ t.ac }};"></i><span style="font-size:15px; font-weight:700; flex:1;">Collection</span></div>
+              <div style="display:flex; gap:16px;">
+                <div><div style="font-size:24px; font-weight:700;">3</div><div style="font-size:11px; color:{{ t.t3 }};">animals</div></div>
+                <div><div style="font-size:24px; font-weight:700;">2</div><div style="font-size:11px; color:{{ t.t3 }};">species</div></div>
+                <div><div style="font-size:24px; font-weight:700;">1y 4m</div><div style="font-size:11px; color:{{ t.t3 }};">with you, avg</div></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px;"><div style="flex:2; background:#ec4899;"></div><div style="flex:1; background:{{ t.t3 }};"></div></div>
+                <div style="display:flex; gap:14px; font-size:12px; color:{{ t.t2 }};"><span><i class="mdi mdi-gender-male" style="color:#3b82f6;"></i> 0 male</span><span><i class="mdi mdi-gender-female" style="color:#ec4899;"></i> 2 female</span><span><i class="mdi mdi-help-circle-outline" style="color:{{ t.t3 }};"></i> 1 unsexed</span></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid {{ t.bd }}; padding-top:10px;">
+                <div style="display:flex; justify-content:space-between; font-size:13px;"><span style="color:{{ t.t2 }};"><i>Brachypelma hamorii</i></span><span style="font-weight:600;">2</span></div>
+                <div style="display:flex; justify-content:space-between; font-size:13px;"><span style="color:{{ t.t2 }};"><i>Grammostola pulchra</i></span><span style="font-weight:600;">1</span></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; border-top:1px solid {{ t.bd }}; padding-top:10px; font-size:13px;"><span style="color:{{ t.t2 }};">Paid in total</span><span><span style="font-weight:700;">142</span> <span style="font-size:11px; color:{{ t.t3 }};">2 of 3 priced</span></span></div>
+            </div>
+
+            <div style="background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rLg }}; padding:14px 16px; display:flex; flex-direction:column; gap:10px; box-shadow:{{ t.shadow }};">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:{{ t.ac }};"></i><span style="font-size:15px; font-weight:700; flex:1;">Feeding</span></div>
+              <div style="display:flex; gap:16px;">
+                <div><div style="font-size:24px; font-weight:700;">24</div><div style="font-size:11px; color:{{ t.t3 }};">feedings</div></div>
+                <div><div style="font-size:24px; font-weight:700;">9d</div><div style="font-size:11px; color:{{ t.t3 }};">between, avg</div></div>
+                <div><div style="font-size:24px; font-weight:700;">8</div><div style="font-size:11px; color:{{ t.t3 }};">per animal</div></div>
+              </div>
+              <div style="font-size:13px; line-height:18px; color:{{ t.t2 }};">Rosie's 19-day gap is the longest right now; she usually eats every 10.</div>
+            </div>
+
+            <div style="background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rLg }}; padding:14px 16px; display:flex; flex-direction:column; gap:10px; box-shadow:{{ t.shadow }};">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-butterfly-outline" style="font-size:18px; color:{{ t.ac }};"></i><span style="font-size:15px; font-weight:700; flex:1;">Molts</span><span style="font-size:12px; color:{{ t.t3 }};">5 logged</span></div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:{{ t.t2 }};">Juniper</span><div style="flex:1; height:8px; border-radius:4px; background:{{ t.el }};"><div style="width:100%; height:8px; border-radius:4px; background:{{ t.pr }};"></div></div><span style="width:72px; text-align:right; font-weight:600;">4 <span style="font-weight:400; color:{{ t.t3 }};">· 3d ago</span></span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:{{ t.t2 }};">Rosie</span><div style="flex:1; height:8px; border-radius:4px; background:{{ t.el }};"><div style="width:25%; height:8px; border-radius:4px; background:{{ t.pr }};"></div></div><span style="width:72px; text-align:right; font-weight:600;">1 <span style="font-weight:400; color:{{ t.t3 }};">· 7mo ago</span></span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:{{ t.t2 }};">Pepper</span><div style="flex:1; height:8px; border-radius:4px; background:{{ t.el }};"></div><span style="width:72px; text-align:right; color:{{ t.t3 }};">none yet</span></div>
+              </div>
+            </div>
+
+            <div style="background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rLg }}; padding:14px 16px; display:flex; flex-direction:column; gap:10px; box-shadow:{{ t.shadow }};">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-history" style="font-size:18px; color:{{ t.ac }};"></i><span style="font-size:15px; font-weight:700; flex:1;">Recent</span></div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><div style="width:28px; height:28px; border-radius:8px; background:rgba(139,92,246,.16); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-butterfly-outline" style="color:#8b5cf6;"></i></div><span style="flex:1;"><b style="font-weight:600;">Juniper</b> molted</span><span style="color:{{ t.t3 }};">3d</span></div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><div style="width:28px; height:28px; border-radius:8px; background:rgba(34,197,94,.16); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-silverware-fork-knife" style="color:#22c55e;"></i></div><span style="flex:1;"><b style="font-weight:600;">Pepper</b> ate a cricket</span><span style="color:{{ t.t3 }};">5d</span></div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><div style="width:28px; height:28px; border-radius:8px; background:rgba(0,102,255,.16); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-layers" style="color:{{ t.ac }};"></i></div><span style="flex:1;"><b style="font-weight:600;">Rosie</b> substrate changed</span><span style="color:{{ t.t3 }};">12d</span></div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; padding-top:6px;"><i class="mdi mdi-lock-outline" style="font-size:14px; color:{{ t.t3 }};"></i><span style="font-size:12px; font-weight:600; letter-spacing:.1em; color:{{ t.t3 }}; flex:1;">PREMIUM · PREVIEW OF YOUR DATA</span></div>
+            <div style="position:relative; border-radius:{{ t.rLg }}; overflow:hidden;">
+              <div style="display:flex; flex-direction:column; gap:12px; filter:blur(5px); pointer-events:none;">
+                <div style="background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rLg }}; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+                  <div style="font-size:15px; font-weight:700;">Molts, last 12 months</div>
+                  <svg viewBox="0 0 300 70" width="100%" height="70"><rect x="2" y="56" width="19" height="12" rx="3" fill="{{ t.pr }}"></rect><rect x="27" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="52" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="77" y="40" width="19" height="28" rx="3" fill="{{ t.pr }}"></rect><rect x="102" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="127" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="152" y="56" width="19" height="12" rx="3" fill="{{ t.pr }}"></rect><rect x="177" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="202" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="227" y="68" width="19" height="2" rx="1" fill="{{ t.el }}"></rect><rect x="252" y="56" width="19" height="12" rx="3" fill="{{ t.pr }}"></rect><rect x="277" y="12" width="19" height="56" rx="3" fill="{{ t.pr }}"></rect></svg>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <div style="flex:1; background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rMd }}; padding:10px 12px;"><div style="font-size:11px; color:{{ t.t2 }};">Spent this month</div><div style="font-size:22px; font-weight:700;">38</div></div>
+                  <div style="flex:1; background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rMd }}; padding:10px 12px;"><div style="font-size:11px; color:{{ t.t2 }};">Feeding cost / mo</div><div style="font-size:22px; font-weight:700;">~12</div></div>
+                </div>
+              </div>
+              <div style="position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; padding:16px;">
+                <div style="background:{{ t.sf }}; border:1px solid {{ t.bd }}; border-radius:{{ t.rLg }}; padding:16px; display:flex; flex-direction:column; gap:10px; width:100%; box-shadow:0 8px 24px rgba(0,0,0,.25);">
+                  <div style="font-size:14px; font-weight:700; line-height:20px;">Molt timing, growth and what you spend</div>
+                  <div style="font-size:12.5px; line-height:18px; color:{{ t.t2 }};">Computed from your 3 animals. Premium unlocks the detail.</div>
+                  <div style="display:flex; align-items:center; gap:12px;"><div style="padding:10px 16px; border-radius:{{ t.rMd }}; background:{{ t.ctaBg }}; color:#fff; font-size:13px; font-weight:700;">See Premium</div><span style="font-size:12px; color:{{ t.t3 }};">No charge until you choose.</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-for>
+    </div>
+    <p style="margin:0; font-size:13px; line-height:19px; color:#475569; max-width:900px;"><strong>Reading the page.</strong> Three "Right now" tiles answer the questions a three-animal keeper actually has. Collection folds in sex split, species (full list ≤ 5, else top 5 + "n more") and "Paid in total" with how many animals carry a price. Molts is per animal, not a 12-month histogram, until the collection is large enough for the histogram to say something. Premium is the keeper's own data at 5px blur with one plain unlock card; nothing free is behind it.</p>
+  </div>
+
+  <!-- ══ 1c ══ -->
+  <div id="1c" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <span style="font-size:12px; font-weight:700; color:#fff; background:#0f172a; padding:5px 10px; border-radius:6px;">1c</span>
+      <h2 style="margin:0; font-size:24px; font-weight:700; color:#0f172a;">Every state</h2>
+      <span style="font-size:14px; color:#64748b;">dark · Hobbyist · loading, error, empty, large, Premium keeper, Premium with no data</span>
+    </div>
+    <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start;">
+
+      <!-- Loading -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">LOADING</div>
+        <div data-screen-label="Analytics · loading" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><i class="mdi mdi-arrow-left" style="font-size:24px;"></i><div><div style="font-size:20px; font-weight:700;">Analytics</div><div style="height:12px; width:110px; border-radius:6px; background:rgba(255,255,255,.3); margin-top:4px;"></div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px; animation:shimmer 1.4s ease-in-out infinite;">
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; height:74px; background:#1a1a24; border-radius:16px;"></div><div style="flex:1; height:74px; background:#1a1a24; border-radius:16px;"></div><div style="flex:1; height:74px; background:#1a1a24; border-radius:16px;"></div>
+            </div>
+            <div style="height:200px; background:#1a1a24; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;"><div style="height:14px; width:90px; border-radius:7px; background:#2a2a3a;"></div><div style="height:26px; width:160px; border-radius:7px; background:#2a2a3a;"></div><div style="height:8px; border-radius:4px; background:#2a2a3a;"></div></div>
+            <div style="height:120px; background:#1a1a24; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;"><div style="height:14px; width:70px; border-radius:7px; background:#2a2a3a;"></div><div style="height:26px; width:200px; border-radius:7px; background:#2a2a3a;"></div></div>
+            <div style="height:120px; background:#1a1a24; border-radius:16px;"></div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">Skeleton blocks in the shape of the real cards. No text, no numbers, no "0". Header subtitle is a bar, not a count.</p>
+      </div>
+
+      <!-- Error -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">ERROR</div>
+        <div data-screen-label="Analytics · error" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi-off"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><i class="mdi mdi-arrow-left" style="font-size:24px;"></i><div><div style="font-size:20px; font-weight:700;">Analytics</div><div style="font-size:12px; opacity:.75;">—</div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:28px 20px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center;">
+              <i class="mdi mdi-alert-outline" style="font-size:34px; color:#eab308;"></i>
+              <div style="font-size:16px; font-weight:700;">We couldn't load your analytics</div>
+              <div style="font-size:13px; line-height:19px; color:#d1d5db; max-width:280px;">Your records are fine. This is a connection problem.</div>
+              <div style="padding:10px 20px; border-radius:12px; border:1px solid #3385FF; color:#3385FF; font-size:13px; font-weight:700; margin-top:4px;">Try again</div>
+            </div>
+            <div style="height:260px;"></div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">An em dash where the subtitle count would be. Never the empty-state copy, never a skeleton that stays forever. One retry, no auto-retry loop.</p>
+      </div>
+
+      <!-- Empty -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">EMPTY · NEW KEEPER, NO ANIMALS</div>
+        <div data-screen-label="Analytics · empty" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><i class="mdi mdi-arrow-left" style="font-size:24px;"></i><div><div style="font-size:20px; font-weight:700;">Analytics</div><div style="font-size:12px; opacity:.75;">No animals yet</div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:24px 20px; display:flex; flex-direction:column; gap:12px;">
+              <i class="mdi mdi-chart-line" style="font-size:30px; color:#3385FF;"></i>
+              <div style="font-size:16px; font-weight:700; line-height:22px;">Add your first animal and this page starts filling in.</div>
+              <div style="font-size:13px; line-height:19px; color:#d1d5db;">Every feeding and molt you log turns into something here: who's due, how often each animal eats, how long between molts.</div>
+              <div style="display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:12px; background:linear-gradient(135deg,#0066FF,#FF0099); font-size:14px; font-weight:700; align-self:flex-start;"><i class="mdi mdi-plus"></i>Add to collection</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; padding-top:6px;"><i class="mdi mdi-lock-outline" style="font-size:14px; color:#9ca3af;"></i><span style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af; flex:1;">PREMIUM</span><span style="font-size:11px; font-weight:700; color:#9ca3af; border:1px solid #2a2a3a; padding:2px 8px; border-radius:6px;">SAMPLE DATA</span></div>
+            <div style="background:#1a1a24; border:1px dashed #3b3b4d; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:15px; font-weight:700;">Molts, last 12 months</div>
+              <svg viewBox="0 0 300 70" width="100%" height="70"><rect x="2" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="27" y="48" width="19" height="20" rx="3" fill="#4b5563"></rect><rect x="52" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="77" y="28" width="19" height="40" rx="3" fill="#4b5563"></rect><rect x="102" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="127" y="56" width="19" height="12" rx="3" fill="#4b5563"></rect><rect x="152" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="177" y="38" width="19" height="30" rx="3" fill="#4b5563"></rect><rect x="202" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="227" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="252" y="48" width="19" height="20" rx="3" fill="#4b5563"></rect><rect x="277" y="18" width="19" height="50" rx="3" fill="#4b5563"></rect></svg>
+              <div style="font-size:12px; line-height:17px; color:#9ca3af;">This is what a keeper with six tarantulas sees. Yours will use your own logs.</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; background:#1a1a24; border:1px dashed #3b3b4d; border-radius:14px; padding:10px 12px;"><div style="font-size:11px; color:#d1d5db;">Spent this month</div><div style="font-size:22px; font-weight:700; color:#9ca3af;">38</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px dashed #3b3b4d; border-radius:14px; padding:10px 12px;"><div style="font-size:11px; color:#d1d5db;">Feeding cost / mo</div><div style="font-size:22px; font-weight:700; color:#9ca3af;">~12</div></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">Free section is one card with a CTA, not six empty cards. Premium shows a labelled sample in grey (<code style="font-size:12px; background:#e2e8f0; padding:1px 4px; border-radius:4px;">#4b5563</code>, dashed border) because there is nothing of the keeper's to blur. No upgrade button here: a keeper with no animals is not a buyer yet.</p>
+      </div>
+
+      <!-- Large -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">LARGE · 1,184 ANIMALS, FREE</div>
+        <div data-screen-label="Analytics · large collection" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><i class="mdi mdi-arrow-left" style="font-size:24px;"></i><div><div style="font-size:20px; font-weight:700;">Analytics</div><div style="font-size:12px; opacity:.75;">1,184 animals · 212 species</div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-silverware-fork-knife" style="color:#ef4444;"></i> Due to eat</div><div style="font-size:22px; font-weight:700;">41</div><div style="font-size:11px; color:#9ca3af;">9 overdue</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-butterfly-outline" style="color:#8b5cf6;"></i> Last molt</div><div style="font-size:22px; font-weight:700;">2h</div><div style="font-size:11px; color:#9ca3af;">B. boehmei #14</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-clock-alert-outline" style="color:#eab308;"></i> Longest gap</div><div style="font-size:22px; font-weight:700;">64d</div><div style="font-size:11px; color:#9ca3af;">Big Bertha</div></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-spider" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700; flex:1;">Collection</span></div>
+              <div style="display:flex; gap:16px;">
+                <div><div style="font-size:24px; font-weight:700;">1,184</div><div style="font-size:11px; color:#9ca3af;">animals</div></div>
+                <div><div style="font-size:24px; font-weight:700;">212</div><div style="font-size:11px; color:#9ca3af;">species</div></div>
+                <div><div style="font-size:24px; font-weight:700;">2y 1m</div><div style="font-size:11px; color:#9ca3af;">with you, avg</div></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px;"><div style="flex:212; background:#3b82f6;"></div><div style="flex:590; background:#ec4899;"></div><div style="flex:382; background:#9ca3af;"></div></div>
+                <div style="display:flex; gap:14px; font-size:12px; color:#d1d5db;"><span><i class="mdi mdi-gender-male" style="color:#3b82f6;"></i> 212 male</span><span><i class="mdi mdi-gender-female" style="color:#ec4899;"></i> 590 female</span><span><i class="mdi mdi-help-circle-outline" style="color:#9ca3af;"></i> 382 unsexed</span></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:7px; border-top:1px solid #2a2a3a; padding-top:10px;">
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="flex:1; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><i>Brachypelma boehmei</i></span><div style="width:90px; height:6px; border-radius:3px; background:#2a2a3a;"><div style="width:100%; height:6px; border-radius:3px; background:#0066FF;"></div></div><span style="width:34px; text-align:right; font-weight:600;">96</span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="flex:1; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><i>Tliltocatl albopilosus</i></span><div style="width:90px; height:6px; border-radius:3px; background:#2a2a3a;"><div style="width:78%; height:6px; border-radius:3px; background:#0066FF;"></div></div><span style="width:34px; text-align:right; font-weight:600;">75</span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="flex:1; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><i>Caribena versicolor</i></span><div style="width:90px; height:6px; border-radius:3px; background:#2a2a3a;"><div style="width:60%; height:6px; border-radius:3px; background:#0066FF;"></div></div><span style="width:34px; text-align:right; font-weight:600;">58</span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="flex:1; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><i>Grammostola pulchra</i></span><div style="width:90px; height:6px; border-radius:3px; background:#2a2a3a;"><div style="width:44%; height:6px; border-radius:3px; background:#0066FF;"></div></div><span style="width:34px; text-align:right; font-weight:600;">42</span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="flex:1; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><i>Aphonopelma chalcodes</i></span><div style="width:90px; height:6px; border-radius:3px; background:#2a2a3a;"><div style="width:40%; height:6px; border-radius:3px; background:#0066FF;"></div></div><span style="width:34px; text-align:right; font-weight:600;">38</span></div>
+                <div style="font-size:13px; font-weight:600; color:#3385FF; padding-top:2px;">207 more species →</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; border-top:1px solid #2a2a3a; padding-top:10px; font-size:13px;"><span style="color:#d1d5db;">Paid in total</span><span><span style="font-weight:700;">41,280</span> <span style="font-size:11px; color:#9ca3af;">811 of 1,184 priced</span></span></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700; flex:1;">Feeding</span></div>
+              <div style="display:flex; gap:16px;">
+                <div><div style="font-size:24px; font-weight:700;">18,402</div><div style="font-size:11px; color:#9ca3af;">feedings</div></div>
+                <div><div style="font-size:24px; font-weight:700;">11d</div><div style="font-size:11px; color:#9ca3af;">between, avg</div></div>
+                <div><div style="font-size:24px; font-weight:700;">15.5</div><div style="font-size:11px; color:#9ca3af;">per animal</div></div>
+              </div>
+              <div style="font-size:13px; line-height:18px; color:#d1d5db;">9 animals are past their usual gap. Big Bertha, at 64 days, is furthest.</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-butterfly-outline" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700; flex:1;">Molts</span><span style="font-size:12px; color:#9ca3af;">3,117 logged</span></div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:90px; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Versicolor #3</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:100%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:72px; text-align:right; font-weight:600;">14 <span style="font-weight:400; color:#9ca3af;">· 9d ago</span></span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:90px; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Mango</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:86%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:72px; text-align:right; font-weight:600;">12 <span style="font-weight:400; color:#9ca3af;">· 1mo ago</span></span></div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:90px; color:#d1d5db; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Sling tray B-07</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:79%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:72px; text-align:right; font-weight:600;">11 <span style="font-weight:400; color:#9ca3af;">· 3d ago</span></span></div>
+                <div style="font-size:13px; font-weight:600; color:#3385FF; padding-top:2px;">All 1,184 →</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">Thousands separators, names ellipsised at the label column, species capped at 5 with a "n more" link to a sorted full list, Molts shows the top 3. The sex bar uses real proportions. Nothing on the page needs a second request.</p>
+      </div>
+
+      <!-- Premium keeper -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">PREMIUM KEEPER · 6 ANIMALS · PREMIUM SECTION</div>
+        <div data-screen-label="Analytics · Premium keeper" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:60px; background:linear-gradient(135deg,#3366cc,#cc3399); display:flex; align-items:center; gap:12px; padding:0 20px;"><i class="mdi mdi-arrow-left" style="font-size:22px;"></i><span style="font-size:17px; font-weight:700;">Analytics</span><span style="font-size:12px; opacity:.75;">· scrolled</span></div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; align-items:center; gap:8px;"><i class="mdi mdi-star-four-points-outline" style="font-size:14px; color:#c9a2ff;"></i><span style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af; flex:1;">PREMIUM</span></div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:15px; font-weight:700; flex:1;">Molts, last 12 months</span><span style="font-size:12px; color:#9ca3af;">9 total</span></div>
+              <svg viewBox="0 0 300 86" width="100%" height="86" role="img" aria-label="Molts per month, November to October"><rect x="2" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="27" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="52" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="77" y="40" width="19" height="28" rx="3" fill="#0066FF"></rect><rect x="102" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="127" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="152" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="177" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="202" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="227" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="252" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="277" y="12" width="19" height="56" rx="3" fill="#FF0099"></rect><text x="296" y="9" font-size="9" fill="#e5e7eb" text-anchor="end" font-family="system-ui">4</text><g font-size="9" fill="#9ca3af" font-family="system-ui" text-anchor="middle"><text x="11" y="82">N</text><text x="36" y="82">D</text><text x="61" y="82">J</text><text x="86" y="82">F</text><text x="111" y="82">M</text><text x="136" y="82">A</text><text x="161" y="82">M</text><text x="186" y="82">J</text><text x="211" y="82">J</text><text x="236" y="82">A</text><text x="261" y="82">S</text><text x="286" y="82">O</text></g></svg>
+              <div style="font-size:13px; line-height:18px; color:#d1d5db;">Busiest month was October: 4 molts, three of them slings.</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:15px; font-weight:700; flex:1;">Collection growth</span><span style="font-size:12px; color:#9ca3af;">12 months</span></div>
+              <svg viewBox="0 0 300 70" width="100%" height="70" role="img" aria-label="Animals in collection by month, 3 to 6"><path d="M4 60 L31 60 L58 60 L85 48 L112 48 L139 48 L166 36 L193 36 L220 36 L247 24 L274 12 L296 12 L296 70 L4 70 Z" fill="rgba(0,102,255,.14)"></path><polyline points="4,60 31,60 58,60 85,48 112,48 139,48 166,36 193,36 220,36 247,24 274,12 296,12" fill="none" stroke="#0066FF" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="296" cy="12" r="4" fill="#0066FF" stroke="#1a1a24" stroke-width="2"></circle><text x="6" y="56" font-size="9" fill="#9ca3af" font-family="system-ui">3</text><text x="290" y="8" font-size="9" fill="#e5e7eb" font-family="system-ui" text-anchor="end">6</text></svg>
+              <div style="font-size:13px; line-height:18px; color:#d1d5db;">3 → 6 this year. Two arrived in September.</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:15px; font-weight:700;">Enclosures</div>
+              <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px;"><div style="flex:4; background:#0066FF;"></div><div style="flex:1; background:#8b5cf6;"></div><div style="flex:1; background:#22c55e;"></div></div>
+              <div style="display:flex; gap:14px; font-size:12px; color:#d1d5db; flex-wrap:wrap;"><span><span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:#0066FF;"></span> 4 terrestrial</span><span><span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:#8b5cf6;"></span> 1 arboreal</span><span><span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:#22c55e;"></span> 1 fossorial</span></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-cash-multiple" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700; flex:1;">Money</span><span style="font-size:11px; color:#9ca3af;">your currency · private</span></div>
+              <div style="display:flex; gap:16px;">
+                <div style="flex:1;"><div style="font-size:24px; font-weight:700;">38.50</div><div style="font-size:11px; color:#9ca3af;">spent this month</div><div style="font-size:11px; color:#9ca3af;">22.00 on feeders</div></div>
+                <div style="flex:1;"><div style="font-size:24px; font-weight:700;">412</div><div style="font-size:11px; color:#9ca3af;">paid for animals</div><div style="font-size:11px; color:#9ca3af;">most: Juniper, 140</div></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px; border-top:1px solid #2a2a3a; padding-top:12px; font-size:13px;"><span style="flex:1; color:#d1d5db;">Est. feeding cost / month <b style="font-weight:700; color:#e5e7eb;">~14</b></span><span style="font-size:12px; color:#9ca3af;">0.35 per feeding</span><span style="font-size:12px; font-weight:600; color:#3385FF; padding:6px 10px; border:1px solid #2a2a3a; border-radius:8px;">Change</span></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">Same page, scrolled to the Premium section (compact header shown after scroll). Every chart carries one sentence under it. "Change" opens the existing cost-per-feeding sheet; when the default is in use the caption reads "default, 0.35 per feeding". By Group (taxon split) is dropped for single-taxon collections and renders as a segmented bar like Enclosures otherwise.</p>
+      </div>
+
+      <!-- Premium, sparse -->
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">PREMIUM KEEPER · SPARSE DATA · 0 / 1 RULES</div>
+        <div data-screen-label="Analytics · Premium sparse" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:60px; background:linear-gradient(135deg,#3366cc,#cc3399); display:flex; align-items:center; gap:12px; padding:0 20px;"><i class="mdi mdi-arrow-left" style="font-size:22px;"></i><span style="font-size:17px; font-weight:700;">Analytics</span><span style="font-size:12px; opacity:.75;">· scrolled</span></div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; align-items:center; gap:8px;"><i class="mdi mdi-star-four-points-outline" style="font-size:14px; color:#c9a2ff;"></i><span style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af; flex:1;">PREMIUM</span></div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:8px;">
+              <div style="font-size:15px; font-weight:700;">Molts, last 12 months</div>
+              <div style="font-size:13px; line-height:18px; color:#d1d5db;">No molts logged in the last year. The chart appears after the first one.</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:15px; font-weight:700;">Collection growth</div>
+              <svg viewBox="0 0 300 50" width="100%" height="50" role="img" aria-label="One animal since March"><line x1="4" y1="30" x2="296" y2="30" stroke="#2a2a3a" stroke-width="2"></line><line x1="110" y1="30" x2="296" y2="30" stroke="#0066FF" stroke-width="2.5" stroke-linecap="round"></line><circle cx="110" cy="30" r="4" fill="#0066FF" stroke="#1a1a24" stroke-width="2"></circle><text x="110" y="48" font-size="9" fill="#9ca3af" font-family="system-ui" text-anchor="middle">Mar</text></svg>
+              <div style="font-size:13px; line-height:18px; color:#d1d5db;">1 animal since March. No change since.</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:8px;">
+              <div style="font-size:15px; font-weight:700;">Enclosures</div>
+              <div style="font-size:13px; line-height:18px; color:#d1d5db;">1 terrestrial. A split appears with two or more animals.</div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-cash-multiple" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700; flex:1;">Money</span><span style="font-size:11px; color:#9ca3af;">your currency · private</span></div>
+              <div style="display:flex; gap:16px;">
+                <div style="flex:1;"><div style="font-size:24px; font-weight:700; color:#9ca3af;">—</div><div style="font-size:11px; color:#9ca3af;">nothing spent this month</div></div>
+                <div style="flex:1;"><div style="font-size:24px; font-weight:700; color:#9ca3af;">—</div><div style="font-size:11px; color:#9ca3af;">no price entered</div><div style="font-size:11px; font-weight:600; color:#3385FF;">Add what you paid</div></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px; border-top:1px solid #2a2a3a; padding-top:12px; font-size:13px;"><span style="flex:1; color:#d1d5db;">Est. feeding cost / month <b style="font-weight:700; color:#e5e7eb;">~3</b></span><span style="font-size:12px; color:#9ca3af;">default, 0.35 per feeding</span><span style="font-size:12px; font-weight:600; color:#3385FF; padding:6px 10px; border:1px solid #2a2a3a; border-radius:8px;">Change</span></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">The 0 / 1 rules from <a href="#1f">1f</a> in practice. A zero series is a sentence, a single data point is a dot with a label, and "not entered" is an em dash with a way to enter it. Never "$0".</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ 1d ══ -->
+  <div id="1d" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <span style="font-size:12px; font-weight:700; color:#fff; background:#0f172a; padding:5px 10px; border-radius:6px;">1d</span>
+      <h2 style="margin:0; font-size:24px; font-weight:700; color:#0f172a;">Web</h2>
+      <span style="font-size:14px; color:#64748b;">same information, sidebar layout · dark Hobbyist and light Keeper</span>
+    </div>
+    <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start;">
+
+      <div style="display:flex; flex-direction:column; gap:10px; width:1100px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">DARK · HOBBYIST · FREE KEEPER, 3 ANIMALS</div>
+        <div data-screen-label="Web analytics · dark" style="width:1100px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:14px; overflow:hidden; display:flex; color:#e5e7eb;">
+          <div style="width:200px; border-right:1px solid #2a2a3a; padding:18px 12px; display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
+            <div style="font-size:15px; font-weight:700; padding:0 10px 14px; background:linear-gradient(90deg,#3385FF,#FF0099); -webkit-background-clip:text; background-clip:text; color:transparent;">Tarantuverse</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-view-dashboard-outline" style="font-size:18px; color:#9ca3af;"></i>Dashboard</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-spider" style="font-size:18px; color:#9ca3af;"></i>Collection</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:#9ca3af;"></i>Feeding day</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; background:rgba(0,102,255,.14); color:#fff;"><i class="mdi mdi-chart-line" style="font-size:18px; color:#3385FF;"></i>Analytics</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-book-open-variant" style="font-size:18px; color:#9ca3af;"></i>Species</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-fridge-outline" style="font-size:18px; color:#9ca3af;"></i>Feeders</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-account-multiple-outline" style="font-size:18px; color:#9ca3af;"></i>Community</div>
+          </div>
+          <div style="flex:1; padding:28px 32px 36px; display:flex; flex-direction:column; gap:20px; min-width:0;">
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px;">
+              <div><div style="font-size:26px; font-weight:700;">Analytics</div><div style="font-size:13px; color:#9ca3af;">3 animals · 2 species · updated just now</div></div>
+              <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:#9ca3af;"><i class="mdi mdi-ruler" style="font-size:15px;"></i>Inches · grams · your currency</div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;"><div style="width:40px; height:40px; border-radius:12px; background:rgba(239,68,68,.14); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-silverware-fork-knife" style="font-size:20px; color:#ef4444;"></i></div><div><div style="font-size:11px; font-weight:600; color:#d1d5db;">Due to eat</div><div style="font-size:24px; font-weight:700; line-height:28px;">1</div><div style="font-size:11px; color:#9ca3af;">Rosie, 19 days</div></div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;"><div style="width:40px; height:40px; border-radius:12px; background:rgba(139,92,246,.14); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-butterfly-outline" style="font-size:20px; color:#8b5cf6;"></i></div><div><div style="font-size:11px; font-weight:600; color:#d1d5db;">Last molt</div><div style="font-size:24px; font-weight:700; line-height:28px;">3 days ago</div><div style="font-size:11px; color:#9ca3af;">Juniper, her 4th</div></div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;"><div style="width:40px; height:40px; border-radius:12px; background:rgba(234,179,8,.14); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-clock-alert-outline" style="font-size:20px; color:#eab308;"></i></div><div><div style="font-size:11px; font-weight:600; color:#d1d5db;">Longest gap since a meal</div><div style="font-size:24px; font-weight:700; line-height:28px;">19 days</div><div style="font-size:11px; color:#9ca3af;">Rosie, usually every 10</div></div></div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:14px;">
+                <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-spider" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700;">Collection</span></div>
+                <div style="display:flex; gap:28px;">
+                  <div><div style="font-size:26px; font-weight:700;">3</div><div style="font-size:11px; color:#9ca3af;">animals</div></div>
+                  <div><div style="font-size:26px; font-weight:700;">2</div><div style="font-size:11px; color:#9ca3af;">species</div></div>
+                  <div><div style="font-size:26px; font-weight:700;">1y 4m</div><div style="font-size:11px; color:#9ca3af;">with you, average</div></div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px;"><div style="flex:2; background:#ec4899;"></div><div style="flex:1; background:#9ca3af;"></div></div>
+                  <div style="display:flex; gap:16px; font-size:12px; color:#d1d5db;"><span><i class="mdi mdi-gender-male" style="color:#3b82f6;"></i> 0 male</span><span><i class="mdi mdi-gender-female" style="color:#ec4899;"></i> 2 female</span><span><i class="mdi mdi-help-circle-outline" style="color:#9ca3af;"></i> 1 unsexed</span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid #2a2a3a; padding-top:12px; font-size:13px;">
+                  <div style="display:flex; justify-content:space-between;"><span style="color:#d1d5db;"><i>Brachypelma hamorii</i></span><span style="font-weight:600;">2</span></div>
+                  <div style="display:flex; justify-content:space-between;"><span style="color:#d1d5db;"><i>Grammostola pulchra</i></span><span style="font-weight:600;">1</span></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; border-top:1px solid #2a2a3a; padding-top:12px; font-size:13px;"><span style="color:#d1d5db;">Paid in total</span><span><span style="font-weight:700;">142</span> <span style="font-size:11px; color:#9ca3af;">2 of 3 priced</span></span></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:14px;">
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700;">Feeding</span></div>
+                  <div style="display:flex; gap:28px;">
+                    <div><div style="font-size:26px; font-weight:700;">24</div><div style="font-size:11px; color:#9ca3af;">feedings</div></div>
+                    <div><div style="font-size:26px; font-weight:700;">9 days</div><div style="font-size:11px; color:#9ca3af;">between, average</div></div>
+                    <div><div style="font-size:26px; font-weight:700;">8</div><div style="font-size:11px; color:#9ca3af;">per animal</div></div>
+                  </div>
+                  <div style="font-size:13px; line-height:18px; color:#d1d5db;">Rosie's 19-day gap is the longest right now; she usually eats every 10.</div>
+                </div>
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; flex:1;">
+                  <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-butterfly-outline" style="font-size:18px; color:#3385FF;"></i><span style="font-size:15px; font-weight:700; flex:1;">Molts</span><span style="font-size:12px; color:#9ca3af;">5 logged</span></div>
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:70px; color:#d1d5db;">Juniper</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:100%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:90px; text-align:right; font-weight:600;">4 <span style="font-weight:400; color:#9ca3af;">· 3 days ago</span></span></div>
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:70px; color:#d1d5db;">Rosie</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:25%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:90px; text-align:right; font-weight:600;">1 <span style="font-weight:400; color:#9ca3af;">· 7 mo ago</span></span></div>
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:70px; color:#d1d5db;">Pepper</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"></div><span style="width:90px; text-align:right; color:#9ca3af;">none yet</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; padding-top:4px;"><i class="mdi mdi-lock-outline" style="font-size:14px; color:#9ca3af;"></i><span style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#9ca3af;">PREMIUM · PREVIEW OF YOUR DATA</span></div>
+            <div style="position:relative; border-radius:16px; overflow:hidden;">
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; filter:blur(5px); pointer-events:none;">
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:10px;"><div style="font-size:15px; font-weight:700;">Molts, last 12 months</div><svg viewBox="0 0 300 70" width="100%" height="70"><rect x="2" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="77" y="40" width="19" height="28" rx="3" fill="#0066FF"></rect><rect x="152" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="252" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="277" y="12" width="19" height="56" rx="3" fill="#0066FF"></rect></svg></div>
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:10px;"><div style="font-size:15px; font-weight:700;">Collection growth</div><svg viewBox="0 0 300 70" width="100%" height="70"><polyline points="4,60 85,60 166,36 247,24 296,12" fill="none" stroke="#0066FF" stroke-width="2.5"></polyline></svg></div>
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:10px;"><div style="font-size:15px; font-weight:700;">Money</div><div style="font-size:26px; font-weight:700;">38.50</div><div style="font-size:11px; color:#9ca3af;">spent this month</div></div>
+              </div>
+              <div style="position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center;">
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 22px; display:flex; align-items:center; gap:20px; box-shadow:0 8px 24px rgba(0,0,0,.3);">
+                  <div><div style="font-size:14px; font-weight:700;">Molt timing, growth and what you spend</div><div style="font-size:12.5px; color:#d1d5db;">Computed from your 3 animals. Premium unlocks the detail.</div></div>
+                  <div style="padding:10px 16px; border-radius:12px; background:linear-gradient(135deg,#0066FF,#FF0099); color:#fff; font-size:13px; font-weight:700; white-space:nowrap;">See Premium</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; width:1100px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">LIGHT · KEEPER · PREMIUM KEEPER, 6 ANIMALS</div>
+        <div data-screen-label="Web analytics · light Keeper" style="width:1100px; background:#f4f4f8; border:1px solid #d9dbe6; border-radius:14px; overflow:hidden; display:flex; color:#111827;">
+          <div style="width:200px; border-right:1px solid #e3e5ee; background:#ffffff; padding:18px 12px; display:flex; flex-direction:column; gap:2px; flex-shrink:0;">
+            <div style="font-size:15px; font-weight:700; padding:0 10px 14px; color:#111827;">Tarantuverse</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; color:#374151;"><i class="mdi mdi-view-dashboard-outline" style="font-size:18px; color:#6b7280;"></i>Dashboard</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; color:#374151;"><i class="mdi mdi-spider" style="font-size:18px; color:#6b7280;"></i>Collection</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; color:#374151;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:#6b7280;"></i>Feeding day</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; background:#eef3ff; color:#0052cc;"><i class="mdi mdi-chart-line" style="font-size:18px;"></i>Analytics</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; color:#374151;"><i class="mdi mdi-book-open-variant" style="font-size:18px; color:#6b7280;"></i>Species</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; color:#374151;"><i class="mdi mdi-fridge-outline" style="font-size:18px; color:#6b7280;"></i>Feeders</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:13px; font-weight:600; color:#374151;"><i class="mdi mdi-account-multiple-outline" style="font-size:18px; color:#6b7280;"></i>Community</div>
+          </div>
+          <div style="flex:1; padding:28px 32px 36px; display:flex; flex-direction:column; gap:20px; min-width:0;">
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px;">
+              <div><div style="font-size:24px; font-weight:700;">Analytics</div><div style="font-size:13px; color:#6b7280;">6 animals · 4 species · updated just now</div></div>
+              <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:#6b7280;"><i class="mdi mdi-ruler" style="font-size:15px;"></i>Centimetres · grams · your currency</div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:14px;"><i class="mdi mdi-silverware-fork-knife" style="font-size:22px; color:#ef4444;"></i><div><div style="font-size:11px; font-weight:600; color:#374151;">Due to eat</div><div style="font-size:24px; font-weight:700; line-height:28px;">2</div><div style="font-size:11px; color:#6b7280;">Rosie 19 days · Mango 12</div></div></div>
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:14px;"><i class="mdi mdi-butterfly-outline" style="font-size:22px; color:#8b5cf6;"></i><div><div style="font-size:11px; font-weight:600; color:#374151;">Last molt</div><div style="font-size:24px; font-weight:700; line-height:28px;">3 days ago</div><div style="font-size:11px; color:#6b7280;">Juniper, her 4th</div></div></div>
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:14px;"><i class="mdi mdi-clock-alert-outline" style="font-size:22px; color:#ca8a04;"></i><div><div style="font-size:11px; font-weight:600; color:#374151;">Longest gap since a meal</div><div style="font-size:24px; font-weight:700; line-height:28px;">19 days</div><div style="font-size:11px; color:#6b7280;">Rosie, usually every 10</div></div></div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:14px;">
+                <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-spider" style="font-size:18px; color:#0052cc;"></i><span style="font-size:15px; font-weight:700;">Collection</span></div>
+                <div style="display:flex; gap:28px;">
+                  <div><div style="font-size:26px; font-weight:700;">6</div><div style="font-size:11px; color:#6b7280;">animals</div></div>
+                  <div><div style="font-size:26px; font-weight:700;">4</div><div style="font-size:11px; color:#6b7280;">species</div></div>
+                  <div><div style="font-size:26px; font-weight:700;">1y 1m</div><div style="font-size:11px; color:#6b7280;">with you, average</div></div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px;"><div style="flex:1; background:#3b82f6;"></div><div style="flex:3; background:#ec4899;"></div><div style="flex:2; background:#9ca3af;"></div></div>
+                  <div style="display:flex; gap:16px; font-size:12px; color:#374151;"><span><i class="mdi mdi-gender-male" style="color:#3b82f6;"></i> 1 male</span><span><i class="mdi mdi-gender-female" style="color:#ec4899;"></i> 3 female</span><span><i class="mdi mdi-help-circle-outline" style="color:#6b7280;"></i> 2 unsexed</span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid #e3e5ee; padding-top:12px; font-size:13px;">
+                  <div style="display:flex; justify-content:space-between;"><span style="color:#374151;"><i>Brachypelma hamorii</i></span><span style="font-weight:600;">2</span></div>
+                  <div style="display:flex; justify-content:space-between;"><span style="color:#374151;"><i>Caribena versicolor</i></span><span style="font-weight:600;">2</span></div>
+                  <div style="display:flex; justify-content:space-between;"><span style="color:#374151;"><i>Grammostola pulchra</i></span><span style="font-weight:600;">1</span></div>
+                  <div style="display:flex; justify-content:space-between;"><span style="color:#374151;"><i>Pandinus imperator</i></span><span style="font-weight:600;">1</span></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; border-top:1px solid #e3e5ee; padding-top:12px; font-size:13px;"><span style="color:#374151;">Paid in total</span><span><span style="font-weight:700;">412</span> <span style="font-size:11px; color:#6b7280;">5 of 6 priced</span></span></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:14px;">
+                <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-silverware-fork-knife" style="font-size:18px; color:#0052cc;"></i><span style="font-size:15px; font-weight:700;">Feeding</span></div>
+                  <div style="display:flex; gap:28px;">
+                    <div><div style="font-size:26px; font-weight:700;">61</div><div style="font-size:11px; color:#6b7280;">feedings</div></div>
+                    <div><div style="font-size:26px; font-weight:700;">8 days</div><div style="font-size:11px; color:#6b7280;">between, average</div></div>
+                    <div><div style="font-size:26px; font-weight:700;">10</div><div style="font-size:11px; color:#6b7280;">per animal</div></div>
+                  </div>
+                  <div style="font-size:13px; line-height:18px; color:#374151;">Two animals are past their usual gap. Rosie, at 19 days, is furthest.</div>
+                </div>
+                <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; flex:1;">
+                  <div style="display:flex; align-items:center; gap:10px;"><i class="mdi mdi-butterfly-outline" style="font-size:18px; color:#0052cc;"></i><span style="font-size:15px; font-weight:700; flex:1;">Molts</span><span style="font-size:12px; color:#6b7280;">9 logged</span></div>
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:70px; color:#374151;">Juniper</span><div style="flex:1; height:8px; border-radius:4px; background:#eceef4;"><div style="width:100%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:90px; text-align:right; font-weight:600;">4 <span style="font-weight:400; color:#6b7280;">· 3 days ago</span></span></div>
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:70px; color:#374151;">Mango</span><div style="flex:1; height:8px; border-radius:4px; background:#eceef4;"><div style="width:75%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:90px; text-align:right; font-weight:600;">3 <span style="font-weight:400; color:#6b7280;">· 1 mo ago</span></span></div>
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:70px; color:#374151;">Pepper</span><div style="flex:1; height:8px; border-radius:4px; background:#eceef4;"><div style="width:25%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:90px; text-align:right; font-weight:600;">1 <span style="font-weight:400; color:#6b7280;">· 2 mo ago</span></span></div>
+                  <div style="font-size:13px; font-weight:600; color:#0052cc;">All 6 →</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; padding-top:4px;"><i class="mdi mdi-star-four-points-outline" style="font-size:14px; color:#7c3aed;"></i><span style="font-size:12px; font-weight:600; letter-spacing:.1em; color:#6b7280;">PREMIUM</span></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:15px; font-weight:700; flex:1;">Molts, last 12 months</span><span style="font-size:12px; color:#6b7280;">9 total</span></div>
+                <svg viewBox="0 0 300 86" width="100%" height="86" role="img" aria-label="Molts per month"><rect x="2" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="27" y="68" width="19" height="2" rx="1" fill="#e3e5ee"></rect><rect x="52" y="68" width="19" height="2" rx="1" fill="#e3e5ee"></rect><rect x="77" y="40" width="19" height="28" rx="3" fill="#0066FF"></rect><rect x="102" y="68" width="19" height="2" rx="1" fill="#e3e5ee"></rect><rect x="127" y="68" width="19" height="2" rx="1" fill="#e3e5ee"></rect><rect x="152" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="177" y="68" width="19" height="2" rx="1" fill="#e3e5ee"></rect><rect x="202" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="227" y="68" width="19" height="2" rx="1" fill="#e3e5ee"></rect><rect x="252" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="277" y="12" width="19" height="56" rx="3" fill="#FF0099"></rect><text x="296" y="9" font-size="9" fill="#111827" text-anchor="end" font-family="system-ui">4</text><g font-size="9" fill="#6b7280" font-family="system-ui" text-anchor="middle"><text x="11" y="82">N</text><text x="36" y="82">D</text><text x="61" y="82">J</text><text x="86" y="82">F</text><text x="111" y="82">M</text><text x="136" y="82">A</text><text x="161" y="82">M</text><text x="186" y="82">J</text><text x="211" y="82">J</text><text x="236" y="82">A</text><text x="261" y="82">S</text><text x="286" y="82">O</text></g></svg>
+                <div style="font-size:13px; line-height:18px; color:#374151;">Busiest month was October: 4 molts.</div>
+              </div>
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:15px; font-weight:700; flex:1;">Collection growth</span><span style="font-size:12px; color:#6b7280;">12 months</span></div>
+                <svg viewBox="0 0 300 86" width="100%" height="86" role="img" aria-label="Animals by month, 3 to 6"><path d="M4 60 L58 60 L85 48 L139 48 L166 36 L220 36 L247 24 L274 12 L296 12 L296 72 L4 72 Z" fill="rgba(0,102,255,.10)"></path><polyline points="4,60 58,60 85,48 139,48 166,36 220,36 247,24 274,12 296,12" fill="none" stroke="#0066FF" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="296" cy="12" r="4" fill="#0066FF" stroke="#fff" stroke-width="2"></circle><text x="6" y="56" font-size="9" fill="#6b7280" font-family="system-ui">3</text><text x="290" y="8" font-size="9" fill="#111827" font-family="system-ui" text-anchor="end">6</text></svg>
+                <div style="font-size:13px; line-height:18px; color:#374151;">3 → 6 this year. Two arrived in September.</div>
+              </div>
+              <div style="background:#fff; border:1px solid #e3e5ee; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:12px;">
+                <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:15px; font-weight:700; flex:1;">Money</span><span style="font-size:11px; color:#6b7280;">private</span></div>
+                <div style="display:flex; gap:20px;">
+                  <div><div style="font-size:26px; font-weight:700;">38.50</div><div style="font-size:11px; color:#6b7280;">spent this month</div></div>
+                  <div><div style="font-size:26px; font-weight:700;">~14</div><div style="font-size:11px; color:#6b7280;">feeding cost / month</div></div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; border-top:1px solid #e3e5ee; padding-top:10px; font-size:12px; color:#6b7280;"><span style="flex:1;">0.35 per feeding</span><span style="font-weight:600; color:#0052cc; padding:5px 10px; border:1px solid #e3e5ee; border-radius:6px;">Change</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="margin:0; font-size:13px; line-height:19px; color:#475569; max-width:900px;"><strong>Web notes.</strong> Right-now tiles in one row, Collection beside Feeding + Molts, Premium as a three-up row. Keeper preset on web means flat sidebar, border elevation, 12px radii, line icons in <code style="font-size:12px; background:#e2e8f0; padding:1px 4px; border-radius:4px;">text-primary</code>; Hobbyist keeps the gradient wordmark and the gradient CTA. Units line top-right is the only place the page names a unit.</p>
+  </div>
+
+  <!-- ══ 1e ══ -->
+  <div id="1e" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <span style="font-size:12px; font-weight:700; color:#fff; background:#0f172a; padding:5px 10px; border-radius:6px;">1e</span>
+      <h2 style="margin:0; font-size:24px; font-weight:700; color:#0f172a;">For comparison: two pages</h2>
+      <span style="font-size:14px; color:#64748b;">basic + Advanced kept separate · dark Hobbyist · not recommended</span>
+    </div>
+    <div style="display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start;">
+
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">MOBILE · ANALYTICS (FREE)</div>
+        <div data-screen-label="Two-page · basic" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><i class="mdi mdi-arrow-left" style="font-size:24px;"></i><div style="flex:1;"><div style="font-size:20px; font-weight:700;">Analytics</div><div style="font-size:12px; opacity:.75;">3 animals · 2 species</div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-silverware-fork-knife" style="color:#ef4444;"></i> Due to eat</div><div style="font-size:22px; font-weight:700;">1</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-butterfly-outline" style="color:#8b5cf6;"></i> Last molt</div><div style="font-size:22px; font-weight:700;">3d</div></div>
+              <div style="flex:1; background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:10px 12px;"><div style="font-size:11px; font-weight:600; color:#d1d5db;"><i class="mdi mdi-clock-alert-outline" style="color:#eab308;"></i> Longest gap</div><div style="font-size:22px; font-weight:700;">19d</div></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:15px; font-weight:700;">Collection</div>
+              <div style="display:flex; gap:16px;"><div><div style="font-size:24px; font-weight:700;">3</div><div style="font-size:11px; color:#9ca3af;">animals</div></div><div><div style="font-size:24px; font-weight:700;">2</div><div style="font-size:11px; color:#9ca3af;">species</div></div><div><div style="font-size:24px; font-weight:700;">1y 4m</div><div style="font-size:11px; color:#9ca3af;">with you, avg</div></div></div>
+              <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px;"><div style="flex:2; background:#ec4899;"></div><div style="flex:1; background:#9ca3af;"></div></div>
+              <div style="display:flex; gap:14px; font-size:12px; color:#d1d5db;"><span><i class="mdi mdi-gender-male" style="color:#3b82f6;"></i> 0</span><span><i class="mdi mdi-gender-female" style="color:#ec4899;"></i> 2</span><span><i class="mdi mdi-help-circle-outline" style="color:#9ca3af;"></i> 1</span></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:15px; font-weight:700;">Feeding</div>
+              <div style="display:flex; gap:16px;"><div><div style="font-size:24px; font-weight:700;">24</div><div style="font-size:11px; color:#9ca3af;">feedings</div></div><div><div style="font-size:24px; font-weight:700;">9d</div><div style="font-size:11px; color:#9ca3af;">between, avg</div></div></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:15px; font-weight:700;">Molts <span style="font-size:12px; font-weight:400; color:#9ca3af;">5 logged</span></div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:#d1d5db;">Juniper</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:100%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="font-weight:600;">4</span></div>
+              <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:#d1d5db;">Rosie</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:25%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="font-weight:600;">1</span></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; align-items:center; gap:12px;">
+              <div style="width:40px; height:40px; border-radius:12px; background:rgba(139,92,246,.16); display:flex; align-items:center; justify-content:center;"><i class="mdi mdi-star-four-points-outline" style="font-size:20px; color:#c9a2ff;"></i></div>
+              <div style="flex:1;"><div style="font-size:14px; font-weight:700;">Advanced analytics</div><div style="font-size:12px; color:#9ca3af;">Molt timing, growth, spending · Premium</div></div>
+              <i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">Same free cards, Advanced becomes a full-width row at the bottom instead of a header button. Better than today, but still a door the keeper has to choose to open.</p>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; width:380px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">MOBILE · ADVANCED (FREE KEEPER)</div>
+        <div data-screen-label="Two-page · Advanced locked" style="width:380px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; color:#e5e7eb;">
+          <div style="height:130px; background:linear-gradient(135deg,#0066FF,#FF0099); display:flex; flex-direction:column; justify-content:space-between; padding:12px 20px 16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;"><span>9:41</span><span style="display:flex; gap:5px;"><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><i class="mdi mdi-arrow-left" style="font-size:24px;"></i><div style="flex:1;"><div style="font-size:20px; font-weight:700;">Advanced analytics</div><div style="font-size:12px; opacity:.75;">Premium</div></div></div>
+          </div>
+          <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+            <div style="position:relative; border-radius:16px; overflow:hidden;">
+              <div style="display:flex; flex-direction:column; gap:12px; filter:blur(5px);">
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;"><div style="font-size:15px; font-weight:700;">Molts, last 12 months</div><svg viewBox="0 0 300 70" width="100%" height="70"><rect x="2" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="77" y="40" width="19" height="28" rx="3" fill="#0066FF"></rect><rect x="152" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="277" y="12" width="19" height="56" rx="3" fill="#0066FF"></rect></svg></div>
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;"><div style="font-size:15px; font-weight:700;">Collection growth</div><svg viewBox="0 0 300 70" width="100%" height="70"><polyline points="4,60 85,60 166,36 247,24 296,12" fill="none" stroke="#0066FF" stroke-width="2.5"></polyline></svg></div>
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px;"><div style="font-size:15px; font-weight:700;">Money</div><div style="font-size:24px; font-weight:700;">38.50</div></div>
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:14px 16px; height:90px;"></div>
+              </div>
+              <div style="position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; padding:16px;">
+                <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:10px; width:100%; box-shadow:0 8px 24px rgba(0,0,0,.3);">
+                  <div style="font-size:14px; font-weight:700;">Molt timing, growth and what you spend</div>
+                  <div style="font-size:12.5px; line-height:18px; color:#d1d5db;">Computed from your 3 animals. Premium unlocks the detail.</div>
+                  <div style="padding:10px 16px; border-radius:12px; background:linear-gradient(135deg,#0066FF,#FF0099); font-size:13px; font-weight:700; align-self:flex-start;">See Premium</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">A whole screen that is a paywall. The free keeper tapped through to see nothing new. This is the main reason to prefer one page.</p>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; width:720px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.08em; color:#64748b;">WEB · TWO PAGES, TABBED</div>
+        <div data-screen-label="Two-page · web" style="width:720px; background:#0a0a0f; border:1px solid #2a2a3a; border-radius:14px; overflow:hidden; display:flex; color:#e5e7eb;">
+          <div style="width:170px; border-right:1px solid #2a2a3a; padding:18px 12px; display:flex; flex-direction:column; gap:4px; flex-shrink:0;">
+            <div style="font-size:15px; font-weight:700; padding:0 10px 14px; background:linear-gradient(90deg,#3385FF,#FF0099); -webkit-background-clip:text; background-clip:text; color:transparent;">Tarantuverse</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-view-dashboard-outline" style="font-size:18px; color:#9ca3af;"></i>Dashboard</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600;"><i class="mdi mdi-spider" style="font-size:18px; color:#9ca3af;"></i>Collection</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; background:rgba(0,102,255,.14); color:#fff;"><i class="mdi mdi-chart-line" style="font-size:18px; color:#3385FF;"></i>Analytics</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:6px 10px 6px 38px; font-size:12px; font-weight:600; color:#d1d5db;">Overview</div>
+            <div style="display:flex; align-items:center; gap:8px; padding:6px 10px 6px 38px; font-size:12px; font-weight:600; color:#9ca3af;">Advanced <i class="mdi mdi-lock-outline" style="font-size:12px;"></i></div>
+          </div>
+          <div style="flex:1; padding:24px 28px; display:flex; flex-direction:column; gap:14px; min-width:0;">
+            <div style="display:flex; gap:4px; border-bottom:1px solid #2a2a3a;"><div style="padding:8px 14px; font-size:13px; font-weight:700; border-bottom:2px solid #3385FF;">Overview</div><div style="padding:8px 14px; font-size:13px; font-weight:600; color:#9ca3af; display:flex; align-items:center; gap:6px;">Advanced <i class="mdi mdi-lock-outline" style="font-size:13px;"></i></div></div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:12px 14px;"><div style="font-size:11px; color:#d1d5db;">Due to eat</div><div style="font-size:22px; font-weight:700;">1</div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:12px 14px;"><div style="font-size:11px; color:#d1d5db;">Last molt</div><div style="font-size:22px; font-weight:700;">3 days ago</div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:12px 14px;"><div style="font-size:11px; color:#d1d5db;">Longest gap</div><div style="font-size:22px; font-weight:700;">19 days</div></div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:14px 16px; height:150px;"><div style="font-size:14px; font-weight:700;">Collection</div></div>
+              <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:14px 16px; height:150px;"><div style="font-size:14px; font-weight:700;">Feeding</div></div>
+            </div>
+            <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px;"><i class="mdi mdi-star-four-points-outline" style="font-size:20px; color:#c9a2ff;"></i><div style="flex:1;"><div style="font-size:14px; font-weight:700;">Advanced analytics</div><div style="font-size:12px; color:#9ca3af;">Molt timing, growth, spending · Premium</div></div><i class="mdi mdi-chevron-right" style="color:#9ca3af;"></i></div>
+          </div>
+        </div>
+        <p style="margin:0; font-size:13px; line-height:19px; color:#475569;">On web, two pages would be a sub-route pair with tabs. It keeps the overlap problem (where does sex split live?) and makes "Advanced" a label people have to decode.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 1f ══ -->
+  <div id="1f" style="display:flex; flex-direction:column; gap:24px;">
+    <div style="display:flex; align-items:baseline; gap:14px;">
+      <span style="font-size:12px; font-weight:700; color:#fff; background:#0f172a; padding:5px 10px; border-radius:6px;">1f</span>
+      <h2 style="margin:0; font-size:24px; font-weight:700; color:#0f172a;">Chart grammar</h2>
+      <span style="font-size:14px; color:#64748b;">three shapes, one palette, the 0 / 1 / many rule</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; max-width:1180px;">
+      <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; color:#e5e7eb;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#9ca3af;">BARS · MONTHLY COUNTS</div>
+        <svg viewBox="0 0 300 86" width="100%" height="86"><rect x="2" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="27" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="52" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="77" y="40" width="19" height="28" rx="3" fill="#0066FF"></rect><rect x="102" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="127" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="152" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="177" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="202" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="227" y="68" width="19" height="2" rx="1" fill="#2a2a3a"></rect><rect x="252" y="56" width="19" height="12" rx="3" fill="#0066FF"></rect><rect x="277" y="12" width="19" height="56" rx="3" fill="#FF0099"></rect><text x="296" y="9" font-size="9" fill="#e5e7eb" text-anchor="end" font-family="system-ui">4</text><g font-size="9" fill="#9ca3af" font-family="system-ui" text-anchor="middle"><text x="11" y="82">N</text><text x="36" y="82">D</text><text x="61" y="82">J</text><text x="86" y="82">F</text><text x="111" y="82">M</text><text x="136" y="82">A</text><text x="161" y="82">M</text><text x="186" y="82">J</text><text x="211" y="82">J</text><text x="236" y="82">A</text><text x="261" y="82">S</text><text x="286" y="82">O</text></g></svg>
+        <div style="font-size:12.5px; line-height:18px; color:#d1d5db;">Bar <code style="font-size:11px; color:#c9a2ff;">primary</code>, max bar <code style="font-size:11px; color:#c9a2ff;">secondary</code> with its value printed above. Zero months are a 2px <code style="font-size:11px; color:#c9a2ff;">border</code> stub, not nothing. Month initials in <code style="font-size:11px; color:#c9a2ff;">textTertiary</code> 9–10px. No y-axis, no gridlines.<br><b style="color:#e5e7eb;">0:</b> no chart, one sentence. <b style="color:#e5e7eb;">1:</b> chart with one bar and the sentence names the month. <b style="color:#e5e7eb;">many:</b> as shown.</div>
+      </div>
+      <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; color:#e5e7eb;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#9ca3af;">LINE · RUNNING TOTAL</div>
+        <svg viewBox="0 0 300 86" width="100%" height="86"><path d="M4 60 L58 60 L85 48 L139 48 L166 36 L220 36 L247 24 L274 12 L296 12 L296 72 L4 72 Z" fill="rgba(0,102,255,.14)"></path><polyline points="4,60 58,60 85,48 139,48 166,36 220,36 247,24 274,12 296,12" fill="none" stroke="#0066FF" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline><circle cx="296" cy="12" r="4" fill="#0066FF" stroke="#1a1a24" stroke-width="2"></circle><text x="6" y="56" font-size="9" fill="#9ca3af" font-family="system-ui">3</text><text x="290" y="8" font-size="9" fill="#e5e7eb" font-family="system-ui" text-anchor="end">6</text></svg>
+        <div style="font-size:12.5px; line-height:18px; color:#d1d5db;">2.5px <code style="font-size:11px; color:#c9a2ff;">primary</code> stroke, 14% fill beneath, end dot r4 with a surface-coloured ring. First and last values printed; nothing else. Step rendering (counts only change on an event).<br><b style="color:#e5e7eb;">0:</b> impossible (there is always ≥1 point once an animal exists). <b style="color:#e5e7eb;">1:</b> a dot on a flat track with the month under it. <b style="color:#e5e7eb;">flat:</b> straight line, sentence says "No change since".</div>
+      </div>
+      <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; color:#e5e7eb;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#9ca3af;">SEGMENTED BAR · A SPLIT</div>
+        <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; gap:2px; margin-top:10px;"><div style="flex:1; background:#3b82f6;"></div><div style="flex:3; background:#ec4899;"></div><div style="flex:2; background:#9ca3af;"></div></div>
+        <div style="display:flex; gap:16px; font-size:12px; color:#d1d5db;"><span><i class="mdi mdi-gender-male" style="color:#3b82f6;"></i> 1 male</span><span><i class="mdi mdi-gender-female" style="color:#ec4899;"></i> 3 female</span><span><i class="mdi mdi-help-circle-outline" style="color:#9ca3af;"></i> 2 unsexed</span></div>
+        <div style="font-size:12.5px; line-height:18px; color:#d1d5db; margin-top:auto;">Replaces every pie. 8px tall, 2px gaps, radius 4. Legend is glyph + count + word, so colour is never the only carrier. Sex uses the fixed <code style="font-size:11px; color:#c9a2ff;">male</code> / <code style="font-size:11px; color:#c9a2ff;">female</code> / <code style="font-size:11px; color:#c9a2ff;">textTertiary</code>; enclosure and taxon splits use <code style="font-size:11px; color:#c9a2ff;">primary</code>, <code style="font-size:11px; color:#c9a2ff;">#8b5cf6</code>, <code style="font-size:11px; color:#c9a2ff;">success</code>, <code style="font-size:11px; color:#c9a2ff;">warning</code> in order.<br><b style="color:#e5e7eb;">1 segment:</b> no bar, sentence ("1 terrestrial. A split appears with two or more animals.").</div>
+      </div>
+      <div style="background:#1a1a24; border:1px solid #2a2a3a; border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:12px; color:#e5e7eb;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:.1em; color:#9ca3af;">RANKED ROWS · PER ANIMAL / PER SPECIES</div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:#d1d5db;">Juniper</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:100%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:72px; text-align:right; font-weight:600;">4 <span style="font-weight:400; color:#9ca3af;">· 3d ago</span></span></div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:#d1d5db;">Rosie</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"><div style="width:25%; height:8px; border-radius:4px; background:#0066FF;"></div></div><span style="width:72px; text-align:right; font-weight:600;">1 <span style="font-weight:400; color:#9ca3af;">· 7mo ago</span></span></div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:13px;"><span style="width:64px; color:#d1d5db;">Pepper</span><div style="flex:1; height:8px; border-radius:4px; background:#2a2a3a;"></div><span style="width:72px; text-align:right; color:#9ca3af;">none yet</span></div>
+        <div style="font-size:12.5px; line-height:18px; color:#d1d5db; margin-top:auto;">Horizontal bars scaled to the max row. Label column 64 (mobile) / 70 (web), ellipsised. Rows with 0 keep their track and say "none yet". Show all rows ≤ 5; otherwise top 3 (animals) or top 5 (species) plus an "n more →" link to a sorted list screen.</div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const grad = 'linear-gradient(135deg,#0066FF,#FF0099)';
+    const dark = { bg:'#0a0a0f', sf:'#1a1a24', el:'#2a2a3a', bd:'#2a2a3a', t1:'#e5e7eb', t2:'#d1d5db', t3:'#9ca3af', pr:'#0066FF', ac:'#3385FF', frame:'#2a2a3a' };
+    const light = { bg:'#f4f4f8', sf:'#ffffff', el:'#eceef4', bd:'#e3e5ee', t1:'#111827', t2:'#374151', t3:'#6b7280', pr:'#0066FF', ac:'#0052cc', frame:'#d9dbe6' };
+    const hobbyist = (c) => ({ headerH:'130px', headerBg:grad, headerBorder:'transparent', headerText:'#ffffff', headerPad:'16px', titleSize:'20px', rMd:'16px', rLg:'16px', shadow:'0 2px 8px rgba(0,0,0,.18)', ctaBg:grad });
+    const keeper = (c) => ({ headerH:'100px', headerBg:c.sf, headerBorder:c.bd, headerText:c.t1, headerPad:'12px', titleSize:'17px', rMd:'12px', rLg:'12px', shadow:'none', ctaBg:c.pr });
+    const themes = [
+      { label:'DARK · HOBBYIST', ...dark, ...hobbyist(dark) },
+      { label:'DARK · KEEPER', ...dark, ...keeper(dark), shadow:'none' },
+      { label:'LIGHT · HOBBYIST', ...light, ...hobbyist(light), shadow:'0 2px 8px rgba(17,24,39,.08)' },
+      { label:'LIGHT · KEEPER', ...light, ...keeper(light) },
+    ];
+    return { themes };
+  }
+}
+</script>
+</body>
+</html>

@@ -19,6 +19,29 @@ import type { ThemeColors } from '../contexts/ThemeContext';
 export const FEEDING_OVERDUE_ORANGE = '#f97316';
 
 /**
+ * Fixed semantic colours (analytics redesign README §5). Identical in every
+ * theme and preset. The web copy of the analytics lib keeps the same literals
+ * above its shared marker, so keep the two in step.
+ */
+export const SEMANTIC_COLORS = {
+  error: '#ef4444',
+  warning: '#eab308',
+  success: '#22c55e',
+  info: '#3b82f6',
+  male: '#3b82f6',
+  female: '#ec4899',
+  molt: '#8b5cf6',
+  premiumDark: '#c9a2ff',
+  premiumLight: '#7c3aed',
+} as const;
+
+/** Text/icons on a `primary` fill or the Hobbyist gradient. */
+export const ON_PRIMARY = '#ffffff';
+
+/** The grey of "sample data" charts (README §3 grey sample, §6). */
+export const MUTED_SAMPLE = '#4b5563';
+
+/**
  * Days-since-last-feeding → ramp color.
  *   <7d  green (success) · 7–13d yellow (warning) · 14–20d orange · ≥21d red (error)
  * null/undefined (never fed / no data) reads as success (no alarm).

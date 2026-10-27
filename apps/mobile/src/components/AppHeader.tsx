@@ -26,6 +26,8 @@ import { useTheme } from '../contexts/ThemeContext';
 interface AppHeaderProps {
   title: string;
   subtitle?: string;
+  /** Replaces the subtitle text with an element (e.g. a loading bar). Takes precedence over `subtitle`. */
+  subtitleNode?: ReactNode;
   /** Element rendered on the far left of the title row (e.g. a back button). */
   leftAction?: ReactNode;
   /** Element rendered on the far right of the title row. */
@@ -39,6 +41,7 @@ interface AppHeaderProps {
 export function AppHeader({
   title,
   subtitle,
+  subtitleNode,
   leftAction,
   rightAction,
   children,
@@ -60,7 +63,9 @@ export function AppHeader({
         ) : null}
         <View style={styles.titleBlock}>
           <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
-          {subtitle ? (
+          {subtitleNode ? (
+            <View style={styles.subtitleNode}>{subtitleNode}</View>
+          ) : subtitle ? (
             <Text style={[styles.subtitle, { color: subtitleColor }]}>{subtitle}</Text>
           ) : null}
         </View>
@@ -121,6 +126,9 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 13,
+    marginTop: 2,
+  },
+  subtitleNode: {
     marginTop: 2,
   },
   leftAction: {

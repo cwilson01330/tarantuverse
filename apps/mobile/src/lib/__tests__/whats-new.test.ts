@@ -99,7 +99,7 @@ describe('routeForTarget', () => {
   it('maps a known target to this app\'s route', () => {
     expect(routeForTarget('expenses')).toBe('/expenses');
     expect(routeForTarget('feeding_day')).toBe('/feeding-day');
-    expect(routeForTarget('analytics_advanced')).toBe('/analytics/advanced');
+    expect(routeForTarget('analytics_advanced')).toBe('/analytics');
     expect(routeForTarget('collection')).toBe('/(tabs)/collection');
     expect(routeForTarget('species')).toBe('/(tabs)/species');
     expect(routeForTarget('settings')).toBe('/settings');

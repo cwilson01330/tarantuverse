@@ -31,7 +31,7 @@ async function sessionKey(): Promise<string> {
 export const TARGET_ROUTES: Record<WhatsNewTarget, string | null> = {
   expenses: '/expenses',
   feeding_day: '/feeding-day',
-  analytics_advanced: '/analytics/advanced',
+  analytics_advanced: '/analytics',
   collection: '/(tabs)/collection',
   species: '/(tabs)/species',
   settings: '/settings',

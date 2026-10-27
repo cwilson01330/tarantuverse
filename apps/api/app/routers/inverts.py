@@ -45,6 +45,7 @@ from app.schemas.invert import (
     InvertResponse,
     InvertUpdate,
 )
+from app.services.feeding_status import compute_feeding_status
 from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
@@ -422,80 +423,9 @@ async def list_feeding_status(
     # move, so nobody is ever asked to feed an animal that died.
     access = scope_collection(db, current_user, "tarantuverse", collection)
     inverts = active_inverts_query(db, access.owner.id).all()
-    if not inverts:
-        return []
-
-    ids = [inv.id for inv in inverts]
-    rows = (
-        db.query(FeedingLog.invert_id, func.max(FeedingLog.fed_at))
-        .filter(FeedingLog.invert_id.in_(ids), FeedingLog.accepted.is_(True))
-        .group_by(FeedingLog.invert_id)
-        .all()
-    )
-    last_by_id = {row[0]: row[1] for row in rows}
-
-    # Batch-load the species referenced by this collection (avoid N+1).
-    species_ids = {inv.species_id for inv in inverts if inv.species_id}
-    species_by_id = {}
-    if species_ids:
-        species_by_id = {
-            sp.id: sp
-            for sp in db.query(InvertSpecies).filter(InvertSpecies.id.in_(species_ids)).all()
-        }
-
-    now = datetime.now(timezone.utc)
-    today_local = (
-        (now + timedelta(minutes=-(tz_offset_minutes or 0))).date()
-        if tz_offset_minutes is not None
-        else now.date()
-    )
-
-    items: List[InvertFeedingStatusItem] = []
-    for inv in inverts:
-        last = last_by_id.get(inv.id)
-        days = _calendar_day_diff(now, last, tz_offset_minutes) if last else None
-        paused = bool(
-            inv.feeding_paused_reason
-            and (inv.feeding_paused_until is None or inv.feeding_paused_until >= today_local)
-        )
-        species = species_by_id.get(inv.species_id) if inv.species_id else None
-        interval, interval_source = _recommended_feeding_interval_with_source(
-            inv.life_stage, species, inv.feeding_interval_days, taxon=inv.taxon
-        )
-        # Never-fed animals are NOT "overdue" — no feeding has established a
-        # cadence yet, so flagging them (esp. in a push digest) is noise. Kept
-        # in lockstep with digest_service and /animals/feeding-status.
-        is_overdue = (
-            (not paused)
-            and interval is not None
-            and last is not None
-            and days is not None
-            and days >= interval
-        )
-        items.append(
-            InvertFeedingStatusItem(
-                id=inv.id,
-                name=inv.name,
-                common_name=inv.common_name,
-                scientific_name=inv.scientific_name,
-                taxon=inv.taxon,
-                photo_url=inv.photo_url,
-                life_stage=inv.life_stage,
-                location=inv.location,
-                last_feeding_date=last,
-                days_since_last_feeding=days,
-                is_feeding_paused=paused,
-                is_overdue=is_overdue,
-                interval_days=interval,
-                interval_source=interval_source,
-            )
-        )
-
-    # Never-fed first, then longest-since-fed, so the neediest float to the top.
-    items.sort(
-        key=lambda x: (0 if x.days_since_last_feeding is None else 1, -(x.days_since_last_feeding or 0))
-    )
-    return items
+    # The rule itself lives in services/feeding_status so the analytics
+    # "right now" tiles can never disagree with this screen.
+    return compute_feeding_status(db, inverts, tz_offset_minutes)
 
 
 # ── Locations (room / rack / shelf) ─────────────────────────────────────────

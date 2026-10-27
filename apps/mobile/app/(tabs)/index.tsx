@@ -31,6 +31,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotificationBell } from '../../src/components/NotificationBell';
 import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
+import InsightsCard from '../../src/components/analytics/InsightsCard';
+import type { CollectionAnalytics } from '../../src/lib/analytics-view';
+import { setCollectionAnimalCount } from '../../src/lib/collection-summary';
 
 /** "Good morning" / "Good afternoon" / "Good evening" from the device clock. */
 function timeGreeting(): string {
@@ -102,16 +105,6 @@ interface Enclosure {
   photo_url: string | null;
   species_name: string | null;
   enclosure_type: string | null;
-}
-
-// Mirrors apps/api/app/routers/analytics.py::get_collection_analytics().
-// We only consume total_molts here; keeping the rest of the shape so any
-// future stat we want to surface on the hub is a one-line change.
-interface CollectionStats {
-  total_tarantulas: number;
-  unique_species: number;
-  total_feedings: number;
-  total_molts: number;
 }
 
 function DashboardHubWrapper() {
@@ -224,7 +217,9 @@ function DashboardHubScreen() {
   const [colonies, setColonies] = useState<ColonyListItem[]>([]);
   // null = not loaded / request failed → the chip renders '—', never a fake 0.
   const [feederStockTotal, setFeederStockTotal] = useState<number | null>(null);
-  const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
+  // The /analytics/collection response: the Molts chip reads total_molts, the
+  // Insights card reads the rest. null = not loaded / request failed.
+  const [collectionStats, setCollectionStats] = useState<CollectionAnalytics | null>(null);
   // Cross-taxon collection total (from /inverts/). null until loaded;
   // falls back to tarantulas.length if the call fails.
   const [totalAnimals, setTotalAnimals] = useState<number | null>(null);
@@ -318,7 +313,9 @@ function DashboardHubScreen() {
       // second request for a subset of the same rows.
       const [enclosuresRes, statsRes, invertsRes, coloniesRes, feedersRes] = await Promise.all([
         apiClient.get('/enclosures/', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
-        apiClient.get('/analytics/collection').catch(() => null),
+        // tz_offset_minutes (JS sign) makes the response's dates the keeper's
+        // local days, which the Insights card's "today / 3 days ago" reads.
+        apiClient.get('/analytics/collection', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
         // Unified inverts list = the whole cross-taxon collection
         // (tarantulas are mirrored in, plus scorpions / centipedes /
         // whip spiders). Drives the true "My Collection" total.
@@ -345,6 +342,9 @@ function DashboardHubScreen() {
 
       if (statsRes?.data) {
         setCollectionStats(statsRes.data);
+        // Hand the count to the You tab's Analytics row (no request there).
+        const stats = statsRes.data as CollectionAnalytics;
+        setCollectionAnimalCount(user?.id, stats.total_animals || stats.total_tarantulas || 0);
       }
 
       if (Array.isArray(invertsRes?.data)) {
@@ -1202,6 +1202,12 @@ function DashboardHubScreen() {
           )}
         </WalkthroughableView>
         </CopilotStep>
+
+        {/* Insights — second card, under the feeding hero. Built from the
+            /analytics/collection response loaded above (no request of its
+            own); renders nothing until that lands, if it failed, or with no
+            animals. Never shows money. */}
+        <InsightsCard collection={collectionStats} />
 
         {/* Colonies (ADR-010) — population entries, taxon-aware. Replaces the
             legacy enclosure-based "Communal Setups" section. */}

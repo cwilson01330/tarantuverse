@@ -1,7 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { Card } from './ui';
+import { RankedRows } from './charts';
+import { SPACING, TYPE } from '../theme/tokens';
+import { withAlpha } from '../lib/chart-helpers';
+import { feedingStatusColor, FEEDING_OVERDUE_ORANGE } from '../utils/status-colors';
+import type { RankedRow } from '../lib/analytics-view';
 
 interface PreyTypeCount {
   food_type: string;
@@ -51,43 +57,179 @@ interface FeedingStatsCardProps {
   onPausedPress?: () => void;
 }
 
-const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress }) => {
+// ───────────────────────────── chart grammar (README §6) ─────────────────────────────
+// Acceptance is a split (SegmentedBar rules: 8pt bar, 2pt gaps, radius 4, a legend
+// that lists every category, a sentence instead of the bar when only one category
+// has anything). The prey mix is ranked rows. No donut, no percent labels on bars.
+
+const BAR_HEIGHT = 8;
+const BAR_GAP = 2;
+const SWATCH = 8;
+
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** Accepted vs refused. Accepted first; fixed semantic colours. */
+function AcceptanceSplit({ data }: { data: FeedingStats }) {
   const { colors } = useTheme();
-  
-  // Determine feeding status color
-  const getFeedingStatusColor = (days?: number) => {
-    if (!days) return styles.statusGray;
-    if (days < 7) return styles.statusGreen;
-    if (days < 14) return styles.statusYellow;
-    if (days < 21) return styles.statusOrange;
-    return styles.statusRed;
+  const accepted = Math.max(0, data.total_accepted ?? 0);
+  const refused = Math.max(0, data.total_refused ?? 0);
+  const filled = (accepted > 0 ? 1 : 0) + (refused > 0 ? 1 : 0);
+
+  let sentence: string;
+  if (filled === 0) {
+    sentence = 'No accepted or refused feedings recorded yet.';
+  } else if (refused === 0) {
+    sentence = accepted === 1 ? 'The one feeding was accepted.' : `All ${accepted} feedings accepted.`;
+  } else if (accepted === 0) {
+    sentence = refused === 1 ? 'The one feeding was refused.' : `All ${refused} feedings refused.`;
+  } else {
+    sentence = `${accepted} of ${data.total_feedings} feedings accepted (${Math.round(data.acceptance_rate)}%).`;
+  }
+
+  const legend = [
+    { key: 'accepted', label: `${accepted} accepted`, color: colors.success },
+    { key: 'refused', label: `${refused} refused`, color: colors.error },
+  ];
+
+  return (
+    <View accessible accessibilityRole="image" accessibilityLabel={`Acceptance: ${accepted} accepted, ${refused} refused`}>
+      {filled >= 2 && (
+        <View style={{ flexDirection: 'row', height: BAR_HEIGHT }}>
+          <View style={{ flex: accepted, backgroundColor: colors.success, borderRadius: BAR_HEIGHT / 2 }} />
+          <View style={{ flex: refused, backgroundColor: colors.error, borderRadius: BAR_HEIGHT / 2, marginLeft: BAR_GAP }} />
+        </View>
+      )}
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          columnGap: SPACING.md,
+          rowGap: SPACING.xs,
+          marginTop: filled >= 2 ? SPACING.sm : 0,
+        }}
+      >
+        {legend.map((item) => (
+          <View key={item.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: SWATCH, height: SWATCH, borderRadius: SWATCH / 2, backgroundColor: item.color }} />
+            <Text style={{ ...TYPE.caption, fontWeight: '400', color: colors.textSecondary }}>{item.label}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={{ ...TYPE.label, fontWeight: '400', color: colors.textSecondary, marginTop: SPACING.sm }}>
+        {sentence}
+      </Text>
+    </View>
+  );
+}
+
+/** Prey types as ranked rows, biggest first, with the sentence under them. */
+function PreyRows({ prey }: { prey: PreyTypeCount[] }) {
+  const { colors } = useTheme();
+  const sorted = [...prey].sort((a, b) => b.count - a.count);
+  const max = Math.max(1, ...sorted.map((p) => p.count));
+  const total = sorted.reduce((sum, p) => sum + p.count, 0);
+  const rows: RankedRow[] = sorted.map((p, i) => {
+    const pct = `${Math.round(p.percentage)}%`;
+    return {
+      key: `${p.food_type}-${i}`,
+      id: null,
+      label: p.food_type ? p.food_type.charAt(0).toUpperCase() + p.food_type.slice(1) : '—',
+      count: p.count,
+      fraction: p.count / max,
+      value: String(p.count),
+      detail: pct,
+      right: `${p.count} · ${pct}`,
+      none: false,
+      a11y: `${p.food_type}, ${plural(p.count, 'feeding')}, ${pct}`,
+    };
+  });
+  const top = sorted[0];
+  const sentence =
+    sorted.length === 1
+      ? `Every feeding so far was ${top.food_type}.`
+      : `Mostly ${top.food_type}: ${top.count} of ${total} feedings.`;
+  return (
+    <View>
+      <RankedRows rows={rows} labelWidth={84} />
+      <Text style={{ ...TYPE.label, fontWeight: '400', color: colors.textSecondary, marginTop: SPACING.sm }}>
+        {sentence}
+      </Text>
+    </View>
+  );
+}
+
+const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress }) => {
+  const { colors, layout } = useTheme();
+
+  // Last-fed ladder: the app-wide one (green <7, yellow 7-13, orange 14-20,
+  // red 21+). `!= null`: 0 days is "fed today", not "unknown".
+  const statusColorFor = (days?: number | null): string =>
+    days == null ? colors.textTertiary : feedingStatusColor(days, colors);
+
+  const acceptanceColor = (rate: number): string => {
+    if (rate >= 80) return colors.success;
+    if (rate >= 60) return colors.warning;
+    return FEEDING_OVERDUE_ORANGE;
   };
 
-  const getAcceptanceColor = (rate: number) => {
-    if (rate >= 80) return styles.acceptanceGreen;
-    if (rate >= 60) return styles.acceptanceYellow;
-    return styles.acceptanceOrange;
-  };
+  const cardStyle = { borderRadius: layout.radius.lg };
+
+  const title = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+      <MaterialCommunityIcons name="silverware-fork-knife" size={18} color={colors.primary} />
+      <Text accessibilityRole="header" style={{ ...TYPE.heading, color: colors.textPrimary }}>
+        Feeding Stats
+      </Text>
+    </View>
+  );
 
   if (data.total_feedings === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>🍽️ Feeding Stats</Text>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>🍴</Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            No feeding data yet.{'\n'}Add feeding logs to track patterns.
-          </Text>
-        </View>
-      </View>
+      <Card style={cardStyle}>
+        {title}
+        <Text style={{ ...TYPE.body, color: colors.textSecondary, textAlign: 'center', paddingVertical: SPACING.xl }}>
+          No feeding data yet. Add feeding logs to track patterns.
+        </Text>
+      </Card>
     );
   }
 
-  const statusColorStyle = getFeedingStatusColor(data.days_since_last_feeding);
+  const statusColor = statusColorFor(data.days_since_last_feeding);
+  const bannerStyle = (tone: string) => ({
+    borderRadius: layout.radius.md,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: withAlpha(tone, 0.5, tone),
+    backgroundColor: withAlpha(tone, 0.14, colors.surfaceElevated),
+  });
+  const kicker = { ...TYPE.caption, fontWeight: '600' as const, color: colors.textSecondary, textTransform: 'uppercase' as const, marginBottom: SPACING.xs };
+
+  const tile = (label: string, value: string, sub: string, valueColor: string) => (
+    <View
+      key={label}
+      accessible
+      accessibilityLabel={`${label}: ${value}, ${sub}`}
+      style={{
+        minWidth: '47%',
+        flexGrow: 1,
+        borderRadius: layout.radius.md,
+        padding: SPACING.md,
+        backgroundColor: colors.surfaceElevated,
+      }}
+    >
+      <Text style={{ ...TYPE.caption, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: SPACING.xs }}>
+        {label}
+      </Text>
+      <Text style={{ ...TYPE.display, color: valueColor }}>{value}</Text>
+      <Text style={{ ...TYPE.caption, fontWeight: '400', color: colors.textTertiary }}>{sub}</Text>
+    </View>
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>🍽️ Feeding Stats</Text>
+    <Card style={cardStyle}>
+      {title}
 
       {/* Paused banner takes priority over the overdue red banner.
           A 7-month premolt sling shouldn't see her "Last Fed: 200 days
@@ -101,37 +243,33 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress
           `_classCallCheck`. See feedback memory dated 2026-05-01. */}
       {data.is_feeding_paused ? (() => {
         const pausedInner = (
-          <View style={styles.statusRow}>
-            <View style={styles.statusLeft}>
-              <Text style={styles.statusLabel}>FEEDING PAUSED</Text>
-              <Text style={styles.statusValue}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={kicker}>Feeding paused</Text>
+              <Text style={{ ...TYPE.title, color: colors.textPrimary }}>
                 {pauseReasonLabel(data.feeding_paused_reason)}
               </Text>
               {data.days_since_last_feeding != null && (
-                <Text style={styles.statusSubtle}>
+                <Text style={{ ...TYPE.caption, fontWeight: '400', color: colors.textSecondary, marginTop: SPACING.xs }}>
                   Last fed {data.days_since_last_feeding} days ago
                 </Text>
               )}
             </View>
-            <View style={styles.statusRight}>
+            <View style={{ alignItems: 'flex-end' }}>
               {data.feeding_paused_until ? (
                 <>
-                  <Text style={styles.statusLabel}>UNTIL</Text>
-                  <Text style={styles.statusSmallValue}>
+                  <Text style={kicker}>Until</Text>
+                  <Text style={{ ...TYPE.subheading, color: colors.textPrimary }}>
                     {new Date(data.feeding_paused_until).toLocaleDateString()}
                   </Text>
                 </>
               ) : (
-                <Text style={styles.statusSubtle}>Indefinite</Text>
+                <Text style={{ ...TYPE.caption, fontWeight: '400', color: colors.textSecondary }}>Indefinite</Text>
               )}
               {onPausedPress && (
-                <View style={styles.pauseEditHint}>
-                  <Text style={styles.pauseEditHintText}>Tap to edit</Text>
-                  <MaterialCommunityIcons
-                    name="chevron-right"
-                    size={14}
-                    color="#4b5563"
-                  />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: SPACING.sm }}>
+                  <Text style={{ ...TYPE.caption, fontWeight: '600', color: colors.textSecondary }}>Tap to edit</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={14} color={colors.textSecondary} />
                 </View>
               )}
             </View>
@@ -141,12 +279,14 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress
           <TouchableOpacity
             onPress={onPausedPress}
             activeOpacity={0.7}
-            style={[styles.statusBanner, styles.statusPaused]}
+            accessibilityRole="button"
+            accessibilityLabel={`Feeding paused: ${pauseReasonLabel(data.feeding_paused_reason)}. Tap to edit.`}
+            style={[bannerStyle(colors.info), { minHeight: 44 }]}
           >
             {pausedInner}
           </TouchableOpacity>
         ) : (
-          <View style={[styles.statusBanner, styles.statusPaused]}>
+          <View style={bannerStyle(colors.info)}>
             {pausedInner}
           </View>
         );
@@ -155,18 +295,18 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress
             and undefined (data still loading). Previous `!== undefined` let
             null through and rendered "null days ago" on new spiders. */
         data.days_since_last_feeding != null && (
-          <View style={[styles.statusBanner, statusColorStyle]}>
-            <View style={styles.statusRow}>
-              <View style={styles.statusLeft}>
-                <Text style={styles.statusLabel}>LAST FED</Text>
-                <Text style={styles.statusValue}>
+          <View style={bannerStyle(statusColor)}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={kicker}>Last fed</Text>
+                <Text style={{ ...TYPE.title, color: colors.textPrimary }}>
                   {data.days_since_last_feeding} days ago
                 </Text>
               </View>
               {data.next_feeding_prediction && (
-                <View style={styles.statusRight}>
-                  <Text style={styles.statusLabel}>NEXT FEEDING</Text>
-                  <Text style={styles.statusSmallValue}>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={kicker}>Next feeding</Text>
+                  <Text style={{ ...TYPE.subheading, color: colors.textPrimary }}>
                     {new Date(data.next_feeding_prediction).toLocaleDateString()}
                   </Text>
                 </View>
@@ -177,254 +317,38 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress
       )}
 
       {/* Key Metrics */}
-      <View style={styles.metricsGrid}>
-        <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
-          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>ACCEPTANCE RATE</Text>
-          <Text style={[styles.metricValue, getAcceptanceColor(data.acceptance_rate)]}>
-            {data.acceptance_rate}%
-          </Text>
-          <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>
-            {data.total_accepted}/{data.total_feedings} accepted
-          </Text>
-        </View>
-
-        {data.average_days_between_feedings != null && data.average_days_between_feedings > 0 && (
-          <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>AVG INTERVAL</Text>
-            <Text style={[styles.metricValue, styles.metricBlue]}>
-              {Math.round(data.average_days_between_feedings)}
-            </Text>
-            <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>days between</Text>
-          </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
+        {tile(
+          'Acceptance rate',
+          `${data.acceptance_rate}%`,
+          `${data.total_accepted}/${data.total_feedings} accepted`,
+          acceptanceColor(data.acceptance_rate),
         )}
-
-        {data.current_streak_accepted != null && data.current_streak_accepted > 0 && (
-          <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>CURRENT STREAK</Text>
-            <Text style={[styles.metricValue, styles.metricPurple]}>
-              {data.current_streak_accepted}
-            </Text>
-            <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>accepted</Text>
-          </View>
-        )}
-
-        {data.longest_gap_days != null && data.longest_gap_days > 0 && (
-          <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>LONGEST GAP</Text>
-            <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
-              {data.longest_gap_days}
-            </Text>
-            <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>days</Text>
-          </View>
-        )}
+        {data.average_days_between_feedings != null && data.average_days_between_feedings > 0 &&
+          tile('Avg interval', String(Math.round(data.average_days_between_feedings)), 'days between', colors.textPrimary)}
+        {data.current_streak_accepted != null && data.current_streak_accepted > 0 &&
+          tile('Current streak', String(data.current_streak_accepted), 'accepted', colors.textPrimary)}
+        {data.longest_gap_days != null && data.longest_gap_days > 0 &&
+          tile('Longest gap', String(data.longest_gap_days), 'days', colors.textPrimary)}
       </View>
 
-      {/* Prey Type Distribution */}
-      {data.prey_type_distribution.length > 0 && (
-        <View style={styles.preySection}>
-          <Text style={[styles.preySectionTitle, { color: colors.textPrimary }]}>Prey Type Distribution</Text>
-          {data.prey_type_distribution.map((prey, index) => (
-            <View key={index} style={styles.preyItem}>
-              <View style={styles.preyHeader}>
-                <Text style={[styles.preyName, { color: colors.textPrimary }]}>{prey.food_type}</Text>
-                <Text style={[styles.preyCount, { color: colors.textSecondary }]}>
-                  {prey.count} ({prey.percentage}%)
-                </Text>
-              </View>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.round(prey.percentage)}%` },
-                  ]}
-                />
-              </View>
-            </View>
-          ))}
+      {/* Acceptance split */}
+      {data.total_feedings > 1 && (
+        <View>
+          <Text style={{ ...TYPE.bodyStrong, color: colors.textPrimary, marginBottom: SPACING.sm }}>Acceptance</Text>
+          <AcceptanceSplit data={data} />
         </View>
       )}
-    </View>
+
+      {/* Prey type distribution */}
+      {data.prey_type_distribution.length > 0 && (
+        <View>
+          <Text style={{ ...TYPE.bodyStrong, color: colors.textPrimary, marginBottom: SPACING.sm }}>Prey types</Text>
+          <PreyRows prey={data.prey_type_distribution} />
+        </View>
+      )}
+    </Card>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  statusBanner: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-  },
-  statusGreen: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#bbf7d0',
-  },
-  statusYellow: {
-    backgroundColor: '#fef9c3',
-    borderColor: '#fde047',
-  },
-  statusOrange: {
-    backgroundColor: '#fed7aa',
-    borderColor: '#fdba74',
-  },
-  statusRed: {
-    backgroundColor: '#fecaca',
-    borderColor: '#fca5a5',
-  },
-  statusGray: {
-    backgroundColor: '#e5e7eb',
-    borderColor: '#9ca3af',
-  },
-  statusPaused: {
-    backgroundColor: '#e0e7ff',
-    borderColor: '#c7d2fe',
-  },
-  statusSubtle: {
-    fontSize: 11,
-    color: '#4b5563',
-    marginTop: 4,
-  },
-  pauseEditHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginTop: 6,
-  },
-  pauseEditHintText: {
-    fontSize: 10,
-    color: '#4b5563',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statusLeft: {
-    flex: 1,
-  },
-  statusRight: {
-    alignItems: 'flex-end',
-  },
-  statusLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  statusValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  statusSmallValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  metricCard: {
-    borderRadius: 12,
-    padding: 12,
-    minWidth: '47%',
-    flexGrow: 1,
-  },
-  metricLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  metricValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  metricSubtext: {
-    fontSize: 11,
-  },
-  acceptanceGreen: {
-    color: '#10b981',
-  },
-  acceptanceYellow: {
-    color: '#eab308',
-  },
-  acceptanceOrange: {
-    color: '#f97316',
-  },
-  metricBlue: {
-    color: '#3b82f6',
-  },
-  metricPurple: {
-    color: '#9333ea',
-  },
-  preySection: {
-    marginTop: 8,
-  },
-  preySectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  preyItem: {
-    marginBottom: 12,
-  },
-  preyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  preyName: {
-    fontSize: 14,
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  preyCount: {
-    fontSize: 13,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#f97316', // Intentional brand orange for prey distribution
-  },
-});
 
 export default FeedingStatsCard;

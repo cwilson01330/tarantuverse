@@ -1,577 +1,338 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { AppHeader } from '../../src/components/AppHeader';
+/**
+ * Analytics: one page (analytics redesign, README §2-§3). Right now, Collection,
+ * Feeding, Molts, Recent, then the Premium block (member cards, a washed-out
+ * preview of the keeper's own data, or a grey sample). It replaces the old
+ * Analytics + Advanced Analytics screens; `advanced.tsx` redirects here.
+ *
+ * Requests: every keeper makes ONE analytics call (`/analytics/collection`).
+ * Whether the keeper is Premium comes from `/promo-codes/me/limits`; a Premium
+ * keeper then also fetches `/analytics/advanced/` (a 402 there switches the
+ * Premium block to the preview). Saving the feeding cost refetches only
+ * `/advanced/`; pull to refresh refetches both, together.
+ *
+ * Every word and chart shape comes from `src/lib/analytics-view.ts`; which block
+ * shows comes from `src/lib/analytics-page-state.ts` (both unit-tested).
+ */
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { AppHeader } from '../../src/components/AppHeader';
+import UpgradeModal from '../../src/components/UpgradeModal';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
+import { AnalyticsSkeleton } from '../../src/components/analytics/AnalyticsSkeleton';
+import { CollectionCard } from '../../src/components/analytics/CollectionCard';
+import { FeedingCard } from '../../src/components/analytics/FeedingCard';
+import { MoltsCard } from '../../src/components/analytics/MoltsCard';
+import { PremiumSection, type PremiumState } from '../../src/components/analytics/PremiumSection';
+import { RecentCard } from '../../src/components/analytics/RecentCard';
+import { RightNow } from '../../src/components/analytics/RightNow';
+import {
+  AnalyticsCard,
+  MIN_TOUCH,
+  ON_PRIMARY,
+  OutlineButton,
+} from '../../src/components/analytics/parts';
+import {
+  SEMANTIC_COLORS,
+  headerSubtitle,
+  type AdvancedAnalytics,
+  type CollectionAnalytics,
+} from '../../src/lib/analytics-view';
+import {
+  isStale,
+  pageBody,
+  planFromLimits,
+  planOnLimitsError,
+  premiumKind,
+  type AdvancedStatus,
+  type LoadStatus,
+  type PlanState,
+} from '../../src/lib/analytics-page-state';
+import { UPGRADE_EVENTS, trackUpgrade } from '../../src/lib/upgrade-tracking';
+import { isPaymentRequired } from '../../src/utils/errors';
+import { SPACING } from '../../src/theme/tokens';
 
-interface SpeciesCount {
-  species_name: string;
-  count: number;
-}
+type AdvancedSlot = { status: Exclude<AdvancedStatus, 'ready'> } | { status: 'ready'; data: AdvancedAnalytics };
+type FetchMode = 'initial' | 'refresh' | 'silent';
 
-interface ActivityItem {
-  type: string;
-  date: string;
-  tarantula_id: string;
-  tarantula_name: string;
-  description: string;
-}
+const tzParams = () => ({ tz_offset_minutes: new Date().getTimezoneOffset() });
 
-interface CollectionAnalytics {
-  total_tarantulas: number;
-  unique_species: number;
-  sex_distribution: {
-    male: number;
-    female: number;
-    unknown: number;
-  };
-  species_counts: SpeciesCount[];
-  total_value: number;
-  average_age_months: number;
-  total_feedings: number;
-  total_molts: number;
-  total_substrate_changes: number;
-  average_days_between_feedings: number;
-  most_active_molter: {
-    tarantula_id: string;
-    name: string;
-    molt_count: number;
-  } | null;
-  newest_acquisition: {
-    tarantula_id: string;
-    name: string;
-    date: string;
-  } | null;
-  oldest_acquisition: {
-    tarantula_id: string;
-    name: string;
-    date: string;
-  } | null;
-  recent_activity: ActivityItem[];
-}
-
-export default function AnalyticsScreen() {
-  const router = useRouter();
+function AnalyticsScreen() {
   const { colors, layout } = useTheme();
-  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
-  const [analytics, setAnalytics] = useState<CollectionAnalytics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const iconColor = layout.useGradient ? ON_PRIMARY : colors.textPrimary;
 
-  useEffect(() => {
-    fetchAnalytics();
+  const [collection, setCollection] = useState<CollectionAnalytics | null>(null);
+  const [status, setStatus] = useState<LoadStatus>('loading');
+  const [now, setNow] = useState(() => new Date());
+  const [plan, setPlan] = useState<PlanState>('unknown');
+  const [advanced, setAdvanced] = useState<AdvancedSlot>({ status: 'idle' });
+  const [refreshing, setRefreshing] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const fetchedAt = useRef<number | null>(null);
+  // Only the newest /collection request may write state (focus and pull-to-refresh can overlap).
+  const collectionRequest = useRef(0);
+  const hasData = useRef(false);
+
+  // ── /analytics/collection: every keeper, one call ──
+  const loadCollection = useCallback(async (mode: FetchMode) => {
+    const id = ++collectionRequest.current;
+    if (mode === 'initial') setStatus('loading');
+    try {
+      const response = await apiClient.get<CollectionAnalytics>('/analytics/collection', { params: tzParams() });
+      if (id !== collectionRequest.current) return;
+      const at = new Date();
+      fetchedAt.current = at.getTime();
+      hasData.current = true;
+      setCollection(response.data);
+      setNow(at);
+      setStatus('ready');
+    } catch (err) {
+      if (id !== collectionRequest.current) return;
+      console.error('Failed to fetch analytics:', err);
+      // A refresh that fails while numbers are on screen keeps them; the first load shows the error card.
+      if (!hasData.current) setStatus('error');
+    }
   }, []);
 
-  const fetchAnalytics = async () => {
+  // ── the plan: Premium keepers fetch /advanced/, everyone else sees the preview ──
+  const loadPlan = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await apiClient.get('/analytics/collection');
-      setAnalytics(response.data);
-    } catch (error) {
-      // Show empty state
-    } finally {
-      setLoading(false);
+      const response = await apiClient.get('/promo-codes/me/limits');
+      setPlan(planFromLimits(response.data));
+    } catch (err) {
+      console.error('Failed to fetch subscription limits:', err);
+      // Don't guess "free" (that would show a paying member the paywall on a bad
+      // network): let /advanced/ decide. 200 = member, 402 = preview.
+      setPlan(planOnLimitsError);
     }
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'feeding':
-        return '🍴';
-      case 'molt':
-        return '🦋';
-      case 'substrate_change':
-        return '🏠';
-      default:
-        return '📝';
+  // ── /analytics/advanced/: a 402 means "not Premium after all" -> the preview ──
+  const loadAdvanced = useCallback(async () => {
+    // Keep what is on screen during a refresh: the cards, or the preview a 402 already chose.
+    setAdvanced((s) => (s.status === 'ready' || s.status === 'gated' ? s : { status: 'loading' }));
+    try {
+      const response = await apiClient.get<AdvancedAnalytics>('/analytics/advanced/');
+      setAdvanced({ status: 'ready', data: response.data });
+    } catch (err) {
+      if (isPaymentRequired(err)) {
+        setAdvanced({ status: 'gated' });
+      } else {
+        console.error('Failed to fetch advanced analytics:', err);
+        setAdvanced((s) => (s.status === 'ready' ? s : { status: 'error' }));
+      }
     }
-  };
+  }, []);
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    backButton: {
-      marginRight: 12,
-    },
-    advancedButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      backgroundColor: 'rgba(255,255,255,0.25)',
-      borderRadius: 6,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    emptyState: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 32,
-      marginTop: 100,
-    },
-    emptyTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginTop: 16,
-      marginBottom: 8,
-    },
-    emptyText: {
-      fontSize: 14,
-      color: colors.textTertiary,
-      textAlign: 'center',
-    },
-    section: {
-      padding: 8,
-    },
-    statsRow: {
-      flexDirection: 'row',
-      gap: 8,
-      marginBottom: 8,
-    },
-    statCard: {
-      flex: 1,
-      backgroundColor: colors.surface,
-      padding: 20,
-      borderRadius: 12,
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    statValue: {
-      fontSize: 28,
-      fontWeight: '700',
-      color: colors.primary,
-      marginBottom: 4,
-    },
-    statLabel: {
-      fontSize: 13,
-      color: colors.textTertiary,
-    },
-    card: {
-      backgroundColor: colors.surface,
-      margin: 8,
-      padding: 16,
-      borderRadius: 12,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    cardTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 16,
-    },
-    sexBar: {
-      flexDirection: 'row',
-      height: 40,
-      borderRadius: 8,
-      overflow: 'hidden',
-    },
-    sexSegment: {
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    maleSegment: {
-      backgroundColor: colors.male || colors.info,
-    },
-    femaleSegment: {
-      backgroundColor: colors.female || '#ec4899',
-    },
-    sexSegmentText: {
-      color: '#fff',
-      fontWeight: '600',
-      fontSize: 14,
-    },
-    unknownText: {
-      marginTop: 8,
-      fontSize: 13,
-      color: colors.textTertiary,
-      textAlign: 'center',
-    },
-    activityGrid: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      marginBottom: 16,
-    },
-    activityItem: {
-      alignItems: 'center',
-    },
-    activityValue: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.primary,
-      marginBottom: 4,
-    },
-    activityLabel: {
-      fontSize: 12,
-      color: colors.textTertiary,
-    },
-    avgStat: {
-      paddingTop: 16,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      alignItems: 'center',
-    },
-    avgLabel: {
-      fontSize: 13,
-      color: colors.textTertiary,
-      marginBottom: 4,
-    },
-    avgValue: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.textPrimary,
-    },
-    notableItem: {
-      padding: 12,
-      borderRadius: 8,
-      marginBottom: 8,
-    },
-    purpleBg: {
-      backgroundColor: colors.primary + '20',
-    },
-    greenBg: {
-      backgroundColor: colors.success + '20',
-    },
-    blueBg: {
-      backgroundColor: colors.info + '20',
-    },
-    notableLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      marginBottom: 4,
-    },
-    notableName: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 2,
-    },
-    notableDetail: {
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    speciesItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    speciesName: {
-      flex: 1,
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      marginRight: 8,
-    },
-    speciesBar: {
-      flex: 2,
-      height: 8,
-      backgroundColor: colors.border,
-      borderRadius: 4,
-      marginRight: 8,
-      overflow: 'hidden',
-    },
-    speciesBarFill: {
-      height: '100%',
-      backgroundColor: colors.success,
-    },
-    speciesCount: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      width: 30,
-      textAlign: 'right',
-    },
-    activityRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    activityIcon: {
-      fontSize: 24,
-      marginRight: 12,
-    },
-    activityContent: {
-      flex: 1,
-    },
-    activityName: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: 2,
-    },
-    activityDesc: {
-      fontSize: 13,
-      color: colors.textTertiary,
-      marginBottom: 2,
-    },
-    activityDate: {
-      fontSize: 11,
-      color: colors.textTertiary,
-    },
-    scrollContent: {
-      flex: 1,
-    },
-  });
+  // The feeding-cost editor: save, then refetch /advanced/ only (README §8).
+  // Failures throw to the Money card, which shows its own message.
+  const saveFeedingCost = useCallback(async (value: number | null) => {
+    await apiClient.put('/analytics/feeding-cost/', { cost_per_feeding: value });
+    const response = await apiClient.get<AdvancedAnalytics>('/analytics/advanced/');
+    setAdvanced({ status: 'ready', data: response.data });
+  }, []);
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <AppHeader
-          title="📊 Analytics"
-          leftAction={
-            <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-              <MaterialCommunityIcons name="arrow-left" size={24} color={iconColor} />
-            </TouchableOpacity>
-          }
-        />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </View>
-    );
+  useEffect(() => {
+    void loadCollection('initial');
+    void loadPlan();
+  }, [loadCollection, loadPlan]);
+
+  // /advanced/ once per signed-in user (not once per render or per plan refetch).
+  const userId = user?.id ?? '';
+  const advancedFetchedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (plan === 'premium' && advancedFetchedFor.current !== userId) {
+      advancedFetchedFor.current = userId;
+      void loadAdvanced();
+    }
+  }, [plan, userId, loadAdvanced]);
+
+  // Coming back to the page (from Feeding Day, an animal, the paywall): quietly
+  // refetch /collection when it is old, so "Due to eat" is not stale; and re-read
+  // the plan if the keeper went to the paywall.
+  const visitedPaywall = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (isStale(fetchedAt.current, Date.now())) void loadCollection('silent');
+      if (visitedPaywall.current) {
+        visitedPaywall.current = false;
+        void loadPlan();
+      }
+    }, [loadCollection, loadPlan]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.allSettled([
+      loadCollection('refresh'),
+      plan === 'premium' ? loadAdvanced() : loadPlan(),
+    ]);
+    setRefreshing(false);
+  }, [loadCollection, loadAdvanced, loadPlan, plan]);
+
+  const ready = status === 'ready' && collection !== null;
+  const animals = ready ? collection.total_animals || collection.total_tarantulas : 0;
+  const body = pageBody(status, animals);
+  const kind = premiumKind({ status, animals, plan, advanced: advanced.status });
+
+  // upgrade_prompt_shown once per page view, when the preview is on screen. Tagged
+  // with this page's surface because UpgradeModal fires its own events when it opens.
+  const shownTracked = useRef(false);
+  useEffect(() => {
+    if (kind === 'preview' && !shownTracked.current) {
+      shownTracked.current = true;
+      trackUpgrade(UPGRADE_EVENTS.shown, 'advanced_analytics', { surface: 'analytics_preview' });
+    }
+  }, [kind]);
+
+  const handleSeePremium = useCallback(() => {
+    trackUpgrade(UPGRADE_EVENTS.clicked, 'advanced_analytics', { surface: 'analytics_preview' });
+    visitedPaywall.current = true;
+    setUpgradeOpen(true);
+  }, []);
+
+  let premium: PremiumState | null = null;
+  if (ready && kind) {
+    if (kind === 'member' && advanced.status === 'ready') {
+      premium = { kind: 'member', advanced: advanced.data, onSaveCost: saveFeedingCost };
+    } else if (kind === 'preview') {
+      premium = { kind: 'preview', collection, onSeePremium: handleSeePremium };
+    } else if (kind === 'error') {
+      premium = { kind: 'error', onRetry: () => void loadAdvanced() };
+    } else if (kind === 'sample') {
+      premium = { kind: 'sample' };
+    } else {
+      premium = { kind: 'loading' };
+    }
   }
 
-  if (!analytics || analytics.total_tarantulas === 0) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <AppHeader
-          title="📊 Analytics"
-          leftAction={
-            <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-              <MaterialCommunityIcons name="arrow-left" size={24} color={iconColor} />
-            </TouchableOpacity>
-          }
-        />
-        <ScrollView style={styles.container}>
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
-            <Text style={styles.emptyTitle}>No Analytics Available</Text>
-            <Text style={styles.emptyText}>
-              Add animals to your collection to see analytics
-            </Text>
-          </View>
-        </ScrollView>
-      </View>
-    );
-  }
+  // ── header ──
+  const subtitleNode =
+    status === 'loading' ? (
+      <View
+        accessible
+        accessibilityLabel="Loading"
+        style={{
+          height: 12,
+          width: 150,
+          borderRadius: 6,
+          // README: 30% white on the gradient, surfaceElevated on the flat header.
+          backgroundColor: layout.useGradient ? 'rgba(255,255,255,0.3)' : colors.surfaceElevated,
+        }}
+      />
+    ) : undefined;
+  const subtitle = status === 'error' || !collection ? '—' : headerSubtitle(collection);
 
-  const totalSexed = analytics.sex_distribution.male + analytics.sex_distribution.female;
-  const malePercent = totalSexed > 0 ? (analytics.sex_distribution.male / totalSexed * 100) : 0;
-  const femalePercent = totalSexed > 0 ? (analytics.sex_distribution.female / totalSexed * 100) : 0;
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)' as never));
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <AppHeader
-        title="📊 Analytics"
+        title="Analytics"
+        subtitle={subtitleNode ? undefined : subtitle}
+        subtitleNode={subtitleNode}
         leftAction={
-          <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-        }
-        rightAction={
           <TouchableOpacity
-            onPress={() => router.push('/analytics/advanced')}
-            style={styles.advancedButton}
+            onPress={goBack}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
-            <MaterialCommunityIcons name="star-four-points" size={16} color={iconColor} />
+            <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
           </TouchableOpacity>
         }
       />
 
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+        }
+      >
+        {body === 'loading' && <AnalyticsSkeleton />}
 
-      {/* Overview Stats */}
-      <View style={styles.section}>
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{analytics.total_tarantulas}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{analytics.unique_species}</Text>
-            <Text style={styles.statLabel}>Species</Text>
-          </View>
-        </View>
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>${analytics.total_value.toFixed(0)}</Text>
-            <Text style={styles.statLabel}>Value</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{analytics.average_age_months}</Text>
-            <Text style={styles.statLabel}>Avg Age (mo)</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Sex Distribution */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Sex Distribution</Text>
-        <View style={styles.sexBar}>
-          {malePercent > 0 && (
-            <View style={[styles.sexSegment, styles.maleSegment, { width: `${malePercent}%` as any }]}>
-              <Text style={styles.sexSegmentText}>♂ {analytics.sex_distribution.male}</Text>
-            </View>
-          )}
-          {femalePercent > 0 && (
-            <View style={[styles.sexSegment, styles.femaleSegment, { width: `${femalePercent}%` as any }]}>
-              <Text style={styles.sexSegmentText}>♀ {analytics.sex_distribution.female}</Text>
-            </View>
-          )}
-        </View>
-        {analytics.sex_distribution.unknown > 0 && (
-          <Text style={styles.unknownText}>
-            {analytics.sex_distribution.unknown} unknown
-          </Text>
+        {body === 'error' && (
+          <AnalyticsCard style={styles.centerCard}>
+            <MaterialCommunityIcons name="alert-outline" size={34} color={SEMANTIC_COLORS.warning} />
+            <Text accessibilityRole="header" style={[styles.centerTitle, { color: colors.textPrimary }]}>
+              We couldn&apos;t load your analytics
+            </Text>
+            <Text style={[styles.centerBody, { color: colors.textSecondary }]}>
+              Your records are fine. This is a connection problem.
+            </Text>
+            <OutlineButton label="Try again" onPress={() => void loadCollection('initial')} />
+          </AnalyticsCard>
         )}
-      </View>
 
-      {/* Activity Stats */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Activity Stats</Text>
-        <View style={styles.activityGrid}>
-          <View style={styles.activityItem}>
-            <Text style={styles.activityValue}>{analytics.total_feedings}</Text>
-            <Text style={styles.activityLabel}>Feedings</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Text style={styles.activityValue}>{analytics.total_molts}</Text>
-            <Text style={styles.activityLabel}>Molts</Text>
-          </View>
-          <View style={styles.activityItem}>
-            <Text style={styles.activityValue}>{analytics.total_substrate_changes}</Text>
-            <Text style={styles.activityLabel}>Substrate</Text>
-          </View>
-        </View>
-        <View style={styles.avgStat}>
-          <Text style={styles.avgLabel}>Avg Days Between Feedings</Text>
-          <Text style={styles.avgValue}>{analytics.average_days_between_feedings}</Text>
-        </View>
-      </View>
-
-      {/* Notable Animals */}
-      {(analytics.most_active_molter || analytics.newest_acquisition || analytics.oldest_acquisition) && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Notable Animals</Text>
-
-          {analytics.most_active_molter && (
-            <View style={[styles.notableItem, styles.purpleBg]}>
-              <Text style={styles.notableLabel}>🦋 Most Active Molter</Text>
-              <Text style={styles.notableName}>{analytics.most_active_molter.name}</Text>
-              <Text style={styles.notableDetail}>{analytics.most_active_molter.molt_count} molts</Text>
-            </View>
-          )}
-
-          {analytics.newest_acquisition && (
-            <View style={[styles.notableItem, styles.greenBg]}>
-              <Text style={styles.notableLabel}>🆕 Newest Addition</Text>
-              <Text style={styles.notableName}>{analytics.newest_acquisition.name}</Text>
-              <Text style={styles.notableDetail}>Added {formatDate(analytics.newest_acquisition.date)}</Text>
-            </View>
-          )}
-
-          {analytics.oldest_acquisition && (
-            <View style={[styles.notableItem, styles.blueBg]}>
-              <Text style={styles.notableLabel}>👴 Oldest in Collection</Text>
-              <Text style={styles.notableName}>{analytics.oldest_acquisition.name}</Text>
-              <Text style={styles.notableDetail}>Since {formatDate(analytics.oldest_acquisition.date)}</Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Top Species */}
-      {analytics.species_counts.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Top Species</Text>
-          {analytics.species_counts.slice(0, 5).map((species, index) => {
-            const percentage = (species.count / analytics.total_tarantulas * 100).toFixed(0);
-            return (
-              <View key={index} style={styles.speciesItem}>
-                <Text style={styles.speciesName} numberOfLines={1}>{species.species_name}</Text>
-                <View style={styles.speciesBar}>
-                  <View style={[styles.speciesBarFill, { width: `${percentage}%` as any }]} />
-                </View>
-                <Text style={styles.speciesCount}>{species.count}</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Recent Activity */}
-      {analytics.recent_activity.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Recent Activity</Text>
-          {analytics.recent_activity.slice(0, 5).map((activity, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.activityRow}
-              onPress={() => router.push(`/tarantula/${activity.tarantula_id}`)}
+        {body === 'empty' && (
+          <AnalyticsCard style={styles.centerCard}>
+            <MaterialCommunityIcons name="chart-line" size={30} color={colors.accent} />
+            <Text accessibilityRole="header" style={[styles.centerTitle, { color: colors.textPrimary }]}>
+              Add your first animal and this page starts filling in.
+            </Text>
+            <Text style={[styles.centerBody, { color: colors.textSecondary }]}>
+              Every feeding and molt you log turns into something here: who&apos;s due, how often each animal eats, how
+              long between molts.
+            </Text>
+            <PrimaryButton
+              onPress={() => router.push('/add' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Add to collection"
+              style={[styles.addButton, { borderRadius: layout.radius.sm }]}
             >
-              <Text style={styles.activityIcon}>{getActivityIcon(activity.type)}</Text>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityName}>{activity.tarantula_name}</Text>
-                <Text style={styles.activityDesc}>{activity.description}</Text>
-                <Text style={styles.activityDate}>{formatDate(activity.date)}</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+              <Text style={styles.addButtonText}>Add to collection</Text>
+            </PrimaryButton>
+          </AnalyticsCard>
+        )}
 
-      <View style={{ height: 32 }} />
+        {body === 'content' && collection && (
+          <>
+            <RightNow data={collection} now={now} />
+            <CollectionCard data={collection} />
+            <FeedingCard data={collection} />
+            <MoltsCard data={collection} now={now} />
+            <RecentCard data={collection} now={now} />
+          </>
+        )}
+
+        {premium && <PremiumSection state={premium} now={now} />}
       </ScrollView>
+
+      <UpgradeModal
+        source="advanced_analytics"
+        visible={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        title="Upgrade to Premium"
+        message="Premium unlocks the detail behind these cards, worked out from your own logs."
+        feature="Molt timing, growth and what you spend"
+      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  content: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
+  backButton: { minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, justifyContent: 'center' },
+  centerCard: { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.sm },
+  centerTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  centerBody: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: SPACING.xs },
+  addButton: {
+    minHeight: MIN_TOUCH,
+    paddingHorizontal: SPACING.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButtonText: { color: ON_PRIMARY, fontSize: 13, fontWeight: '700' },
+});
+
+export default withErrorBoundary(AnalyticsScreen, 'analytics');

@@ -36,9 +36,47 @@ import { MenuRow, MenuSection } from '../../src/components/YouMenu';
 import { TYPE } from '../../src/theme/tokens';
 import { openStorePage } from '../../src/lib/reviewPrompt';
 import { useWhatsNew } from '../../src/lib/whats-new';
+import { useCollectionAnimalCount } from '../../src/lib/collection-summary';
+import { formatCount } from '../../src/lib/analytics-view';
 
 const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
 const DELETE_CONFIRM_WORD = 'DELETE';
+
+/**
+ * The Analytics row (README §3): `chart-line` 20pt accent, "Analytics" 14/600,
+ * trailing "{n} animals" 12 textTertiary, chevron, 52pt. Its own row because
+ * MenuRow's label is 16pt with a 22pt primary icon and has no trailing text.
+ */
+function AnalyticsRow({ animals, onPress }: { animals: number | null; onPress: () => void }) {
+  const { colors } = useTheme();
+  const count = animals == null ? null : `${formatCount(animals)} ${animals === 1 ? 'animal' : 'animals'}`;
+  return (
+    <TouchableOpacity
+      style={styles.analyticsRow}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={count ? `Analytics. ${count}` : 'Analytics'}
+      accessibilityHint="Opens your collection analytics"
+    >
+      <MaterialCommunityIcons
+        name="chart-line"
+        size={20}
+        color={colors.accent}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+      <Text style={[styles.analyticsLabel, { color: colors.textPrimary }]}>Analytics</Text>
+      {count ? <Text style={[styles.analyticsCount, { color: colors.textTertiary }]}>{count}</Text> : null}
+      <MaterialCommunityIcons
+        name="chevron-right"
+        size={22}
+        color={colors.textTertiary}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+    </TouchableOpacity>
+  );
+}
 
 function ProfileScreen() {
   const { user, logout, refreshUser, units, setMeasurementUnits } = useAuth();
@@ -46,6 +84,7 @@ function ProfileScreen() {
   const router = useRouter();
   const { isUpdatePending } = Updates.useUpdates();
   const { unseenCount } = useWhatsNew();
+  const animalCount = useCollectionAnimalCount(user?.id);
 
   // Refresh user data when screen is focused
   useFocusEffect(
@@ -240,12 +279,20 @@ function ProfileScreen() {
       </MenuSection>
 
       <MenuSection title="Your collection">
+        {/* README §3 "You · Analytics row": first in the group. The count comes
+            from Home's /analytics/collection response (no request here); until
+            Home has loaded it the row shows no number. */}
+        <AnalyticsRow animals={animalCount} onPress={() => router.push('/analytics' as never)} />
+        <MenuRow icon="bug-outline" label="Feeders" onPress={() => router.push('/feeders')}
+          accessibilityHint="Your feeder colonies and stock" />
+        <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses')}
+          accessibilityHint="Log what you spend on feeders, substrate and supplies" />
+        <MenuRow icon="download-outline" label="Export your data" onPress={() => router.push('/settings/data-export')} />
         <MenuRow icon="link" label="Sitter links" onPress={() => router.push('/sitter' as never)}
           accessibilityHint="Make a feeding-list link for someone looking after your animals" />
         <MenuRow icon="account-multiple-outline" label="Sharing" onPress={() => router.push('/sharing' as never)}
           accessibilityHint="Co-keepers: collections shared with you, and people who help keep yours" />
         <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import')} />
-        <MenuRow icon="download-outline" label="Export your data" onPress={() => router.push('/settings/data-export')} />
         {/* The shared feed is cached for the session, so this adds no request.
             MenuRow has no badge slot (an accessory would drop the chevron and
             the button role), so unseen entries show as a "N new" detail line. */}
@@ -256,8 +303,6 @@ function ProfileScreen() {
           onPress={() => router.push('/whats-new' as never)}
           accessibilityHint="See recent changes to the app"
         />
-        <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses')}
-          accessibilityHint="Log what you spend on feeders, substrate and supplies" />
       </MenuSection>
 
       <MenuSection title="Premium">
@@ -408,6 +453,9 @@ const styles = StyleSheet.create({
   },
   center: { textAlign: 'center' },
   gap: { marginTop: 8 },
+  analyticsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 52 },
+  analyticsLabel: { flex: 1, ...TYPE.bodyStrong },
+  analyticsCount: { ...TYPE.note },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { padding: 24, width: '100%', maxWidth: 400 },
   modalInput: { borderWidth: 1, padding: 14, marginTop: 12, textAlign: 'center' },

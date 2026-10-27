@@ -2,7 +2,7 @@
 Schemas for analytics and collection statistics
 """
 from typing import List, Optional, Dict, Any
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 
@@ -19,6 +19,41 @@ class ActivityItem(BaseModel):
     tarantula_id: str
     tarantula_name: str
     description: str
+
+
+class LongestGap(BaseModel):
+    """The animal that has gone longest without an accepted feeding right now.
+
+    Only animals Feeding Day would flag count: fed at least once, not paused,
+    and with a cadence (detritivores have none). `usual_interval_days` is that
+    cadence, so the client can say "usually eats every 7".
+    """
+    tarantula_id: str
+    name: str
+    sex: Optional[str] = None  # "male" | "female" | "unknown"
+    days: int
+    usual_interval_days: Optional[int] = None
+
+
+class LastMolt(BaseModel):
+    """The newest molt across the active collection."""
+    tarantula_id: str
+    name: str
+    sex: Optional[str] = None
+    date: date  # the keeper's local calendar day (tz_offset_minutes), else UTC
+    molted_at: Optional[datetime] = None  # the instant, timezone-aware UTC
+    molt_number: int  # this animal's molts up to and including this one
+    avg_interval_days: Optional[int] = None  # None with fewer than 2 molts
+
+
+class MoltRow(BaseModel):
+    """One animal's molt tally. Animals with no molts are included (count 0)."""
+    tarantula_id: str
+    name: str
+    sex: Optional[str] = None
+    count: int
+    last_date: Optional[date] = None  # keeper's local day (tz_offset_minutes), else UTC
+    last_molted_at: Optional[datetime] = None  # the instant, timezone-aware UTC
 
 
 class CollectionAnalytics(BaseModel):
@@ -44,6 +79,21 @@ class CollectionAnalytics(BaseModel):
 
     # Recent activity
     recent_activity: List[ActivityItem]
+
+    # "Right now" (analytics redesign). Always sent by the server; the defaults
+    # keep older callers valid and let clients ship before the API does.
+    # Due/overdue use the Feeding Day rule (services/feeding_status).
+    feeding_due_today: int = 0  # due today or overdue
+    feeding_overdue: int = 0  # strict subset: past their cadence
+    longest_gap: Optional[LongestGap] = None
+    # The due animal that has waited longest (Due tile caption); None when none due.
+    first_due: Optional[LongestGap] = None
+    last_molt: Optional[LastMolt] = None
+    priced_count: int = 0  # animals with a price_paid on file
+    molts_per_animal: List[MoltRow] = Field(default_factory=list)  # top 10; /analytics/molts has all
+    # Aliases kept beside the originals for one release.
+    total_animals: int = 0  # = total_tarantulas
+    average_months_in_collection: float = 0.0  # = average_age_months
 
     class Config:
         from_attributes = True

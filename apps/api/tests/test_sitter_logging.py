@@ -445,7 +445,8 @@ class TestHvAnimalFeeding:
 
     def test_accepted_feeding_moves_last_fed_forward(self):
         self.call(True)
-        assert self.animal.last_fed_at > NOW - timedelta(minutes=1)
+        # `now` is taken at test time: the module-level NOW goes stale in a long run.
+        assert self.animal.last_fed_at > datetime.now(timezone.utc) - timedelta(minutes=1)
 
 
 # ── T8: undo — own entries only, within an hour ──────────────────────────────
@@ -458,7 +459,9 @@ class TestUndo:
 
     def test_own_recent_entry_is_removed(self):
         p = make_pass()
-        f = FeedingLog(id=uuid.uuid4(), logged_via_pass_id=p.id, created_at=NOW - timedelta(minutes=59))
+        # The undo window is measured against the real clock, so build "recent" from it now.
+        now = datetime.now(timezone.utc)
+        f = FeedingLog(id=uuid.uuid4(), logged_via_pass_id=p.id, created_at=now - timedelta(minutes=59))
         assert self.call(p, f).deleted == [f]
 
     def test_undo_puts_days_since_fed_back(self):
@@ -466,10 +469,11 @@ class TestUndo:
         it must not leave the badge claiming a meal that didn't happen."""
         from app.models.animal import Animal
         p = make_pass(app="herpetoverse")
-        before = NOW - timedelta(days=9)
-        animal = NS(id=uuid.uuid4(), last_fed_at=NOW)
+        now = datetime.now(timezone.utc)
+        before = now - timedelta(days=9)
+        animal = NS(id=uuid.uuid4(), last_fed_at=now)
         f = FeedingLog(id=uuid.uuid4(), animal_id=animal.id, logged_via_pass_id=p.id,
-                       fed_at=NOW, created_at=NOW - timedelta(minutes=5))
+                       fed_at=now, created_at=now - timedelta(minutes=5))
         db = DB({FeedingLog: Q(f), Animal: Q(animal)})
         orig = db.query
         db.query = lambda m, *a: Q(scalar=before) if not hasattr(m, "class_") and m is not Animal and m is not FeedingLog else orig(m)
@@ -478,7 +482,8 @@ class TestUndo:
 
     def test_after_an_hour_only_the_keeper_can_change_it(self):
         p = make_pass()
-        f = FeedingLog(id=uuid.uuid4(), logged_via_pass_id=p.id, created_at=NOW - timedelta(minutes=61))
+        now = datetime.now(timezone.utc)
+        f = FeedingLog(id=uuid.uuid4(), logged_via_pass_id=p.id, created_at=now - timedelta(minutes=61))
         with pytest.raises(HTTPException) as e:
             self.call(p, f)
         assert e.value.status_code == 409

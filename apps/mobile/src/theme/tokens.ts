@@ -43,6 +43,29 @@ export const TYPE = {
   bodyStrong: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   label:      { fontSize: 13, fontWeight: '500', lineHeight: 18 },
   caption:    { fontSize: 12, fontWeight: '500', lineHeight: 16 },
+
+  // Finer steps used by the analytics redesign (design_handoff_analytics
+  // README §3/§6) and the sign-in notices. Same numbers the screens used
+  // before, now named. Weights are explicit (400 = RN's default).
+  micro:          { fontSize: 11, fontWeight: '400', lineHeight: 15 },
+  microStrong:    { fontSize: 11, fontWeight: '600', lineHeight: 15 },
+  microBold:      { fontSize: 11, fontWeight: '700', lineHeight: 15 },
+  note:           { fontSize: 12, fontWeight: '400', lineHeight: 16 },
+  noteStrong:     { fontSize: 12, fontWeight: '600', lineHeight: 16 },
+  small:          { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  smallStrong:    { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  smallBold:      { fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  bodyBold:       { fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  cardTitle:      { fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  subheadingBold: { fontSize: 16, fontWeight: '700', lineHeight: 22 },
+  tileValue:      { fontSize: 22, fontWeight: '700', lineHeight: 28 },
+  figure:         { fontSize: 24, fontWeight: '700', lineHeight: 30 },
+  // Premium unlock card (README §3): 14/700 title over 12.5/400 body.
+  panelTitle:     { fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  panelBody:      { fontSize: 12.5, fontWeight: '400', lineHeight: 17 },
+  // Letter-spaced section labels ("INSIGHTS", "PREMIUM · PREVIEW OF YOUR DATA").
+  eyebrow:        { fontSize: 12, fontWeight: '600', lineHeight: 16, letterSpacing: 1.2 },
+  eyebrowSmall:   { fontSize: 11, fontWeight: '600', lineHeight: 15, letterSpacing: 1.2 },
 } as const satisfies Record<string, TextStyle>;
 
 export type TypeKey = keyof typeof TYPE;

@@ -1,7 +1,7 @@
 """
 Analytics routes for collection-wide statistics and insights
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from decimal import Decimal, ROUND_HALF_UP
@@ -25,12 +25,115 @@ from app.schemas.analytics import (
     SpeciesDistEntry,
     FeedingCostUpdate,
     FeedingCostResponse,
+    LongestGap,
+    LastMolt,
+    MoltRow,
 )
+from app.services.feeding_status import compute_feeding_status
 from app.utils.dependencies import get_current_user
 from app.utils.access import policy
 from app.utils.limits import active_inverts_query
 
 router = APIRouter()
+
+
+# ── Shared by /collection and /molts ────────────────────────────────────────
+
+def _display_name(t) -> str:
+    return t.name or t.common_name or t.scientific_name or "Unnamed"
+
+
+def _sex_value(sex) -> Optional[str]:
+    """'male' | 'female' | 'unknown' (the enum's lowercase value), or None."""
+    if sex is None:
+        return None
+    return str(getattr(sex, "value", sex)).lower()
+
+
+def _as_utc(moment: datetime) -> datetime:
+    """A stored timestamp as a timezone-aware UTC instant (naive values are UTC)."""
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _local_date(moment: datetime, tz_offset_minutes: Optional[int] = None) -> date:
+    """The keeper's calendar day for a stored timestamp.
+
+    `tz_offset_minutes` follows the JS getTimezoneOffset() convention used by
+    /inverts/feeding-status (`_calendar_day_diff`): positive WEST of UTC
+    (EDT = 240, AEST = -600), so local time = UTC - offset. None = UTC.
+    """
+    utc = _as_utc(moment)
+    if tz_offset_minutes is None:
+        return utc.date()
+    return (utc - timedelta(minutes=tz_offset_minutes)).date()
+
+
+def _molt_summary(db: Session, animal_ids: list) -> Dict[Any, tuple]:
+    """{invert_id: (molt count, first molted_at, last molted_at)} for animals
+    with at least one molt. ONE grouped query however many animals there are."""
+    if not animal_ids:
+        return {}
+    rows = (
+        db.query(
+            MoltLog.invert_id,
+            func.count(MoltLog.id),
+            func.min(MoltLog.molted_at),
+            func.max(MoltLog.molted_at),
+        )
+        .filter(MoltLog.invert_id.in_(animal_ids))
+        .group_by(MoltLog.invert_id)
+        .all()
+    )
+    return {r[0]: (r[1], r[2], r[3]) for r in rows}
+
+
+def _molt_rows(
+    animals: list,
+    summary: Dict[Any, tuple],
+    tz_offset_minutes: Optional[int] = None,
+) -> List[MoltRow]:
+    """Every animal (zero-molt ones too) as a MoltRow: most molts first, then
+    the most recent molt (by the keeper's local day), then name."""
+    rows = []
+    for a in animals:
+        count, _first, last = summary.get(a.id, (0, None, None))
+        rows.append(MoltRow(
+            tarantula_id=str(a.id),
+            name=_display_name(a),
+            sex=_sex_value(a.sex),
+            count=count,
+            last_date=_local_date(last, tz_offset_minutes) if last else None,
+            last_molted_at=_as_utc(last) if last else None,
+        ))
+    rows.sort(key=lambda r: (
+        -r.count,
+        r.last_date is None,
+        -r.last_date.toordinal() if r.last_date else 0,
+        r.name.lower(),
+        r.tarantula_id,
+    ))
+    return rows
+
+
+@router.get("/molts", response_model=List[MoltRow])
+@policy("owner_only")
+async def get_molts_list(
+    tz_offset_minutes: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Every active animal with its molt count and last molt date (the Molts
+    card's "All n" screen). Animals with no molts are included with count 0.
+    Same ordering and names as `molts_per_animal` on /collection, uncapped.
+    `tz_offset_minutes` (JS getTimezoneOffset sign, as on feeding-status) makes
+    `last_date` the keeper's local day; `last_molted_at` is the UTC instant."""
+    animals = active_inverts_query(db, current_user.id).all()
+    return _molt_rows(animals, _molt_summary(db, [a.id for a in animals]), tz_offset_minutes)
 
 
 @router.get("/breeding")
@@ -156,6 +259,9 @@ async def breeding_analytics(
 @router.get("/collection", response_model=CollectionAnalytics)
 @policy("owner_only")
 async def get_collection_analytics(
+    # Query param (same meaning as /inverts/feeding-status). A plain default,
+    # not Query(None), so callers that invoke the handler directly still work.
+    tz_offset_minutes: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -319,6 +425,10 @@ async def get_collection_analytics(
     tarantula_map = {t.id: t for t in tarantulas}
 
     recent_activity = []
+    # The instant behind each item, so same-day items sort newest-first by time
+    # of day (dates alone are the keeper's local day). A substrate change only
+    # has a date, so it sorts after anything logged with a time on that day.
+    logged_at: Dict[int, datetime] = {}
 
     # Get recent feedings
     recent_feedings = db.query(FeedingLog).filter(
@@ -330,11 +440,12 @@ async def get_collection_analytics(
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="feeding",
-                date=feeding.fed_at.date() if feeding.fed_at else date.today(),
+                date=_local_date(feeding.fed_at, tz_offset_minutes) if feeding.fed_at else date.today(),
                 tarantula_id=str(tarantula.id),
                 tarantula_name=get_display_name(tarantula),
                 description=f"Fed {feeding.food_type or 'prey'}" + (" (refused)" if not feeding.accepted else "")
             ))
+            logged_at[id(recent_activity[-1])] = _as_utc(feeding.fed_at) if feeding.fed_at else _EPOCH
 
     # Get recent molts
     recent_molts = db.query(MoltLog).filter(
@@ -355,11 +466,12 @@ async def get_collection_analytics(
 
             recent_activity.append(ActivityItem(
                 type="molt",
-                date=molt.molted_at.date() if molt.molted_at else date.today(),
+                date=_local_date(molt.molted_at, tz_offset_minutes) if molt.molted_at else date.today(),
                 tarantula_id=str(tarantula.id),
                 tarantula_name=get_display_name(tarantula),
                 description=description
             ))
+            logged_at[id(recent_activity[-1])] = _as_utc(molt.molted_at) if molt.molted_at else _EPOCH
 
     # Get recent substrate changes
     recent_substrate = db.query(SubstrateChange).filter(
@@ -378,9 +490,71 @@ async def get_collection_analytics(
             ))
     
     # Sort all activity by date and limit to 10 most recent
-    recent_activity.sort(key=lambda x: x.date, reverse=True)
+    recent_activity.sort(key=lambda x: (x.date, logged_at.get(id(x), _EPOCH)), reverse=True)
     recent_activity = recent_activity[:10]
-    
+
+    # ── "Right now" fields (analytics redesign) ──
+    # Due/overdue come from the Feeding Day rule itself, never a copy of it.
+    status_items = compute_feeding_status(db, tarantulas, tz_offset_minutes)
+    feeding_due_today = sum(1 for s in status_items if s.is_overdue)
+    feeding_overdue = sum(1 for s in status_items if s.is_overdue and s.days_since_last_feeding > s.interval_days)
+
+    # Longest gap: only animals Feeding Day could flag (a cadence, fed at least
+    # once, not paused). Ties go to the name that sorts first.
+    gap_candidates = [
+        s for s in status_items
+        if s.interval_days is not None and not s.is_feeding_paused and s.days_since_last_feeding is not None
+    ]
+    # First due: the due animal that has waited longest (names the Due tile's
+    # caption). Same shape as longest_gap; same tie rule.
+    due_candidates = [
+        s for s in status_items
+        if s.is_overdue and s.days_since_last_feeding is not None
+    ]
+    first_due = None
+    if due_candidates:
+        due = min(due_candidates, key=lambda s: (-s.days_since_last_feeding, _display_name(s).lower(), str(s.id)))
+        first_due = LongestGap(
+            tarantula_id=str(due.id),
+            name=_display_name(due),
+            sex=_sex_value(tarantula_map[due.id].sex),
+            days=due.days_since_last_feeding,
+            usual_interval_days=due.interval_days,
+        )
+
+    longest_gap = None
+    if gap_candidates:
+        gap = min(gap_candidates, key=lambda s: (-s.days_since_last_feeding, _display_name(s).lower(), str(s.id)))
+        longest_gap = LongestGap(
+            tarantula_id=str(gap.id),
+            name=_display_name(gap),
+            sex=_sex_value(tarantula_map[gap.id].sex),
+            days=gap.days_since_last_feeding,
+            usual_interval_days=gap.interval_days,
+        )
+
+    # Molts: one grouped query serves the last molt and the per-animal rows.
+    molt_summary = _molt_summary(db, tarantula_ids)
+    last_molt = None
+    if molt_summary:
+        newest_id = max(molt_summary, key=lambda i: (molt_summary[i][2], str(i)))
+        count, first_at, last_at = molt_summary[newest_id]
+        owner = tarantula_map[newest_id]
+        last_molt = LastMolt(
+            tarantula_id=str(owner.id),
+            name=_display_name(owner),
+            sex=_sex_value(owner.sex),
+            date=_local_date(last_at, tz_offset_minutes),
+            molted_at=_as_utc(last_at),
+            molt_number=count,
+            # Mean gap between consecutive molts = (last - first) / (n - 1).
+            avg_interval_days=(
+                int((last_at - first_at).total_seconds() / 86400 / (count - 1) + 0.5) if count >= 2 else None
+            ),
+        )
+    molts_per_animal = _molt_rows(tarantulas, molt_summary, tz_offset_minutes)[:10]
+    priced_count = sum(1 for t in tarantulas if t.price_paid is not None)
+
     return CollectionAnalytics(
         total_tarantulas=total_count,
         unique_species=unique_species,
@@ -395,7 +569,16 @@ async def get_collection_analytics(
         most_active_molter=most_active_molter,
         newest_acquisition=newest_acquisition,
         oldest_acquisition=oldest_acquisition,
-        recent_activity=recent_activity
+        recent_activity=recent_activity,
+        feeding_due_today=feeding_due_today,
+        feeding_overdue=feeding_overdue,
+        longest_gap=longest_gap,
+        first_due=first_due,
+        last_molt=last_molt,
+        priced_count=priced_count,
+        molts_per_animal=molts_per_animal,
+        total_animals=total_count,
+        average_months_in_collection=round(average_age_months, 1),
     )
 
 

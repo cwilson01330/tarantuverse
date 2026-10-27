@@ -65,7 +65,7 @@ async function sessionKey(): Promise<string> {
 export const TARGET_ROUTES: Record<WhatsNewTarget, string | null> = {
   expenses: '/dashboard/expenses',
   feeding_day: '/dashboard/feeding-day',
-  analytics_advanced: '/dashboard/analytics/advanced',
+  analytics_advanced: '/dashboard/analytics#premium',
   collection: '/dashboard/tarantulas',
   species: '/species',
   settings: '/dashboard/settings',

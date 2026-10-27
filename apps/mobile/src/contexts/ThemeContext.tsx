@@ -294,7 +294,7 @@ const createLightColors = (userColors: UserColors): ThemeColors => ({
 
   textPrimary: '#0f172a',
   textSecondary: '#475569',
-  textTertiary: '#94a3b8',
+  textTertiary: '#5f6f86', // AA on white / background / surfaceElevated (4.7-5.1:1); was #94a3b8 (2.6:1)
 
   primary: userColors.primary,
   primaryLight: lightenColor(userColors.primary, 0.2),

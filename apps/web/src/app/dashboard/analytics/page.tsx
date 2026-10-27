@@ -1,184 +1,210 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { AlertTriangle, LineChart, Ruler } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
+import UpgradeModal from "@/components/UpgradeModal";
+import { useUnits } from "@/components/UnitsProvider";
+import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import apiClient from "@/lib/api";
+import { UPGRADE_EVENTS, trackUpgrade } from "@/lib/upgrade-tracking";
+import {
+  SEMANTIC_COLORS,
+  headerSubtitle,
+  relativeLong,
+  type AdvancedAnalytics,
+  type CollectionAnalytics,
+} from "@/lib/analyticsView";
+import { CARD, OUTLINE_BTN, PRIMARY_BTN, TERTIARY } from "@/components/analytics/AnalyticsParts";
+import AnalyticsSkeleton from "@/components/analytics/AnalyticsSkeleton";
+import CollectionCard from "@/components/analytics/CollectionCard";
+import FeedingCard from "@/components/analytics/FeedingCard";
+import MoltsCard from "@/components/analytics/MoltsCard";
+import PremiumSection, { type PremiumState } from "@/components/analytics/PremiumSection";
+import RecentCard from "@/components/analytics/RecentCard";
+import RightNow from "@/components/analytics/RightNow";
 
-interface SpeciesCount {
-  species_name: string;
-  count: number;
+type LoadStatus = "loading" | "ready" | "error";
+type AdvancedSlot =
+  | { status: "idle" | "loading" | "gated" | "error" }
+  | { status: "ready"; data: AdvancedAnalytics };
+
+const tzParams = () => ({ tz_offset_minutes: new Date().getTimezoneOffset() });
+
+function ErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section className={`${CARD} flex flex-col items-center gap-2 px-6 py-10 text-center`}>
+      <AlertTriangle size={34} style={{ color: SEMANTIC_COLORS.warning }} aria-hidden />
+      <h2 className="text-base font-bold text-theme-primary">We couldn&apos;t load your analytics</h2>
+      <p className="max-w-xs text-[13px] text-theme-secondary">
+        Your records are fine. This is a connection problem.
+      </p>
+      <button type="button" onClick={onRetry} className={`${OUTLINE_BTN} mt-2`}>
+        Try again
+      </button>
+    </section>
+  );
 }
 
-interface ActivityItem {
-  type: string;
-  date: string;
-  tarantula_id: string;
-  tarantula_name: string;
-  description: string;
-}
-
-interface CollectionAnalytics {
-  total_tarantulas: number;
-  unique_species: number;
-  sex_distribution: {
-    male: number;
-    female: number;
-    unknown: number;
-  };
-  species_counts: SpeciesCount[];
-  total_value: number;
-  average_age_months: number;
-  total_feedings: number;
-  total_molts: number;
-  total_substrate_changes: number;
-  average_days_between_feedings: number;
-  most_active_molter: {
-    tarantula_id: string;
-    name: string;
-    molt_count: number;
-  } | null;
-  newest_acquisition: {
-    tarantula_id: string;
-    name: string;
-    date: string;
-  } | null;
-  oldest_acquisition: {
-    tarantula_id: string;
-    name: string;
-    date: string;
-  } | null;
-  recent_activity: ActivityItem[];
+function EmptyCard() {
+  return (
+    <section className={`${CARD} flex flex-col items-center gap-2 px-6 py-10 text-center`}>
+      <LineChart size={30} className="text-primary" aria-hidden />
+      <h2 className="max-w-md text-base font-bold text-theme-primary">
+        Add your first animal and this page starts filling in.
+      </h2>
+      <p className="max-w-md text-[13px] text-theme-secondary">
+        Every feeding and molt you log turns into something here: who&apos;s due, how often each animal eats, how long
+        between molts.
+      </p>
+      {/* The collection page carries the add menu for every taxon. */}
+      <Link href="/dashboard/tarantulas?add=1" className={`${PRIMARY_BTN} mt-2`}>
+        Add to collection
+      </Link>
+    </section>
+  );
 }
 
 export default function AnalyticsPage() {
-  const router = useRouter();
-  const { user } = useAuth();
-  const [analytics, setAnalytics] = useState<CollectionAnalytics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
+  const { units } = useUnits();
+  const { isPremium, limits } = useSubscription();
 
-  const fetchAnalytics = useCallback(async () => {
+  const [collection, setCollection] = useState<CollectionAnalytics | null>(null);
+  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
+  const [advanced, setAdvanced] = useState<AdvancedSlot>({ status: "idle" });
+  const [now, setNow] = useState(() => new Date());
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  // ── /analytics/collection: every keeper, one call ──
+  const loadCollection = useCallback(async () => {
+    setStatus("loading");
     try {
-      setLoading(true);
-      const response = await apiClient.get("/api/v1/analytics/collection");
-      setAnalytics(response.data);
-      setError(null);
-    } catch (err: any) {
+      const response = await apiClient.get<CollectionAnalytics>("/api/v1/analytics/collection", {
+        params: tzParams(),
+      });
+      const at = new Date();
+      setCollection(response.data);
+      setFetchedAt(at);
+      setNow(at);
+      setStatus("ready");
+    } catch (err) {
       console.error("Failed to fetch analytics:", err);
-      setError(err.response?.data?.detail || "Failed to load analytics");
-      if (err.response?.status === 401) {
-        router.push("/login");
-      }
-    } finally {
-      setLoading(false);
+      setStatus("error");
     }
-  }, [router]);
+  }, []);
+
+  // ── /analytics/advanced/: Premium keepers only. A 402 means "not Premium after all" -> the preview. ──
+  const loadAdvanced = useCallback(async () => {
+    setAdvanced({ status: "loading" });
+    try {
+      const response = await apiClient.get<AdvancedAnalytics>("/api/v1/analytics/advanced/");
+      setAdvanced({ status: "ready", data: response.data });
+    } catch (err: any) {
+      if (err?.response?.status === 402) {
+        setAdvanced({ status: "gated" });
+      } else {
+        console.error("Failed to fetch advanced analytics:", err);
+        setAdvanced({ status: "error" });
+      }
+    }
+  }, []);
+
+  // Change on the feeding cost: save, then refetch /advanced/ only (README §8).
+  // Errors reach the Money card, which shows its own message.
+  const saveFeedingCost = useCallback(async (value: number | null) => {
+    await apiClient.put("/api/v1/analytics/feeding-cost/", { cost_per_feeding: value });
+    const response = await apiClient.get<AdvancedAnalytics>("/api/v1/analytics/advanced/");
+    setAdvanced({ status: "ready", data: response.data });
+  }, []);
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
+    void loadCollection();
+  }, [loadCollection]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "feeding":
-        return "🍴";
-      case "molt":
-        return "🦋";
-      case "substrate_change":
-        return "🏠";
-      default:
-        return "📝";
+  // Premium is known once the session and the plan have both answered; until
+  // then the Premium slot is a skeleton, so a member never sees the preview flash.
+  // `subLoading` is left out on purpose: useSubscription refetches whenever the
+  // session token renews and keeps `limits` while it does, so waiting on it would
+  // flash the skeleton and unmount an open feeding-cost editor.
+  const planKnown = !authLoading && limits !== null;
+  // /advanced/ is fetched once per signed-in user, not once per token object.
+  const userId = user?.id ?? "";
+  const advancedFetchedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (planKnown && isPremium && advancedFetchedFor.current !== userId) {
+      advancedFetchedFor.current = userId;
+      void loadAdvanced();
     }
-  };
+  }, [planKnown, isPremium, userId, loadAdvanced]);
 
-  if (loading) {
-    return (
-      <DashboardLayout
-        userName={user?.name ?? undefined}
-        userEmail={user?.email ?? undefined}
-        userAvatar={user?.image ?? undefined}
-      >
-        <div className="container mx-auto p-6">
-          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                <CardHeader>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </DashboardLayout>
-    );
+  // "updated just now" / "3 minutes ago" follows the clock.
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const ready = status === "ready" && collection !== null;
+  const animals = ready ? collection.total_animals || collection.total_tarantulas : 0;
+  const noAnimals = ready && animals === 0;
+
+  // What the Premium slot shows.
+  let premium: PremiumState | null = null;
+  if (ready) {
+    const showPreview = (): PremiumState =>
+      noAnimals
+        ? { kind: "sample" }
+        : { kind: "preview", collection, onSeePremium: () => handleSeePremium() };
+    if (!planKnown) premium = { kind: "loading" };
+    else if (!isPremium) premium = showPreview();
+    else if (advanced.status === "ready") {
+      premium = { kind: "member", advanced: advanced.data, onSaveCost: saveFeedingCost };
+    } else if (advanced.status === "gated") premium = showPreview();
+    else if (advanced.status === "error") premium = { kind: "error", onRetry: () => void loadAdvanced() };
+    else premium = { kind: "loading" };
   }
 
-  if (error || !analytics) {
-    return (
-      <DashboardLayout
-        userName={user?.name ?? undefined}
-        userEmail={user?.email ?? undefined}
-        userAvatar={user?.image ?? undefined}
-      >
-        <div className="container mx-auto p-6">
-          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
-          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-            <CardContent className="p-6">
-              <p className="text-red-600 dark:text-red-400">{error || "No data available"}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
+  // upgrade_prompt_shown once per page view, when the preview is on screen.
+  const shownTracked = useRef(false);
+  const previewVisible = premium?.kind === "preview";
+  useEffect(() => {
+    if (previewVisible && !shownTracked.current) {
+      shownTracked.current = true;
+      trackUpgrade(UPGRADE_EVENTS.shown, "advanced_analytics", { surface: "analytics_preview" });
+    }
+  }, [previewVisible]);
+
+  function handleSeePremium() {
+    trackUpgrade(UPGRADE_EVENTS.clicked, "advanced_analytics", { surface: "analytics_preview" });
+    setUpgradeOpen(true);
   }
 
-  if (analytics.total_tarantulas === 0) {
-    return (
-      <DashboardLayout
-        userName={user?.name ?? undefined}
-        userEmail={user?.email ?? undefined}
-        userAvatar={user?.image ?? undefined}
-      >
-        <div className="container mx-auto p-6">
-          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
-          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-            <CardContent className="p-6 text-center">
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                No animals in your collection yet.
-              </p>
-              {/* The collection page carries the add menu for every taxon;
-                  the old target was the tarantula-only form. */}
-              <button
-                onClick={() => router.push("/dashboard/tarantulas?add=1")}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Add your first animal
-              </button>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // /dashboard/analytics#premium (the old Advanced page redirects here): the
+  // section only exists once the data has loaded, so scroll to it then.
+  const scrolledToPremium = useRef(false);
+  useEffect(() => {
+    if (premium && !scrolledToPremium.current && window.location.hash === "#premium") {
+      scrolledToPremium.current = true;
+      document.getElementById("premium")?.scrollIntoView({ block: "start" });
+    }
+  }, [premium]);
 
-  const totalSexed = analytics.sex_distribution.male + analytics.sex_distribution.female;
-  const malePercent = totalSexed > 0 ? (analytics.sex_distribution.male / totalSexed * 100).toFixed(1) : 0;
-  const femalePercent = totalSexed > 0 ? (analytics.sex_distribution.female / totalSexed * 100).toFixed(1) : 0;
+  // ── header ──
+  let subtitle: ReactNode;
+  if (status === "loading") {
+    subtitle = <span className="mt-1 block h-3 w-40 rounded bg-surface-elevated" aria-label="Loading" />;
+  } else if (!ready) {
+    subtitle = "—";
+  } else {
+    // Zero animals: just "No animals yet" (README), no "updated" tail.
+    subtitle =
+      fetchedAt && !noAnimals
+        ? `${headerSubtitle(collection)} · updated ${relativeLong(fetchedAt.toISOString(), now)}`
+        : headerSubtitle(collection);
+  }
 
   return (
     <DashboardLayout
@@ -186,253 +212,57 @@ export default function AnalyticsPage() {
       userEmail={user?.email ?? undefined}
       userAvatar={user?.image ?? undefined}
     >
-      <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-2 transition-colors"
-          >
-            ← Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">📊 Collection Analytics</h1>
-        </div>
-        <button
-          onClick={() => router.push('/dashboard/analytics/advanced')}
-          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-medium flex items-center gap-2"
-        >
-          ✨ Advanced Analytics
-        </button>
-      </div>
-
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
-              Total Animals
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.total_tarantulas}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {analytics.unique_species} unique species
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
-              Collection Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">${analytics.total_value.toFixed(2)}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Avg: ${(analytics.total_value / analytics.total_tarantulas).toFixed(2)} each
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
-              Average Age
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.average_age_months}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">months in collection</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
-              Total Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              {analytics.total_feedings + analytics.total_molts + analytics.total_substrate_changes}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {analytics.total_feedings} feedings, {analytics.total_molts} molts
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sex Distribution and Notable Animals */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Sex Distribution */}
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-white">Sex Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Male Bar */}
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">♂️ Male</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{analytics.sex_distribution.male} ({malePercent}%)</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                  <div
-                    className="bg-blue-500 h-3 rounded-full transition-all"
-                    style={{ width: `${malePercent}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Female Bar */}
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">♀️ Female</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{analytics.sex_distribution.female} ({femalePercent}%)</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                  <div
-                    className="bg-pink-500 h-3 rounded-full transition-all"
-                    style={{ width: `${femalePercent}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Unknown */}
-              <div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">❓ Unknown</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{analytics.sex_distribution.unknown}</span>
-                </div>
+      <div className="container mx-auto px-6 pb-10">
+        {/* Sticky title: stays under the top bar while the page scrolls. */}
+        <div className="sticky top-16 z-20 -mx-6 mb-5 bg-gray-50/95 px-6 py-4 backdrop-blur dark:bg-gray-950/95">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+            <div>
+              <h1 className="text-[26px] font-bold leading-8 text-theme-primary">Analytics</h1>
+              <div className={`text-[13px] ${TERTIARY}`} aria-live="polite">
+                {subtitle}
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Notable Animals */}
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-white">Notable Animals</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {analytics.most_active_molter && (
-              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">🦋 Most Active Molter</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">{analytics.most_active_molter.name}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{analytics.most_active_molter.molt_count} molts</p>
-              </div>
-            )}
-
-            {analytics.newest_acquisition && (
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">🆕 Newest Addition</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">{analytics.newest_acquisition.name}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Added {formatDate(analytics.newest_acquisition.date)}
-                </p>
-              </div>
-            )}
-
-            {analytics.oldest_acquisition && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">👴 Oldest in Collection</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">{analytics.oldest_acquisition.name}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Since {formatDate(analytics.oldest_acquisition.date)}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Species Distribution */}
-      {analytics.species_counts.length > 0 && (
-        <Card className="mb-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-white">Species Distribution (Top 10)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {analytics.species_counts.slice(0, 10).map((species, index) => {
-                const percentage = (species.count / analytics.total_tarantulas * 100).toFixed(1);
-                return (
-                  <div key={index}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium truncate text-gray-900 dark:text-white">{species.species_name}</span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{species.count} ({percentage}%)</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-green-500 h-2 rounded-full transition-all"
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Feeding Statistics */}
-      <Card className="mb-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white">Feeding Statistics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.total_feedings}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Feedings</p>
-            </div>
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.average_days_between_feedings}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Days Between Feedings</p>
-            </div>
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {analytics.total_tarantulas > 0
-                  ? (analytics.total_feedings / analytics.total_tarantulas).toFixed(1)
-                  : 0}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Feedings Per Animal</p>
+            <div className={`flex items-center gap-2 text-xs ${TERTIARY}`}>
+              <Ruler size={15} aria-hidden />
+              {units === "metric" ? "Centimeters" : "Inches"} · grams · your currency
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Recent Activity */}
-      {analytics.recent_activity.length > 0 && (
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-white">Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {analytics.recent_activity.map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
-                  onClick={() => router.push(`/dashboard/inverts/${activity.tarantula_id}`)}
-                >
-                  <span className="text-2xl">{getActivityIcon(activity.type)}</span>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-white">{activity.tarantula_name}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{activity.description}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{formatDate(activity.date)}</p>
-                  </div>
+        <div className="flex flex-col gap-5">
+          {status === "loading" && <AnalyticsSkeleton />}
+
+          {status === "error" && <ErrorCard onRetry={() => void loadCollection()} />}
+
+          {ready && noAnimals && <EmptyCard />}
+
+          {ready && !noAnimals && (
+            <>
+              <RightNow data={collection} now={now} />
+              <div className="grid grid-cols-1 items-start gap-3.5 lg:grid-cols-2">
+                <div className="flex flex-col gap-3.5">
+                  <CollectionCard data={collection} />
+                  <RecentCard data={collection} now={now} />
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <div className="flex flex-col gap-3.5">
+                  <FeedingCard data={collection} />
+                  <MoltsCard data={collection} now={now} />
+                </div>
+              </div>
+            </>
+          )}
+
+          {premium && <PremiumSection state={premium} now={now} />}
+        </div>
       </div>
+
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        source="advanced_analytics"
+        feature="Molt timing, growth and what you spend"
+        description="Premium unlocks the detail behind these cards, worked out from your own logs."
+      />
     </DashboardLayout>
   );
 }

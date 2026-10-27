@@ -15,6 +15,8 @@ import PremoltAlertsCard from '@/components/PremoltAlertsCard'
 import WhatsNewCard from '@/components/WhatsNewCard'
 import { resetWhatsNewCache } from '@/lib/whatsNew'
 import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload, Utensils } from 'lucide-react'
+import InsightsCard from '@/components/analytics/InsightsCard'
+import type { CollectionAnalytics } from '@/lib/analyticsView'
 import type { ColonyListItem } from '@/lib/colonies'
 
 // Colony mode (ADR-010) presentation helpers for the dashboard card.
@@ -107,7 +109,8 @@ export default function DashboardHub() {
   // Real collection-level aggregate from /analytics/collection. Replaces
   // the bogus "Total Molts" derivation that was reading premolt predictions
   // (a count of in-premolt specimens, NOT a count of logged molts).
-  const [collectionStats, setCollectionStats] = useState<{ total_molts: number } | null>(null)
+  // The same response feeds the Insights card (no second request).
+  const [collectionStats, setCollectionStats] = useState<CollectionAnalytics | null>(null)
   // Cross-taxon collection total (from /inverts/); falls back to
   // tarantulas.length until it loads or if the call fails.
   const [totalAnimals, setTotalAnimals] = useState<number | null>(null)
@@ -158,7 +161,7 @@ export default function DashboardHub() {
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula&tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
-        fetch(`${API_URL}/api/v1/analytics/collection`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/analytics/collection?tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
         // Unified inverts list = the whole cross-taxon collection. Drives
         // the true "My Collection" total + free-tier gate.
         fetch(`${API_URL}/api/v1/inverts/`, { headers }).catch(() => null),
@@ -426,6 +429,9 @@ export default function DashboardHub() {
 
         {/* Premolt Alerts Card */}
         <PremoltAlertsCard />
+
+        {/* Insights — one sentence from the analytics response already fetched */}
+        <InsightsCard collection={collectionStats} />
 
         {/* Quick Stats Row */}
         <div data-tour="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
