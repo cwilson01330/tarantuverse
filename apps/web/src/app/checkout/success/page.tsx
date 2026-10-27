@@ -88,7 +88,8 @@ function CheckoutSuccessContent() {
                 <li>Unlimited animals</li>
                 <li>Unlimited photos</li>
                 <li>Full breeding module</li>
-                <li>Advanced analytics</li>
+                <li>Molt history, collection growth &amp; spending charts</li>
+                <li>Expense tracking</li>
                 <li>Priority support</li>
               </ul>
             </div>

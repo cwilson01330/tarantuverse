@@ -107,8 +107,15 @@ export default function UpgradeModal({ isOpen, onClose, source, feature, descrip
             </li>
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>
-              <span>Advanced analytics</span>
+              <span>Molt history, collection growth &amp; spending charts</span>
             </li>
+            {/* The expenses prompt already leads with its own perk line. */}
+            {source === 'expenses' ? null : (
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-0.5">✓</span>
+                <span>Expense tracking</span>
+              </li>
+            )}
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>
               <span>Priority support</span>

@@ -109,7 +109,9 @@ export default function UpgradeModal({
     'Full breeding module (pairings, egg sacs, offspring)',
     'Co-keepers — share your collection with up to 10 people',
     'Sitter logging + unlimited sitter links',
-    'Advanced analytics & insights',
+    'Molt history, collection growth & spending charts',
+    // The expenses prompt already leads with its own perk line.
+    ...(source === 'expenses' ? [] : ['Expense tracking']),
     // No "Data export" here: export is free and stays free. This list used
     // to sell it as premium — at the exact moment a keeper was deciding.
     'Priority support',

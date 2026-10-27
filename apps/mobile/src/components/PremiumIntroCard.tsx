@@ -57,7 +57,8 @@ const FREE = [
 const PREMIUM = [
   'Unlimited animals and photos',
   'Breeding: pairings, egg sacs, offspring',
-  'Advanced analytics',
+  'Molt history, collection growth & spending charts',
+  'Expense tracking',
   'Co-keepers and sitter logging',
 ];
 
