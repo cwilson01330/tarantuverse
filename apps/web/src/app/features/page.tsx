@@ -95,7 +95,7 @@ export default function FeaturesPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Reminders for upcoming feedings</span>
+                <span>A daily digest of who&apos;s due to eat</span>
               </li>
             </ul>
           </div>
@@ -136,24 +136,24 @@ export default function FeaturesPage() {
             </div>
             <h2 className="text-3xl font-bold mb-4">Analytics Dashboard</h2>
             <p className="text-gray-600 mb-6">
-              Get insights into your collection with comprehensive analytics and reports.
+              One page that starts with what needs your attention, then the bigger picture.
             </p>
             <ul className="space-y-3 text-gray-600">
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Species diversity breakdown</span>
+                <span>Right now: who&apos;s due to eat, the last molt, the longest gap since a meal</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Activity tracking and patterns</span>
+                <span>Feeding summary, molts per animal and recent activity</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Collection statistics and trends</span>
+                <span>Collection breakdown by species, sex and group</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Notable achievements and milestones</span>
+                <span>Premium: molt history, collection growth and spending</span>
               </li>
             </ul>
           </div>
@@ -174,7 +174,7 @@ export default function FeaturesPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Automatic thumbnail generation</span>
+                <span>Timeline grouped by molt, with first-and-latest compare</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>

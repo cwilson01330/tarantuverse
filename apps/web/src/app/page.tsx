@@ -208,7 +208,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-300">
                     <span className="w-2 h-2 rounded-full bg-neon-pink-400 flex-shrink-0"></span>
-                    <span><strong>ArachnoBreeder</strong> listed 12 P. metallica slings</span>
+                    <span><strong>ArachnoBreeder</strong> logged a P. metallica pairing</span>
                   </div>
                 </div>
               </div>
@@ -242,8 +242,8 @@ export default function Home() {
               <div className="text-xs md:text-sm text-gray-400 mt-1">To Start, Forever</div>
             </div>
             <div>
-              <div className="text-2xl md:text-3xl font-bold text-amber-400">11</div>
-              <div className="text-xs md:text-sm text-gray-400 mt-1">Feeder Colony Species</div>
+              <div className="text-2xl md:text-3xl font-bold text-amber-400">10</div>
+              <div className="text-xs md:text-sm text-gray-400 mt-1">Invertebrate Groups</div>
             </div>
           </div>
         </div>
@@ -270,7 +270,7 @@ export default function Home() {
               <span className="text-3xl">🕷️</span>
               <div>
                 <h3 className="text-lg font-bold text-gray-100">Tarantulas</h3>
-                <div className="text-xs text-electric-blue-400 font-semibold">150+ species care sheets</div>
+                <div className="text-xs text-electric-blue-400 font-semibold">200+ species care sheets</div>
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
@@ -286,7 +286,7 @@ export default function Home() {
               <span className="text-3xl">🦂</span>
               <div>
                 <h3 className="text-lg font-bold text-gray-100">Scorpions</h3>
-                <div className="text-xs text-neon-pink-400 font-semibold">35+ species care sheets</div>
+                <div className="text-xs text-neon-pink-400 font-semibold">50+ species care sheets</div>
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
@@ -302,11 +302,11 @@ export default function Home() {
               <span className="text-3xl">🐛</span>
               <div>
                 <h3 className="text-lg font-bold text-gray-100">Centipedes</h3>
-                <div className="text-xs text-green-400 font-semibold">13 species care sheets</div>
+                <div className="text-xs text-green-400 font-semibold">15 species care sheets</div>
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
-              The newest addition, from beginner-friendly mild-venom species to medically
+              From beginner-friendly mild-venom species to medically
               significant Scolopendra. Full feeding, molt, and substrate tracking, with care
               sheets that include a biology callout for these fast, fascinating predators.
             </p>
@@ -339,8 +339,9 @@ export default function Home() {
             <div className="text-3xl mb-3">🍴</div>
             <h3 className="text-lg font-bold mb-2 text-gray-100">Feeding Tracker & Predictions</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Log every feeding in seconds. Tarantuverse learns each animal's pattern and tells
-              you exactly when they're ready to eat again — and flags refusals that signal premolt.
+              Log every feeding in seconds — or walk your shelves with Feeding Day and log a whole
+              round at once. Each animal&apos;s cadence comes from its species and life stage, and
+              refusals that signal premolt get flagged.
             </p>
             <div className="mt-4 bg-dark rounded-xl p-3 space-y-2">
               <div className="flex justify-between text-xs">
@@ -362,8 +363,8 @@ export default function Home() {
             <div className="text-3xl mb-3">📈</div>
             <h3 className="text-lg font-bold mb-2 text-gray-100">Growth & Molt Analytics</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Log weight and leg span after every molt. Beautiful charts show exactly how fast
-              your slings and juveniles are developing over their entire life with you.
+              Log weight and size after every molt — in inches or centimetres, your choice. Charts
+              show how fast your slings and juveniles are growing over their whole life with you.
             </p>
             <div className="mt-4 bg-dark rounded-xl p-3">
               <div className="text-xs text-gray-400 mb-2">Leg Span Growth</div>
@@ -379,12 +380,12 @@ export default function Home() {
           </div>
 
           <div className="bg-dark-50 border-2 border-neon-pink-500/30 rounded-2xl p-6 hover:border-neon-pink-500/50 hover:shadow-lg hover:shadow-neon-pink-500/10 transition relative">
-            <div className="absolute top-4 right-4 bg-neon-pink-500/20 text-neon-pink-300 px-2 py-1 rounded-full text-xs font-bold">UNIQUE</div>
             <div className="text-3xl mb-3">🏜️</div>
-            <h3 className="text-lg font-bold mb-2 text-gray-100">Substrate & Husbandry Logs</h3>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">Substrate, Husbandry & Locations</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              The only platform with dedicated substrate change tracking. Log rehouse dates,
-              substrate type, and depth. Know exactly when each enclosure is due for maintenance.
+              Log every substrate change with type, depth and reason, and see at a glance how
+              long it&apos;s been. Give animals a room, rack or shelf so your collection and
+              Feeding Day follow the way you walk your setup.
             </p>
             <div className="mt-4 bg-dark rounded-xl p-3 text-xs space-y-1.5">
               <div className="flex justify-between text-gray-300">
@@ -394,7 +395,7 @@ export default function Home() {
                 <span>Substrate</span><span className="text-gray-100">Coco fiber 4″</span>
               </div>
               <div className="flex justify-between text-gray-300">
-                <span>Next rehouse</span><span className="text-orange-400">Overdue ⚠</span>
+                <span>Location</span><span className="text-gray-100">Rack B · Shelf 2</span>
               </div>
             </div>
           </div>
@@ -403,7 +404,7 @@ export default function Home() {
             <div className="text-3xl mb-3">📚</div>
             <h3 className="text-lg font-bold mb-2 text-gray-100">400+ Species Care Sheets</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Link any animal — across all eleven taxa — to our species database and get instant
+              Link any animal — tarantulas, scorpions, mantises, roaches and more — to our species database and get instant
               care requirements — temperature, humidity, enclosure size, feeding frequency, and
               safety warnings for Old World species and medically significant venom.
             </p>
@@ -413,17 +414,18 @@ export default function Home() {
             <div className="text-3xl mb-3">📸</div>
             <h3 className="text-lg font-bold mb-2 text-gray-100">Photo Timeline</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Build a visual record of every molt and growth stage. Cloud storage means your
-              photos survive even if your device doesn't. Upload from your phone or desktop.
+              Scroll through every photo of an animal in date order, each one labelled by molt —
+              &ldquo;After molt 3&rdquo; — and compare the first and latest side by side. Photos
+              live in the cloud, so they survive even if your phone doesn&apos;t.
             </p>
           </div>
 
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
             <div className="text-3xl mb-3">🔔</div>
-            <h3 className="text-lg font-bold mb-2 text-gray-100">Smart Reminders</h3>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">Daily Feeding Digest</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Push notifications when an animal is overdue to feed, a substrate change is needed,
-              or molt probability hits 70%. Your phone does the remembering so you don't have to.
+              One push a day, at the hour you pick, telling you how many animals are due to eat.
+              Quiet hours are respected, and you can turn it off any time.
             </p>
           </div>
         </div>
@@ -478,33 +480,33 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-neon-pink-500/10 border border-neon-pink-500/30 text-neon-pink-300 rounded-full text-xs font-semibold mb-6">
-                ✨ NEW FEATURE
+                🏷️ ENCLOSURE LABELS
               </div>
               <h2 className="text-4xl font-bold mb-6 text-gray-100">
-                Scan a QR code.<br />
-                <span className="bg-gradient-primary bg-clip-text text-transparent">Photo uploaded.</span>
+                Scan the enclosure.<br />
+                <span className="bg-gradient-primary bg-clip-text text-transparent">Log it on the spot.</span>
               </h2>
               <p className="text-lg text-gray-300 mb-8 leading-relaxed">
-                Stick a QR code on each enclosure. Scan it with any phone — no app needed —
-                and you're instantly on that animal's upload page. Take the photo, hit send.
-                Done. Every molt documented without hunting through menus.
+                Print a QR label for each enclosure. Scan it with any phone camera and you&apos;re
+                on that animal&apos;s page — signed in, you can log a feeding or molt right there,
+                without hunting through menus.
               </p>
               <ul className="space-y-3 text-gray-300">
                 <li className="flex items-start gap-3">
                   <span className="text-neon-pink-400 font-bold mt-0.5">→</span>
-                  <span>Generate unique QR codes for each animal from the web app</span>
+                  <span>Print labels in three sizes, with the fonts, colours and details you choose</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-neon-pink-400 font-bold mt-0.5">→</span>
-                  <span>Scan with any camera — opens a dedicated mobile upload page</span>
+                  <span>Scan with any camera — no app needed to open the animal&apos;s page</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-neon-pink-400 font-bold mt-0.5">→</span>
-                  <span>Choose a photo or take one directly — it syncs to your collection</span>
+                  <span>One tap to log a feeding or molt when you&apos;re signed in</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-neon-pink-400 font-bold mt-0.5">→</span>
-                  <span>Works for guests too — let someone else document a feeding</span>
+                  <span>Need photos from another phone? Open a 20-minute upload link — no login needed</span>
                 </li>
               </ul>
             </div>
@@ -562,6 +564,7 @@ export default function Home() {
             </p>
             <ul className="mt-4 space-y-1.5 text-sm text-gray-300">
               <li><span className="text-electric-blue-400 font-bold">✓</span> Free: 2 open links at a time</li>
+              <li><span className="text-electric-blue-400 font-bold">✓</span> Free: a printable care sheet for the fridge</li>
               <li><span className="text-neon-pink-400 font-bold">★</span> Premium: your sitter marks feedings with a PIN you share</li>
             </ul>
           </div>
@@ -609,9 +612,9 @@ export default function Home() {
           <span className="bg-gradient-to-r from-amber-400 to-neon-pink-400 bg-clip-text text-transparent">never run out of feeders</span>
         </h2>
         <p className="text-xl text-gray-300 mb-16 max-w-2xl">
-          Raising your own crickets, roaches, or mealworms? Tarantuverse is now the only
-          keeper app that tracks feeder colonies with life-stage inventory, care logs,
-          and low-stock alerts — so you never open an empty cricket bin on feeding night.
+          Raising your own crickets, roaches, or mealworms? Track your feeder colonies
+          right next to your animals, with life-stage inventory, care logs, and low-stock
+          alerts — so you never open an empty cricket bin on feeding night.
         </p>
 
         <div className="grid lg:grid-cols-2 gap-12 items-start">
@@ -737,14 +740,14 @@ export default function Home() {
             </div>
 
             <div className="absolute -top-4 -right-4 bg-amber-500 text-gray-900 px-4 py-2 rounded-full font-bold text-sm shadow-lg shadow-amber-500/40 transform rotate-6">
-              Industry First
+              Included Free
             </div>
           </div>
         </div>
 
         <div className="mt-12 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <p className="text-gray-300">
-            <strong className="text-amber-300">No other keeper app tracks feeders.</strong>{' '}
+            <strong className="text-amber-300">Feeders and animals in one place.</strong>{' '}
             If you breed your own, this replaces three spreadsheets and a wall calendar.
           </p>
           <Link href="/register" className="px-6 py-3 bg-amber-500 text-gray-900 rounded-xl hover:bg-amber-400 transition font-bold whitespace-nowrap">
@@ -774,8 +777,8 @@ export default function Home() {
             <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">💑</div>
             <h3 className="text-lg font-bold mb-3 text-gray-100">Pairing Logs</h3>
             <p className="text-gray-300 text-sm leading-relaxed mb-4">
-              Record every pairing attempt with date, type (natural / assisted), and outcome.
-              Link to the male and female from your collection or another keeper's.
+              Record every pairing attempt with date, type (natural / assisted), and outcome,
+              linked to the male and female in your collection.
             </p>
             <div className="bg-dark rounded-xl p-3 text-xs space-y-2">
               <div className="flex justify-between text-gray-300">
@@ -896,55 +899,78 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Also New ────────────────────────────────────────────── */}
+      {/* ── Recently added ───────────────────────────────────────
+          Only shipped features. Free vs premium must match the API gates
+          (expenses: premium to add/edit; everything else here is free). */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12">
           <div>
-            <div className="text-electric-blue-400 font-bold text-sm uppercase tracking-widest mb-2">Also new this quarter</div>
+            <div className="text-electric-blue-400 font-bold text-sm uppercase tracking-widest mb-2">Recently added</div>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-100">
               Small wins that make a big difference
             </h2>
           </div>
           <p className="text-gray-400 max-w-md text-sm">
-            Polish, security, and quality-of-life upgrades that shipped alongside the
-            headline features.
+            The newest tools in Tarantuverse. Everything here is free unless it says
+            Premium.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
-            <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🏆</div>
-            <h3 className="font-bold mb-2 text-gray-100">18 Achievements</h3>
+            <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">📊</div>
+            <h3 className="font-bold mb-2 text-gray-100">Analytics, rebuilt</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Earn badges for collection milestones, feeding streaks, molt witnesses,
-              breeding firsts, and community posts.
+              One page that starts with what needs you now: who&apos;s due to eat, the last molt, and the longest gap since a meal. Premium adds molt history, collection growth and what you&apos;ve spent.
             </p>
           </div>
-
           <div className="bg-dark-50 border border-neon-pink-500/20 rounded-2xl p-6 hover:border-neon-pink-500/40 hover:shadow-lg hover:shadow-neon-pink-500/10 transition">
-            <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🔍</div>
-            <h3 className="font-bold mb-2 text-gray-100">Global Search (⌘K)</h3>
+            <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">💸</div>
+            <h3 className="font-bold mb-2 text-gray-100">Expense tracking <span className="ml-1 align-middle px-2 py-0.5 bg-neon-pink-500/15 text-neon-pink-300 rounded-full text-[10px] font-bold uppercase tracking-wide">Premium</span></h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Press Cmd/Ctrl+K from anywhere to jump to any tarantula, species,
-              keeper, or forum thread instantly.
+              Log feeders, substrate, enclosures and vet bills, split them across animals, a rack or the whole collection, and see what each animal costs to keep.
             </p>
           </div>
-
           <div className="bg-dark-50 border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 hover:shadow-lg hover:shadow-green-500/10 transition">
-            <div className="w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🌟</div>
-            <h3 className="font-bold mb-2 text-gray-100">Discover Page</h3>
+            <div className="w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🖨️</div>
+            <h3 className="font-bold mb-2 text-gray-100">Printable care sheets</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Trending threads, active keepers, popular species, and new members —
-              your gateway into the community.
+              Pick the animals, add a note, and print a clean sheet for whoever&apos;s looking after them. The link stops working after 24 hours.
             </p>
           </div>
-
+          <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 transition">
+            <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🖼️</div>
+            <h3 className="font-bold mb-2 text-gray-100">Share cards</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Turn any animal into a tidy image card to post or send. You choose what&apos;s on it — price, notes and location never are.
+            </p>
+          </div>
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
+            <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🔁</div>
+            <h3 className="font-bold mb-2 text-gray-100">Transfers</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Selling or rehoming an animal? Send the new keeper a link and they claim it with its species, where it came from, and its photos.
+            </p>
+          </div>
+          <div className="bg-dark-50 border border-neon-pink-500/20 rounded-2xl p-6 hover:border-neon-pink-500/40 hover:shadow-lg hover:shadow-neon-pink-500/10 transition">
+            <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">📏</div>
+            <h3 className="font-bold mb-2 text-gray-100">Metric or imperial</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Show lengths and temperatures in inches and °F or centimetres and °C. Switching never changes what you&apos;ve logged.
+            </p>
+          </div>
+          <div className="bg-dark-50 border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 hover:shadow-lg hover:shadow-green-500/10 transition">
+            <div className="w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🔍</div>
+            <h3 className="font-bold mb-2 text-gray-100">Global search (⌘K)</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Press Cmd/Ctrl+K from anywhere to jump to any animal, species, keeper, or forum thread.
+            </p>
+          </div>
           <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 transition">
             <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">📦</div>
-            <h3 className="font-bold mb-2 text-gray-100">GDPR Data Export</h3>
+            <h3 className="font-bold mb-2 text-gray-100">Your data, any time</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Download everything — collection, logs, photos, forum history —
-              as JSON, CSV, or a full ZIP whenever you want.
+              Download everything — collection, logs, photos, forum history — as JSON, CSV, or a full ZIP whenever you want.
             </p>
           </div>
         </div>
@@ -1041,7 +1067,7 @@ export default function Home() {
               <div className="mb-4"><span className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">$0</span></div>
               <p className="text-gray-400 mb-6 text-sm">Perfect for casual keepers</p>
               <ul className="space-y-3 mb-6 text-sm">
-                {['Up to 15 animals', '5 photos per animal', 'Feeding & molt tracking', 'Colony population tracking', 'Sitter links (2 at a time)', 'Growth analytics', 'Web + mobile apps', 'Species care database', 'Community access'].map(f => (
+                {['Up to 15 animals', '5 photos per animal', 'Feeding & molt tracking', 'Feeder colonies', 'Colony population tracking', 'Sitter links (2 at a time) + printable care sheets', 'Analytics: who’s due, last molt, per-animal growth', 'Web + mobile apps', 'Species care database', 'Community access'].map(f => (
                   <li key={f} className="flex items-start gap-2">
                     <span className="text-electric-blue-400 font-bold">✓</span>
                     <span className="text-gray-300">{f}</span>
@@ -1065,7 +1091,7 @@ export default function Home() {
               </div>
               <p className="text-neon-pink-300 mb-6 text-sm font-semibold">Cancel anytime</p>
               <ul className="space-y-3 mb-6 text-sm">
-                {['Everything in Free, plus:', 'Unlimited animals', 'Unlimited photos', 'Co-keepers — share with up to 10 people', 'Sitter logging + unlimited sitter links', 'Breeding module (pairings, egg sacs, offspring)', 'Advanced analytics & predictions', 'Priority support'].map((f, i) => (
+                {['Everything in Free, plus:', 'Unlimited animals', 'Unlimited photos', 'Co-keepers — share with up to 10 people', 'Sitter logging + unlimited sitter links', 'Breeding module (pairings, egg sacs, offspring)', 'Expense tracking', 'Premium analytics: molt history, collection growth, spending', 'Priority support'].map((f, i) => (
                   <li key={f} className="flex items-start gap-2">
                     <span className="text-neon-pink-400 font-bold">{i === 0 ? '→' : '✓'}</span>
                     <span className={i === 0 ? 'text-gray-200 font-semibold' : 'text-gray-200'}>{f}</span>
@@ -1101,6 +1127,9 @@ export default function Home() {
               </Link>
             </div>
           </div>
+          <p className="text-center text-sm text-gray-400 mt-10">
+            Rather pay once? <Link href="/pricing?plan=lifetime" className="text-electric-blue-300 hover:text-electric-blue-200 underline underline-offset-4">Lifetime access is $149.99</Link>.
+          </p>
         </div>
       </section>
 

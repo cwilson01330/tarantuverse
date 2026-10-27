@@ -19,18 +19,30 @@
 - Individual animals, or a colony as one entry with headcounts by life stage
 
 ## What it does
-- Feeding logs, including logging a whole feeding day at once, with
-  reminders when an animal is due
+- Feeding logs, including logging a whole feeding day at once, with a daily
+  push digest of how many animals are due
 - Molt logs with leg span or body length and weight, growth charts, and
   instar or stage counts
 - Premolt prediction for tarantulas, based on feeding refusals and molt
   history
 - Substrate changes, water, husbandry settings and enclosure notes
-- Photos, and printable QR enclosure labels that open an upload page
+- Photos, with a timeline that groups them by molt and compares first and
+  latest side by side
+- Printable QR enclosure labels that open the animal's page, plus a
+  20-minute photo upload link that works from any phone without a login
+- Rooms, racks and shelves for each animal, and lengths and temperatures in
+  imperial or metric units
+- An analytics page: who is due to eat, the last molt, the longest gap since
+  a meal, molts per animal (Premium adds molt history, collection growth and
+  spending)
+- Expense tracking, split across animals, a location or the whole
+  collection (Premium)
 - Breeding: pairings, egg sacs and offspring (Premium)
 - Feeder colony inventory with low-stock alerts
-- Sitter links (a care card per animal, no account needed) and co-keepers
-  (shared collections)
+- Sitter links (a care card per animal, no account needed), printable care
+  sheets for a sitter, and co-keepers (shared collections)
+- Transfers: send a new keeper a link to claim an animal with its species,
+  origin and photos
 - Share cards for posting an animal to social media
 - Data export as JSON, CSV or a full ZIP with photos
 
@@ -48,7 +60,8 @@
   colony tracking, 2 open sitter links, data export
 - Premium: USD 4.99 per month, USD 44.99 per year, or USD 149.99 once for
   lifetime access. Adds unlimited animals and photos, the breeding module,
-  co-keeper invites (up to 10 people), sitter logging and advanced analytics.
+  co-keeper invites (up to 10 people), sitter logging, expense tracking and
+  premium analytics.
 - Premium is per app. The All-Access plan covers Tarantuverse and
   Herpetoverse together: https://herpetoverse.com/pricing
 

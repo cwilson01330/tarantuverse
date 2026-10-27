@@ -163,7 +163,7 @@ export default function PricingPage() {
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-gray-700 dark:text-gray-300">Basic analytics</span>
+                <span className="text-gray-700 dark:text-gray-300">Analytics: who&apos;s due, last molt, growth</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -247,7 +247,13 @@ export default function PricingPage() {
                 <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-gray-700 dark:text-gray-300">Advanced analytics</span>
+                <span className="text-gray-700 dark:text-gray-300">Premium analytics: molt history, collection growth, spending</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">Expense tracking</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -428,15 +434,20 @@ export default function PricingPage() {
               </tr>
               <tr className="bg-gray-50 dark:bg-gray-700/30">
                 <td className="px-6 py-4 text-gray-900 dark:text-white">Analytics</td>
-                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">Basic</td>
-                <td className="px-6 py-4 text-center text-purple-600 dark:text-purple-400 font-semibold">Advanced</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">Who&apos;s due, molts, growth</td>
+                <td className="px-6 py-4 text-center text-purple-600 dark:text-purple-400 font-semibold">+ molt history, collection growth, spending</td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-gray-900 dark:text-white">Priority support</td>
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Expense tracking</td>
                 <td className="px-6 py-4 text-center text-gray-400">-</td>
                 <td className="px-6 py-4 text-center text-green-500">✓</td>
               </tr>
               <tr className="bg-gray-50 dark:bg-gray-700/30">
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Priority support</td>
+                <td className="px-6 py-4 text-center text-gray-400">-</td>
+                <td className="px-6 py-4 text-center text-green-500">✓</td>
+              </tr>
+              <tr>
                 <td className="px-6 py-4 text-gray-900 dark:text-white">Data export (JSON/CSV/Full backup)</td>
                 <td className="px-6 py-4 text-center text-green-500">✓</td>
                 <td className="px-6 py-4 text-center text-green-500">✓</td>
