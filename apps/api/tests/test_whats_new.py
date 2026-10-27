@@ -57,28 +57,35 @@ def test_real_file_is_valid():
     assert all(isinstance(e, WhatsNewEntry) for es in feed.values() for e in es)
 
 
+TV_LAUNCH = {
+    "2026-10-23-expenses",
+    "2026-10-23-care-sheets",
+    "2026-10-23-photo-timeline",
+    "2026-10-23-feeding-cost",
+    "2026-10-23-millipede-photos",
+}
+HV_LAUNCH = {
+    "2026-10-23-expenses",
+    "2026-10-23-care-sheets",
+    "2026-10-23-photo-timeline",
+}
+
+
 def test_real_file_launch_entries():
+    """Published entries are never removed or re-flagged (keepers may have
+    seen them); later weeks only add entries."""
     feed = load_feed()
     tv = {e.id: e for e in feed["tarantuverse"]}
     hv = {e.id: e for e in feed["herpetoverse"]}
-    assert set(tv) == {
-        "2026-10-23-expenses",
-        "2026-10-23-care-sheets",
-        "2026-10-23-photo-timeline",
-        "2026-10-23-feeding-cost",
-        "2026-10-23-millipede-photos",
-    }
-    assert set(hv) == {
-        "2026-10-23-expenses",
-        "2026-10-23-care-sheets",
-        "2026-10-23-photo-timeline",
-    }
-    assert {i for i, e in tv.items() if e.premium} == {
+    assert TV_LAUNCH <= set(tv)
+    assert HV_LAUNCH <= set(hv)
+    assert {i for i in TV_LAUNCH if tv[i].premium} == {
         "2026-10-23-expenses",
         "2026-10-23-feeding-cost",
     }
-    assert {i for i, e in hv.items() if e.premium} == {"2026-10-23-expenses"}
-    assert all(e.published_on == date(2026, 10, 23) for e in [*tv.values(), *hv.values()])
+    assert {i for i in HV_LAUNCH if hv[i].premium} == {"2026-10-23-expenses"}
+    assert all(tv[i].published_on == date(2026, 10, 23) for i in TV_LAUNCH)
+    assert all(hv[i].published_on == date(2026, 10, 23) for i in HV_LAUNCH)
     # HV care-sheets body is the TV care-sheets body.
     assert hv["2026-10-23-care-sheets"].body == tv["2026-10-23-care-sheets"].body
     assert tv["2026-10-23-feeding-cost"].action_target == "analytics_advanced"

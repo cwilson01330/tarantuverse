@@ -1,6 +1,21 @@
 {
   "tarantuverse": [
     {
+      "id": "2026-10-27-analytics",
+      "published_on": "2026-10-27",
+      "title": "A new Analytics page",
+      "body": "Analytics is now one page that starts with what needs you: who's due to eat, the last molt and the longest gap since a meal. Premium keepers also get molt history, collection growth and spending.",
+      "premium": false,
+      "action": { "label": "Open Analytics", "target": "analytics_advanced" }
+    },
+    {
+      "id": "2026-10-27-feeder-species",
+      "published_on": "2026-10-27",
+      "title": "20 feeder species to choose from",
+      "body": "Link a feeder colony to one of 20 feeder species, from crickets and dubias to fruit flies, springtails and isopods, each with care notes to start from.",
+      "premium": false
+    },
+    {
       "id": "2026-10-23-expenses",
       "published_on": "2026-10-23",
       "title": "Track what your collection costs",
