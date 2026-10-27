@@ -469,7 +469,7 @@ export default function Home() {
               </div>
               <div className="flex-1 bg-dark-50 rounded px-3 py-0.5 text-xs text-gray-500 text-center">tarantuverse.com/dashboard/analytics</div>
             </div>
-            <img src="/screenshots/analytics.png" alt="Collection analytics showing sex distribution, species breakdown, and notable tarantulas" className="w-full h-auto" />
+            <img src="/screenshots/analytics.png" alt="Analytics page showing who is due to eat, the last molt, the longest feeding gap, the collection by species and sex, feeding summary and molts per animal" className="w-full h-auto" />
           </div>
         </div>
       </section>
@@ -663,10 +663,11 @@ export default function Home() {
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">📚</div>
                 <div>
-                  <h3 className="text-lg font-bold mb-2 text-gray-100">11 Feeder Species, Pre-Seeded</h3>
+                  <h3 className="text-lg font-bold mb-2 text-gray-100">20 Feeder Species, Ready to Pick</h3>
                   <p className="text-gray-300 text-sm leading-relaxed">
-                    Crickets (banded & house), dubias, red runners, discoids, superworms,
-                    mealworms, hornworms, BSFL, and isopods — all with care defaults baked in.
+                    Crickets, dubias, red runners, discoids, lobster roaches, superworms,
+                    mealworms, waxworms, silkworms, hornworms, BSFL, fruit flies, springtails
+                    and isopods — each with care notes to start from.
                   </p>
                 </div>
               </div>
