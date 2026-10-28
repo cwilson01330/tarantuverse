@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import { FIRST_FEEDING_COPY } from '@/lib/firstFeeding'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -420,6 +421,9 @@ export default function ImportCollectionPage() {
                   </button>
                 ))}
               </div>
+              {!isColony && (
+                <p className="mt-3 text-sm text-theme-secondary">{FIRST_FEEDING_COPY.importLastFedHelp}</p>
+              )}
               {isColony && (
                 <div className="mt-3 p-4 rounded-2xl border border-theme bg-surface text-sm text-theme-secondary space-y-2">
                   <p>

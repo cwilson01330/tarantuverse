@@ -1,288 +1,155 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  SafeAreaView,
-} from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { PrimaryButton } from '../src/components/PrimaryButton';
+import { FIRST_FEEDING_COPY } from '../src/lib/first-feeding';
 import { completeOnboarding } from '../src/lib/onboarding';
+import { SPACING, TYPE } from '../src/theme/tokens';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
-interface OnboardingScreen {
-  id: number;
-  title: string;
-  description: string;
-  icon: string;
-  emoji: string;
-}
+const EMOJI_SIZE = 64;
+const EMOJI_CIRCLE = 120;
 
 /**
- * Copy rewritten 2026-09-18. The original was written when this was a
- * tarantula-only app and had never actually been shown to anyone, so turning
- * the carousel on would have pitched a product we stopped shipping — four
- * screens telling a scorpion keeper they were in the wrong place.
+ * Welcome (Day-one, 2026-10-27). One screen, three ways in. It replaces the
+ * four-screen carousel, which a new keeper had to tap through before they could
+ * do anything; the goal now is "first animal in under a minute".
  *
- * Two things here are deliberate and worth keeping:
+ * The route name, the pending/completed flags and `resolveColdStartRoute` are
+ * unchanged (src/lib/onboarding.ts): a new account is still routed here once,
+ * and a force-quit before choosing resumes here on the next cold start.
  *
- *  - Screen 3 does NOT promise "smart insights". Premolt prediction can only
- *    compute an interval for a small fraction of animals, because it needs
- *    molt history the keeper hasn't logged yet. "Built from your own logs, so
- *    they sharpen the longer you keep them" is true, sets the right
- *    expectation, and points at the behaviour we actually want.
- *  - "Hundreds of species care guides" rather than a figure. The real number
- *    moves every time we seed, and a stale count in onboarding is the same
- *    mistake as the storefront's "550+".
- *
- * Icons are MaterialCommunityIcons names verified against shipping screens.
- * The originals (clipboard-list, chart-line) only ever appeared in this
- * unreachable file, so they had never rendered — an unverified MDI name shows
- * up as a blank box in production.
+ * Every button clears the pending marker first. completeOnboarding swallows
+ * storage errors, so the navigation always runs - never trap someone on this
+ * screen because AsyncStorage hiccuped.
  */
-const SCREENS: OnboardingScreen[] = [
-  {
-    id: 1,
-    title: 'Welcome to Tarantuverse',
-    description:
-      'A husbandry tracker for the whole invertebrate side of the hobby — tarantulas, scorpions, centipedes, mantises, isopods and more.',
-    icon: 'paw',
-    emoji: '🐾',
-  },
-  {
-    id: 2,
-    title: 'Log it as you go',
-    description:
-      'Feedings, molts, substrate changes and water. Track animals one by one, or a whole colony as headcounts. Already keep a spreadsheet? Import it.',
-    icon: 'silverware-fork-knife',
-    emoji: '🍽️',
-  },
-  {
-    id: 3,
-    title: 'Care sheets and your own history',
-    description:
-      'Hundreds of species care guides are built in. Premolt predictions and growth charts are built from your own logs, so they sharpen the longer you keep them.',
-    icon: 'book-open-variant',
-    emoji: '📖',
-  },
-  {
-    id: 4,
-    title: 'Community, if you want it',
-    description:
-      'Forums, keeper profiles and messages for when you want a second opinion. Your collection stays private unless you choose to share it.',
-    icon: 'comment-multiple',
-    emoji: '💬',
-  },
-];
-
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [currentScreen, setCurrentScreen] = useState(0);
+  const { colors, layout } = useTheme();
+  const leaving = useRef(false);
 
-  const handleNext = () => {
-    if (currentScreen < SCREENS.length - 1) {
-      const nextScreen = currentScreen + 1;
-      setCurrentScreen(nextScreen);
-      scrollViewRef.current?.scrollTo({
-        x: nextScreen * SCREEN_WIDTH,
-        animated: true,
-      });
-    }
-  };
-
-  const handleGetStarted = async () => {
-    // completeOnboarding clears the pending marker as well as setting the
-    // completed flag — see src/lib/onboarding.ts for why those are two keys.
-    // It swallows storage errors, so the navigation below always runs: never
-    // trap someone on the carousel because AsyncStorage hiccuped.
+  const go = async (href: '/add' | '/import' | '/(tabs)') => {
+    if (leaving.current) return;
+    leaving.current = true;
     await completeOnboarding();
-    router.replace('/(tabs)');
+    if (href === '/(tabs)') {
+      router.replace(href);
+    } else {
+      // Land on the tabs first so the form's back/close button and Android back
+      // have somewhere to go; replace alone would leave a one-screen stack.
+      router.replace('/(tabs)');
+      router.push(href);
+    }
+    // Re-arm for the (unlikely) case the screen is still mounted afterwards.
+    leaving.current = false;
   };
-
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const scrollX = event.nativeEvent.contentOffset.x;
-    const screenIndex = Math.round(scrollX / SCREEN_WIDTH);
-    setCurrentScreen(screenIndex);
-  };
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    screen: {
-      width: SCREEN_WIDTH,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 32,
-      paddingVertical: 60,
-    },
-    emojiContainer: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: colors.surfaceElevated,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 32,
-      borderWidth: 2,
-      borderColor: colors.border,
-    },
-    emoji: {
-      fontSize: 64,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 16,
-      textAlign: 'center',
-    },
-    description: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 24,
-      marginBottom: 32,
-    },
-    dotsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 8,
-      paddingVertical: 24,
-      backgroundColor: colors.background,
-    },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.border,
-    },
-    activeDot: {
-      backgroundColor: colors.primary,
-      width: 32,
-    },
-    footer: {
-      paddingHorizontal: 32,
-      paddingBottom: 32,
-      gap: 12,
-    },
-    button: {
-      paddingVertical: 14,
-      paddingHorizontal: 32,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    primaryButton: {
-      backgroundColor: colors.primary,
-    },
-    primaryButtonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    secondaryButton: {
-      backgroundColor: colors.surfaceElevated,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    secondaryButtonText: {
-      color: colors.textPrimary,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    skipButton: {
-      alignSelf: 'flex-end',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      marginRight: 16,
-      marginTop: 8,
-    },
-    skipButtonText: {
-      color: colors.textSecondary,
-      fontSize: 14,
-      fontWeight: '500',
-    },
-  });
-
-  const isLastScreen = currentScreen === SCREENS.length - 1;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {currentScreen < SCREENS.length && (
-        <TouchableOpacity style={styles.skipButton} onPress={handleGetStarted}>
-          <Text style={styles.skipButtonText}>Skip</Text>
-        </TouchableOpacity>
-      )}
-
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        pagingEnabled
-        scrollEventThrottle={16}
-        onScroll={handleScroll}
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={false}
-        style={styles.scrollView}
-      >
-        {SCREENS.map((screen) => (
-          <View key={screen.id} style={styles.screen}>
-            <View style={styles.emojiContainer}>
-              <Text style={styles.emoji}>{screen.emoji}</Text>
-            </View>
-            <Text style={styles.title}>{screen.title}</Text>
-            <Text style={styles.description}>{screen.description}</Text>
-          </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.dotsContainer}>
-        {SCREENS.map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dot,
-              currentScreen === index && styles.activeDot,
-            ]}
-          />
-        ))}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.center}>
+        <View
+          style={[
+            styles.logo,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              borderRadius: layout.radius.full,
+            },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text style={styles.emoji}>🐾</Text>
+        </View>
+        <Text style={[TYPE.display, styles.title, { color: colors.textPrimary }]} accessibilityRole="header">
+          {FIRST_FEEDING_COPY.welcomeTitle}
+        </Text>
+        <Text style={[TYPE.subheading, styles.line, { color: colors.textSecondary }]}>
+          {FIRST_FEEDING_COPY.welcomeLine}
+        </Text>
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton]}
-          onPress={isLastScreen ? handleGetStarted : handleNext}
-          activeOpacity={0.8}
+        <PrimaryButton
+          onPress={() => go('/add')}
+          accessibilityRole="button"
+          accessibilityLabel={FIRST_FEEDING_COPY.welcomeAdd}
+          style={[styles.buttonInner, { borderRadius: layout.radius.md }]}
         >
-          <Text style={styles.primaryButtonText}>
-            {isLastScreen ? 'Get Started' : 'Next'}
-          </Text>
+          <Text style={[TYPE.subheadingBold, styles.primaryText]}>{FIRST_FEEDING_COPY.welcomeAdd}</Text>
+        </PrimaryButton>
+
+        <TouchableOpacity
+          onPress={() => go('/import')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={FIRST_FEEDING_COPY.welcomeImport}
+          style={[
+            styles.buttonInner,
+            styles.secondary,
+            { borderColor: colors.border, backgroundColor: colors.surfaceElevated, borderRadius: layout.radius.md },
+          ]}
+        >
+          <Text style={[TYPE.subheadingBold, { color: colors.textPrimary }]}>{FIRST_FEEDING_COPY.welcomeImport}</Text>
         </TouchableOpacity>
 
-        {!isLastScreen && (
-          <TouchableOpacity
-            style={[styles.button, styles.secondaryButton]}
-            onPress={handleGetStarted}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.secondaryButtonText}>Skip for Now</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => go('/(tabs)')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={FIRST_FEEDING_COPY.welcomeLookAround}
+          style={styles.buttonInner}
+        >
+          <Text style={[TYPE.bodyStrong, { color: colors.textSecondary }]}>{FIRST_FEEDING_COPY.welcomeLookAround}</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.xxl,
+  },
+  logo: {
+    width: EMOJI_CIRCLE,
+    height: EMOJI_CIRCLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.xl,
+    borderWidth: 2,
+  },
+  emoji: {
+    fontSize: EMOJI_SIZE,
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  line: {
+    textAlign: 'center',
+  },
+  footer: {
+    paddingHorizontal: SPACING.xxl,
+    paddingBottom: SPACING.xl,
+    gap: SPACING.md,
+  },
+  buttonInner: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryText: {
+    color: '#fff',
+  },
+  secondary: {
+    borderWidth: 1,
+  },
+});

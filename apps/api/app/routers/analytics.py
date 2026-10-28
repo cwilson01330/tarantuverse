@@ -497,7 +497,15 @@ async def get_collection_analytics(
     # Due/overdue come from the Feeding Day rule itself, never a copy of it.
     status_items = compute_feeding_status(db, tarantulas, tz_offset_minutes)
     feeding_due_today = sum(1 for s in status_items if s.is_overdue)
-    feeding_overdue = sum(1 for s in status_items if s.is_overdue and s.days_since_last_feeding > s.interval_days)
+    # A due animal that was never fed has no last feeding: it has waited since
+    # its baseline instead (days_since_baseline). A fed one waits since the meal.
+    def _waited(s):
+        return s.days_since_last_feeding if s.days_since_last_feeding is not None else s.days_since_baseline
+
+    feeding_overdue = sum(
+        1 for s in status_items
+        if s.is_overdue and _waited(s) is not None and _waited(s) > s.interval_days
+    )
 
     # Longest gap: only animals Feeding Day could flag (a cadence, fed at least
     # once, not paused). Ties go to the name that sorts first.
@@ -509,16 +517,16 @@ async def get_collection_analytics(
     # caption). Same shape as longest_gap; same tie rule.
     due_candidates = [
         s for s in status_items
-        if s.is_overdue and s.days_since_last_feeding is not None
+        if s.is_overdue and _waited(s) is not None
     ]
     first_due = None
     if due_candidates:
-        due = min(due_candidates, key=lambda s: (-s.days_since_last_feeding, _display_name(s).lower(), str(s.id)))
+        due = min(due_candidates, key=lambda s: (-_waited(s), _display_name(s).lower(), str(s.id)))
         first_due = LongestGap(
             tarantula_id=str(due.id),
             name=_display_name(due),
             sex=_sex_value(tarantula_map[due.id].sex),
-            days=due.days_since_last_feeding,
+            days=_waited(due),
             usual_interval_days=due.interval_days,
         )
 

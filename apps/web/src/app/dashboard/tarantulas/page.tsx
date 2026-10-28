@@ -14,6 +14,7 @@ import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
 import CareSheetDialog from '@/components/CareSheetDialog'
 import { formatLocalDate } from '@/lib/date'
+import { feedingStatusText } from '@/lib/firstFeeding'
 import {
   listColonies,
   listPastColonies,
@@ -50,8 +51,11 @@ interface FeedingStatus {
   // never overdue, so a 7-month premolt sling doesn't look like an emergency.
   is_feeding_paused?: boolean
   // Server-computed from the species + life stage (or the keeper's own
-  // cadence). Detritivores and never-fed animals are never overdue.
+  // cadence). Detritivores are never overdue; a never-fed animal is once its
+  // first meal is due (then days_since_last_feeding is null).
   is_overdue?: boolean
+  // Day-one: never fed and past the release cutoff (no meal logged yet).
+  needs_first_feeding?: boolean
   interval_days?: number | null
 }
 
@@ -62,6 +66,9 @@ interface FeedingStatus {
  */
 function feedingLine(s: FeedingStatus): { text: string; tone: 'muted' | 'ok' | 'overdue' } {
   if (s.is_feeding_paused) return { text: 'Feeding paused', tone: 'muted' }
+  // No logged feeding: "First meal not logged" / "Due · no meal logged yet".
+  const noMeal = feedingStatusText(s)
+  if (noMeal) return { text: noMeal, tone: s.needs_first_feeding ? 'muted' : 'overdue' }
   if (s.days_since_last_feeding == null) return { text: 'Not yet fed', tone: 'muted' }
   const d = s.days_since_last_feeding
   if (s.is_overdue) {

@@ -30,7 +30,7 @@
  *   - `enclosureId` — "Add inhabitant" from an enclosure screen; the new
  *     animal is filed into that enclosure (the API checks it's yours).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -65,6 +65,8 @@ import { formatTempRange } from '../src/lib/units';
 import { SPACING, TYPE } from '../src/theme/tokens';
 import { LocationPicker } from '../src/components/LocationPicker';
 import { maybeRequestReview } from '../src/lib/reviewPrompt';
+import { FIRST_FEEDING_COPY, lastFedIso, type LastFedChoice } from '../src/lib/first-feeding';
+import { NotificationAskSheet, useNotificationAsk } from '../src/components/NotificationAskSheet';
 import { MEMBER_APP, loadSharedWithMe } from '../src/lib/co-keepers';
 import {
   loadSpeciesCatalog,
@@ -181,7 +183,20 @@ function AddScreen() {
   const [dateAcquired, setDateAcquired] = useState('');
   const [source, setSource] = useState<string>('');
   const [pricePaid, setPricePaid] = useState('');
-  const [lastFed, setLastFed] = useState('');
+  // "When did it last eat?" - a choice, plus the day when the keeper picks one.
+  // Default is "Not sure": nothing is logged and the nudge card asks later.
+  const [lastFedChoice, setLastFedChoice] = useState<LastFedChoice>('not_sure');
+  const [lastFedPicked, setLastFedPicked] = useState<Date | null>(null);
+  const ask = useNotificationAsk();
+  // The ask can outlive the screen (keeper backs out while it is open): then
+  // we must not navigate from a screen that is gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const [notes, setNotes] = useState('');
   // Room / rack / shelf. Kept across "add another" — a shipment of slings
   // usually all go on the same rack.
@@ -322,6 +337,8 @@ function AddScreen() {
     try {
       const taxon = picked?.taxon ?? effectiveManualTaxon;
       const husbandry = buildHusbandry(mode === 'colony' ? 'colony' : 'animal');
+      // Set by the two individual-animal branches below; colonies leave it null.
+      let createdId: string | null = null;
 
       if (mode === 'colony') {
         // Colonies are a different endpoint AND a different concept — this
@@ -353,6 +370,7 @@ function AddScreen() {
           location: location ?? undefined,
           ...husbandry,
         });
+        createdId = created.data?.id ?? null;
         await seedFirstFeeding(`/tarantulas/${created.data?.id}/feedings`);
       } else {
         // Tarantulas take this path too when adding to a shared collection
@@ -375,6 +393,7 @@ function AddScreen() {
           location,
           ...husbandry,
         });
+        createdId = created.data?.id ?? null;
         await seedFirstFeeding(`/inverts/${created.data?.id}/feedings`);
       }
 
@@ -392,14 +411,29 @@ function AddScreen() {
         setSex('unknown');
         setNotes('');
         setPricePaid('');
-        setLastFed('');
+        setLastFedChoice('not_sure');
+        setLastFedPicked(null);
         Alert.alert('Added', `${displayName} saved. Add another?`);
       } else if (collection) {
         router.replace({ pathname: '/shared/[ownerId]', params: { ownerId: collection } } as never);
       } else if (enclosureId) {
         router.back();
       } else {
-        router.replace('/(tabs)/collection' as any);
+        // The one-time "heads-up when it's due" ask. Only here: not after
+        // "add another", not into a shared collection or an enclosure, and
+        // never for a colony. It resolves AFTER the sheet has closed: true =
+        // the keeper saw it (open the new animal), false = not shown (or this
+        // screen is gone), so navigate as before.
+        const shown =
+          mode !== 'colony' && createdId ? await ask.maybeAskAfterSave(displayName) : false;
+        if (!mountedRef.current) {
+          // Screen is gone: leave navigation alone.
+        } else if (shown && createdId) {
+          // A tarantula shares its id with its invert row.
+          router.replace(`/invert/${createdId}` as any);
+        } else {
+          router.replace('/(tabs)/collection' as any);
+        }
       }
     } catch (e: any) {
       // 402 = free-tier cap. Same treatment as every other create path —
@@ -417,9 +451,12 @@ function AddScreen() {
   /** Non-fatal by design: the animal is saved either way, and failing the
    *  whole add over a log would be a far worse trade. */
   const seedFirstFeeding = async (path: string) => {
-    if (!lastFed) return;
+    if (mode !== 'individual') return;
+    // Local noon of the chosen day; null for "Not sure" (nothing is logged).
+    const fedAt = lastFedIso(lastFedChoice, lastFedPicked);
+    if (!fedAt) return;
     try {
-      await apiClient.post(path, { fed_at: new Date(lastFed).toISOString(), accepted: true });
+      await apiClient.post(path, { fed_at: fedAt, accepted: true });
     } catch {
       /* ignore */
     }
@@ -691,6 +728,63 @@ function AddScreen() {
             </>
           )}
 
+          {/* --- last fed ------------------------------------------------- */}
+          {mode === 'individual' && (
+            <>
+              <Text style={[styles.sectionLabel, { marginTop: 22 }]}>{FIRST_FEEDING_COPY.lastFedLabel}</Text>
+              <View
+                style={styles.taxonChips}
+                accessibilityRole="radiogroup"
+                accessibilityLabel={FIRST_FEEDING_COPY.lastFedLabel}
+              >
+                {([
+                  ['today', FIRST_FEEDING_COPY.chipToday],
+                  ['yesterday', FIRST_FEEDING_COPY.chipYesterday],
+                  ['pick', FIRST_FEEDING_COPY.chipPickDate],
+                  ['not_sure', FIRST_FEEDING_COPY.chipNotSure],
+                ] as Array<[LastFedChoice, string]>).map(([value, label]) => {
+                  const on = lastFedChoice === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      onPress={() => {
+                        setLastFedChoice(value);
+                        if (value === 'pick' && !lastFedPicked) setLastFedPicked(new Date());
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={label}
+                      style={[
+                        styles.taxonChip,
+                        {
+                          minHeight: 44,
+                          borderRadius: layout.radius.full,
+                          borderColor: on ? colors.primary : colors.border,
+                          backgroundColor: on ? colors.primary + '1F' : 'transparent',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.taxonChipText, { color: on ? colors.primary : colors.textSecondary }]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {lastFedChoice === 'pick' && (
+                <View style={{ marginTop: 10 }}>
+                  <DateInput
+                    value={lastFedPicked ?? new Date()}
+                    onChange={setLastFedPicked}
+                    maximumDate={new Date()}
+                    label={FIRST_FEEDING_COPY.lastFedLabel}
+                  />
+                </View>
+              )}
+              <Text style={styles.hintLine}>{FIRST_FEEDING_COPY.lastFedHint}</Text>
+            </>
+          )}
+
           {/* --- naming --------------------------------------------------- */}
           <Text style={[styles.sectionLabel, { marginTop: 22 }]}>
             {mode === 'colony' ? 'NAME THE COLONY' : 'WHAT DO YOU CALL IT?'}
@@ -834,24 +928,14 @@ function AddScreen() {
           </Collapsed>
 
           <Collapsed
-            title="Notes & first feeding"
+            title="Notes"
             icon="note-text-outline"
-            preview={lastFed ? `Fed ${lastFed}` : notes ? 'Has notes' : 'Not set'}
+            preview={notes ? 'Has notes' : 'Not set'}
             open={openSection === 'notes'}
             onToggle={() => setOpenSection(openSection === 'notes' ? null : 'notes')}
             colors={colors}
             styles={styles}
           >
-            {mode === 'individual' && (
-              <Field label="Last fed" colors={colors} styles={styles}>
-                <DateInput
-                  value={parseLocalDate(lastFed) ?? new Date()}
-                  onChange={(d) => setLastFed(toISODateLocal(d))}
-                  maximumDate={new Date()}
-                  label="Last fed"
-                />
-              </Field>
-            )}
             <Field label="Notes" colors={colors} styles={styles}>
               <TextInput
                 style={[styles.input, { height: 88, textAlignVertical: 'top' }]}
@@ -904,6 +988,8 @@ function AddScreen() {
           <UpgradeModal source="collection_cap" visible={showUpgrade} onClose={() => setShowUpgrade(false)} />
         </React.Suspense>
       )}
+
+      <NotificationAskSheet {...ask.sheetProps} />
     </View>
   );
 }

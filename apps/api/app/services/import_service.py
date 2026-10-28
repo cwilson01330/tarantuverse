@@ -18,7 +18,7 @@ import csv
 import io
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -47,6 +47,8 @@ IMPORT_FIELDS: List[Dict[str, str]] = [
     {"field": "sex", "label": "Sex", "type": "sex"},
     {"field": "life_stage", "label": "Life stage", "type": "life_stage"},
     {"field": "date_acquired", "label": "Date acquired", "type": "date"},
+    # Not an invert column: the commit route turns it into one accepted feeding.
+    {"field": "last_fed", "label": "Last fed", "type": "date"},
     {"field": "source", "label": "Source", "type": "source"},
     {"field": "price_paid", "label": "Price paid", "type": "decimal"},
     {"field": "enclosure_type", "label": "Enclosure type", "type": "enclosure_type"},
@@ -74,6 +76,10 @@ HEADER_SYNONYMS: Dict[str, str] = {
     "date acquired": "date_acquired", "acquired": "date_acquired",
     "acquired date": "date_acquired", "purchase date": "date_acquired",
     "date": "date_acquired", "acquired on": "date_acquired",
+    # _clean_header turns "Last_Fed" into "last fed", so only the spaced form can match.
+    "last fed": "last_fed", "last feeding": "last_fed", "last fed date": "last_fed",
+    "fed": "last_fed", "last feeding date": "last_fed", "date last fed": "last_fed",
+    "last fed on": "last_fed", "date of last feeding": "last_fed",
     "source": "source", "origin": "source", "acquired from": "source",
     "price": "price_paid", "price paid": "price_paid", "cost": "price_paid", "paid": "price_paid",
     "enclosure type": "enclosure_type", "habitat": "enclosure_type", "habitat type": "enclosure_type",
@@ -219,6 +225,10 @@ def suggest_mapping(headers: List[str], rows: List[Dict[str, Any]]) -> Dict[str,
             return HEADER_SYNONYMS[ch], "high"
         # loose contains match against synonym keys
         for key, fld in HEADER_SYNONYMS.items():
+            # last_fed is exact-synonym only: a plain "Feeding" column is
+            # usually text ("weekly", "crickets") and "last feeding" contains it.
+            if fld == "last_fed":
+                continue
             if key in ch or ch in key:
                 return fld, "medium"
         return None
@@ -341,6 +351,19 @@ def _coerce(field: str, value: Any) -> Any:
     return s
 
 
+def _last_fed_error(coerced: Optional[str]) -> Optional[str]:
+    """Row error for a mapped, non-empty `last_fed` cell (None = fine).
+
+    `coerced` is the ISO date `_coerce` produced, or None when the cell wasn't a
+    date. Allowed up to UTC today + 1 day: a keeper ahead of UTC may type
+    tomorrow's UTC date for their own "today"."""
+    if coerced is None:
+        return "Last fed: couldn't read that as a date"
+    if date.fromisoformat(coerced) > datetime.now(timezone.utc).date() + timedelta(days=1):
+        return "Last fed can't be in the future"
+    return None
+
+
 # ── Species matching ─────────────────────────────────────────────────────────
 
 def match_species(db: Session, scientific_name: Optional[str]) -> Optional[InvertSpecies]:
@@ -372,6 +395,7 @@ def normalize_row(
     taxon (+ source), matched species, and any per-row errors."""
     payload: Dict[str, Any] = {}
     extra_notes: List[str] = []
+    errors: List[str] = []
 
     for header, value in raw.items():
         field = mapping.get(header)
@@ -380,6 +404,14 @@ def normalize_row(
                 extra_notes.append(f"{header}: {value}")
             continue
         coerced = _coerce(field, value)
+        if field == "last_fed" and value is not None and str(value).strip() != "":
+            # Unlike the other dates, a last-fed we can't read is a row error:
+            # silently dropping it would leave the animal "never fed" and the
+            # keeper none the wiser.
+            err = _last_fed_error(coerced)
+            if err:
+                errors.append(err)
+                continue
         if coerced is not None:
             # last non-empty wins if two columns map to the same field
             payload[field] = coerced
@@ -401,7 +433,6 @@ def normalize_row(
     if species is not None:
         payload["species_id"] = str(species.id)
 
-    errors: List[str] = []
     if not payload.get("name") and not payload.get("scientific_name"):
         errors.append("needs a name or a scientific name")
     if taxon not in TAXA:

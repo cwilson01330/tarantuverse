@@ -1,7 +1,10 @@
 """
 Notification preferences routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
@@ -13,7 +16,12 @@ from app.schemas.notification_preferences import (
     NotificationPreferencesUpdate,
     NotificationPreferencesBase
 )
+from app.services.notification_prefs import ensure_notification_preferences
+from app.utils.access import policy
 from app.utils.dependencies import get_current_user
+from app.utils.digest_unsubscribe_token import read_unsubscribe_token
+from app.utils.frontend_origin import resolve_frontend_origin
+from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/notification-preferences", tags=["notification-preferences"])
 
@@ -34,34 +42,10 @@ async def get_notification_preferences(
     current_user: User = Depends(get_current_user)
 ):
     """Get current user's notification preferences (creates default if doesn't exist)"""
-    prefs = db.query(NotificationPreferences).filter(
-        NotificationPreferences.user_id == current_user.id
-    ).first()
-
-    # Create default preferences if they don't exist
-    if not prefs:
-        prefs = NotificationPreferences(
-            user_id=current_user.id,
-            feeding_reminders_enabled=True,
-            feeding_reminder_hours=24,
-            substrate_reminders_enabled=True,
-            substrate_reminder_days=90,
-            molt_predictions_enabled=True,
-            maintenance_reminders_enabled=True,
-            maintenance_reminder_days=30,
-            push_notifications_enabled=True,
-            direct_messages_enabled=True,
-            forum_replies_enabled=True,
-            new_followers_enabled=True,
-            community_activity_enabled=False,
-            sitter_activity_enabled=True,
-            quiet_hours_enabled=False,
-            quiet_hours_start="22:00",
-            quiet_hours_end="08:00"
-        )
-        db.add(prefs)
-        db.commit()
-        db.refresh(prefs)
+    # Every keeper has a row; create the defaults if this one never got one.
+    prefs = ensure_notification_preferences(db, current_user.id)
+    db.commit()
+    db.refresh(prefs)
 
     return prefs
 
@@ -73,14 +57,7 @@ async def update_notification_preferences(
     current_user: User = Depends(get_current_user)
 ):
     """Update notification preferences"""
-    prefs = db.query(NotificationPreferences).filter(
-        NotificationPreferences.user_id == current_user.id
-    ).first()
-
-    # Create if doesn't exist
-    if not prefs:
-        prefs = NotificationPreferences(user_id=current_user.id)
-        db.add(prefs)
+    prefs = ensure_notification_preferences(db, current_user.id)
 
     # Update fields that were provided
     for field, value in update_values(preferences).items():
@@ -111,13 +88,7 @@ async def update_push_token(
     `token` as a bare str, which FastAPI treats as a QUERY param — so the app's
     JSON-body registration 422'd and no tokens were ever saved (ADR-009).
     """
-    prefs = db.query(NotificationPreferences).filter(
-        NotificationPreferences.user_id == current_user.id
-    ).first()
-
-    if not prefs:
-        prefs = NotificationPreferences(user_id=current_user.id)
-        db.add(prefs)
+    prefs = ensure_notification_preferences(db, current_user.id)
 
     prefs.expo_push_token = payload.token
     if payload.tz_offset_minutes is not None:
@@ -142,3 +113,54 @@ async def delete_push_token(
         db.commit()
 
     return None
+
+
+@router.get("/email-unsubscribe")
+@limiter.limit("30/minute")
+@policy("public")
+async def email_unsubscribe_page(
+    request: Request,
+    token: str = Query(""),
+):
+    """GET changes nothing: mail scanners and link prefetchers open every URL in
+    an email, so a state-changing GET would unsubscribe people who never asked.
+    It sends the browser to the web page, where the keeper confirms and the page
+    POSTs. A forged or garbled token is a 404."""
+    if read_unsubscribe_token(token) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    origin = resolve_frontend_origin(None)
+    return RedirectResponse(
+        f"{origin}/unsubscribe/{quote(token, safe='')}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/email-unsubscribe")
+@limiter.limit("30/minute")
+@policy("public")
+async def email_unsubscribe(
+    request: Request,
+    token: str = Query(""),
+    db: Session = Depends(get_db),
+):
+    """One-click unsubscribe from the daily email digest. No login: the signed
+    token (it carries only the user id, never expires) is the whole capability
+    and can only switch `email_digest_enabled` off. POST serves both the
+    List-Unsubscribe-Post one-click header and the web page's button.
+
+    A forged or garbled token is a 404. A genuine token for an account that is
+    gone, or has no preferences row, is a success: unsubscribing is idempotent.
+    """
+    user_id = read_unsubscribe_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    prefs = (
+        db.query(NotificationPreferences)
+        .filter(NotificationPreferences.user_id == user_id)
+        .first()
+    )
+    if prefs is not None and prefs.email_digest_enabled:
+        prefs.email_digest_enabled = False
+        db.commit()
+    return {"ok": True}

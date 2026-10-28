@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { UpdateBanner } from '../src/components/UpdateBanner';
-import { ONBOARDING_COMPLETED } from '../src/lib/onboarding';
 import {
   identifyUser,
   initPostHog,
@@ -84,33 +82,12 @@ function QuickActionsBridge() {
 function RootLayoutContent() {
   const { user, isLoading } = useAuth();
   const { colors } = useTheme();
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
-  useEffect(() => {
-    checkOnboardingStatus();
-  }, [user]);
-
-  const checkOnboardingStatus = async () => {
-    try {
-      if (user) {
-        // Constant, not a literal — this key is also read and written by
-        // src/lib/onboarding.ts, and a typo in one place would silently mean
-        // "never onboarded" forever.
-        const completed = await AsyncStorage.getItem(ONBOARDING_COMPLETED);
-        setOnboardingComplete(completed === 'true');
-      }
-    } catch (error) {
-      console.error('Error checking onboarding status:', error);
-      setOnboardingComplete(false);
-    } finally {
-      setCheckingOnboarding(false);
-    }
-  };
-
-  // Hold on a themed loading view (not a blank screen) until both the auth
-  // and onboarding checks finish. AuthContext caps the auth wait.
-  if (isLoading || checkingOnboarding) {
+  // Hold on a themed loading view (not a blank screen) until the auth check
+  // finishes. AuthContext caps the wait. (Who sees the welcome screen is decided
+  // at sign-in and on cold start by src/lib/onboarding.ts - this layout used to
+  // run its own check whose result routed nothing.)
+  if (isLoading) {
     return (
       <View
         style={[launchStyles.loading, { backgroundColor: colors.background }]}
@@ -130,13 +107,6 @@ function RootLayoutContent() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
-        {/* Show onboarding if user is authenticated but hasn't completed it.
-            NB: expo-router 6 dropped the legacy `animationEnabled` flag in
-            favor of the v7 navigation `animation` enum — `'none'` is the
-            equivalent of the old `false`. */}
-        {user && !onboardingComplete && (
-          <Stack.Screen name="onboarding" options={{ animation: 'none' }} />
-        )}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
     </>

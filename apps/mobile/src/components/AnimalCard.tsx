@@ -29,6 +29,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { getImageUrl } from '../utils/image-url';
 import { taxonMdiIcon } from '../lib/inverts';
+import { feedingStatusText } from '../lib/first-feeding';
 
 export interface AnimalCardFeeding {
   /** null / undefined = never fed (or no ACCEPTED feeding). Not the same as 0. */
@@ -39,6 +40,8 @@ export interface AnimalCardFeeding {
    *  say how far PAST DUE an animal is; without it the card says "Overdue"
    *  rather than guessing a number. */
   intervalDays?: number | null;
+  /** From /inverts/feeding-status: due for a first meal that was never logged. */
+  needsFirstFeeding?: boolean;
 }
 
 export interface AnimalCardProps {
@@ -96,6 +99,18 @@ export interface AnimalCardProps {
 function feedingLine(f: AnimalCardFeeding | undefined, colors: any) {
   if (!f) return null;
   if (f.isPaused) return { text: 'Feeding paused', color: colors.textTertiary };
+  // No logged feeding at all: "First meal not logged" / "Due · no meal logged yet".
+  // Anything else falls through to the sentences below.
+  const noMeal = feedingStatusText({
+    needs_first_feeding: f.needsFirstFeeding,
+    is_overdue: f.isOverdue,
+    days_since_last_feeding: f.daysSince,
+  });
+  if (noMeal) {
+    return f.isOverdue && !f.needsFirstFeeding
+      ? { text: noMeal, color: colors.error, strong: true }
+      : { text: noMeal, color: colors.textTertiary };
+  }
   if (f.daysSince === undefined || f.daysSince === null) {
     // Never fed is a real, common state for a newly added animal — say so
     // rather than rendering nothing or a phantom day count.

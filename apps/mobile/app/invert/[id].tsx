@@ -61,6 +61,7 @@ import { parseLocalDate } from '../../src/utils/date';
 import { clearMarkDied, hasMarkDied } from '../../src/lib/pending-intent';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { formatLengthMm, formatTempRange, stripUnit } from '../../src/lib/units';
+import { feedingStatusText } from '../../src/lib/first-feeding';
 import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
 function InvertDetailScreen() {
@@ -523,10 +524,15 @@ function InvertDetailScreen() {
       };
     }
     if (d === null || d === undefined) {
+      // Same words the lists use: "Due · no meal logged yet" when it is
+      // overdue with no feeding on record, "First meal not logged" when a first
+      // meal is due (feedingStatusText decides, needs_first_feeding wins).
+      const noMeal = feedingStatusText(feedingStats);
+      const dueNoMeal = !!feedingStats.is_overdue && !feedingStats.needs_first_feeding;
       return {
-        tone: 'muted' as const,
-        icon: 'silverware-fork-knife',
-        headline: 'Not yet fed',
+        tone: dueNoMeal ? ('bad' as const) : ('muted' as const),
+        icon: dueNoMeal ? 'alert-circle-outline' : 'silverware-fork-knife',
+        headline: noMeal ?? 'Not yet fed',
         detail: 'Log the first feeding to start tracking a cadence.',
       };
     }

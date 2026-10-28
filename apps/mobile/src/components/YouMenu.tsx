@@ -64,6 +64,7 @@ export function MenuRow({
   external = false,
   busy = false,
   accessory,
+  badge,
   accessibilityHint,
 }: {
   icon: IconName;
@@ -77,9 +78,11 @@ export function MenuRow({
   busy?: boolean;
   /** Replaces the chevron, e.g. a Switch. The row is then not a button. */
   accessory?: React.ReactNode;
+  /** A short pill after the label, e.g. "Premium". Keeps the chevron + button role. */
+  badge?: string;
   accessibilityHint?: string;
 }) {
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
   const tint = danger ? colors.error : colors.textPrimary;
   const content = (
     <>
@@ -91,7 +94,14 @@ export function MenuRow({
         importantForAccessibility="no"
       />
       <View style={styles.text}>
-        <Text style={[TYPE.subheading, { color: tint }]}>{label}</Text>
+        <View style={styles.labelLine}>
+          <Text style={[TYPE.subheading, { color: tint }]}>{label}</Text>
+          {badge ? (
+            <View style={[styles.badge, { borderColor: colors.primary, borderRadius: layout.radius.sm }]}>
+              <Text style={[TYPE.caption, { color: colors.primary }]}>{badge}</Text>
+            </View>
+          ) : null}
+        </View>
         {detail ? <Text style={[TYPE.caption, { color: colors.textTertiary }]}>{detail}</Text> : null}
       </View>
       {accessory ?? (busy ? (
@@ -116,7 +126,7 @@ export function MenuRow({
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
-      accessibilityLabel={detail ? `${label}. ${detail}` : label}
+      accessibilityLabel={[label, badge, detail].filter(Boolean).join('. ')}
       accessibilityHint={external ? accessibilityHint ?? 'Opens outside the app' : accessibilityHint}
       accessibilityState={{ disabled: busy, busy }}
     >
@@ -131,5 +141,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, minHeight: 52 },
   text: { flex: 1, gap: 2 },
+  labelLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  badge: { borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1 },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 50 },
 });

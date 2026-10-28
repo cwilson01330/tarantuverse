@@ -522,7 +522,7 @@ async def test_email_sending(
     import logging
     logger = logging.getLogger(__name__)
 
-    logger.info(f"🧪 Testing email send to: {test_email}")
+    logger.info("Testing email send (admin test-email route)")
 
     try:
         await EmailService.send_email(
@@ -538,10 +538,10 @@ async def test_email_sending(
             </div>
             """
         )
-        logger.info(f"✅ Test email sent successfully to {test_email}")
+        logger.info("Test email sent successfully")
         return {"message": f"Test email sent to {test_email}. Check your inbox and Render logs."}
     except Exception as e:
-        logger.error(f"❌ Failed to send test email: {str(e)}")
+        logger.error("Failed to send test email: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send test email: {str(e)}"

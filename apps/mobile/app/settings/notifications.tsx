@@ -11,19 +11,29 @@
  *
  * Kept in step with apps/web/src/app/dashboard/settings/notifications.
  */
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator, Linking, AppState,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
-import { requestNotificationPermissions, getExpoPushToken } from '../../src/services/notifications';
+import {
+  getPermissionStatus,
+  registerPushToken,
+  requestNotificationPermissions,
+} from '../../src/services/notifications';
+import { FIRST_FEEDING_COPY } from '../../src/lib/first-feeding';
+import type { Permission } from '../../src/lib/notification-ask';
 import { SPACING, TYPE } from '../../src/theme/tokens';
 
 interface NotificationPreferences {
   daily_digest_enabled: boolean;
   digest_hour: number;
+  /** Opt-in daily email on days something is due (Day-one). Older APIs omit it. */
+  email_digest_enabled?: boolean;
   push_notifications_enabled: boolean;
   direct_messages_enabled: boolean;
   forum_replies_enabled: boolean;
@@ -75,11 +85,14 @@ export default function NotificationSettingsScreen() {
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  // Read without prompting. null until the first read finishes, so the banner
+  // never flashes (Enable / Open phone settings) before we know.
+  const [permission, setPermission] = useState<Permission | null>(null);
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     daily_digest_enabled: true,
     digest_hour: 9,
+    email_digest_enabled: false,
     push_notifications_enabled: true,
     direct_messages_enabled: true,
     forum_replies_enabled: true,
@@ -90,30 +103,26 @@ export default function NotificationSettingsScreen() {
     quiet_hours_end: '08:00',
   });
 
+  // Opening this screen must never raise the OS permission dialog (Day-one):
+  // read the status, and register the token only if it is already granted.
+  const checkNotificationPermissions = useCallback(async () => {
+    const status = await getPermissionStatus();
+    setPermission(status);
+    if (status === 'granted') await registerPushToken();
+  }, []);
+
   useEffect(() => {
     loadPreferences();
     checkNotificationPermissions();
-  }, []);
+  }, [checkNotificationPermissions]);
 
-  const registerToken = async () => {
-    const token = await getExpoPushToken();
-    if (!token) return;
-    try {
-      // The device time zone rides along: the digest hour is this phone's hour.
-      await apiClient.post('/notification-preferences/push-token', {
-        token,
-        tz_offset_minutes: new Date().getTimezoneOffset(),
-      });
-    } catch (error) {
-      console.error('Error registering push token:', error);
-    }
-  };
-
-  const checkNotificationPermissions = async () => {
-    const hasPermission = await requestNotificationPermissions();
-    setPermissionGranted(hasPermission);
-    if (hasPermission) await registerToken();
-  };
+  // Coming back from the phone's Settings app: pick up a changed permission.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void checkNotificationPermissions();
+    });
+    return () => sub.remove();
+  }, [checkNotificationPermissions]);
 
   const loadPreferences = async () => {
     try {
@@ -125,6 +134,7 @@ export default function NotificationSettingsScreen() {
         // Older API builds don't return these; keep the defaults the server uses.
         daily_digest_enabled: d.daily_digest_enabled ?? true,
         digest_hour: typeof d.digest_hour === 'number' ? d.digest_hour : 9,
+        email_digest_enabled: d.email_digest_enabled ?? false,
       }));
     } catch (error: any) {
       console.error('Error loading notification preferences:', error);
@@ -143,6 +153,7 @@ export default function NotificationSettingsScreen() {
       await apiClient.put('/notification-preferences/', {
         daily_digest_enabled: preferences.daily_digest_enabled,
         digest_hour: preferences.digest_hour,
+        email_digest_enabled: preferences.email_digest_enabled ?? false,
         tz_offset_minutes: new Date().getTimezoneOffset(),
         direct_messages_enabled: preferences.direct_messages_enabled,
         forum_replies_enabled: preferences.forum_replies_enabled,
@@ -158,16 +169,23 @@ export default function NotificationSettingsScreen() {
     }
   };
 
+  // The banner button. Undetermined: this is a moment the keeper chose, so the
+  // OS dialog is fine here. Denied for good: the OS won't show it again, so
+  // send them to the phone's settings instead of a dead end.
   const requestPermissions = async () => {
-    const granted = await requestNotificationPermissions();
-    setPermissionGranted(granted);
-
-    if (granted) {
-      Alert.alert('Success', 'Notification permissions granted!');
-      await registerToken();
-    } else {
-      Alert.alert('Permissions Denied', 'You need to enable notifications in your device settings.');
+    if (permission === 'denied') {
+      try {
+        await Linking.openSettings();
+      } catch {
+        Alert.alert('Open Settings', "Open your phone's Settings, find Tarantuverse, and turn on Notifications.");
+      }
+      return;
     }
+    const granted = await requestNotificationPermissions();
+    if (granted) await registerPushToken();
+    // Re-read rather than assume: a refusal leaves 'denied' (button becomes
+    // "Open phone settings") or, where the OS will ask again, 'undetermined'.
+    setPermission(await getPermissionStatus());
   };
 
   const stepHour = (delta: number) =>
@@ -344,14 +362,20 @@ export default function NotificationSettingsScreen() {
 
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         {/* Permission Banner */}
-        {!permissionGranted && (
+        {permission !== null && permission !== 'granted' && (
           <View style={styles.permissionBanner}>
             <MaterialCommunityIcons name="bell-off" size={24} color={colors.primary} />
             <Text style={styles.permissionBannerText}>
               Turn on notifications to get your daily feeding digest and community alerts on this phone.
             </Text>
-            <TouchableOpacity style={styles.permissionButton} onPress={requestPermissions}>
-              <Text style={styles.permissionButtonText}>Enable</Text>
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={requestPermissions}
+              accessibilityRole="button"
+            >
+              <Text style={styles.permissionButtonText}>
+                {permission === 'denied' ? FIRST_FEEDING_COPY.openPhoneSettings : 'Enable'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -375,7 +399,7 @@ export default function NotificationSettingsScreen() {
             />
           </View>
 
-          <View style={[styles.settingRow, styles.settingRowLast, !digestOn && styles.disabled]}>
+          <View style={[styles.settingRow, !digestOn && styles.disabled]}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Time</Text>
               <Text style={styles.settingDescription}>
@@ -408,6 +432,23 @@ export default function NotificationSettingsScreen() {
                 <MaterialCommunityIcons name="plus" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Opt-in email on the same days and at the same hour. The server
+              sends it from the daily digest run, so it follows the digest
+              switch above (off there = no email either). */}
+          <View style={[styles.settingRow, styles.settingRowLast, !digestOn && styles.disabled]}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{FIRST_FEEDING_COPY.dailyEmailSwitch}</Text>
+              <Text style={styles.settingDescription}>{FIRST_FEEDING_COPY.dailyEmailHelp}</Text>
+            </View>
+            <Switch
+              value={preferences.email_digest_enabled ?? false}
+              onValueChange={(value) => setPreferences({ ...preferences, email_digest_enabled: value })}
+              disabled={!digestOn}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              accessibilityLabel={FIRST_FEEDING_COPY.dailyEmailSwitch}
+            />
           </View>
         </View>
 

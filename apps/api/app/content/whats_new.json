@@ -1,6 +1,14 @@
 {
   "tarantuverse": [
     {
+      "id": "2026-10-29-first-meal",
+      "published_on": "2026-10-29",
+      "title": "Reminders that work from day one",
+      "body": "Adding an animal now asks when it last ate, so reminders can start right away. Until a meal is logged it shows \"First meal not logged\". On the website you can also get a daily email on days something is due.",
+      "premium": false,
+      "action": { "label": "Open Feeding Day", "target": "feeding_day" }
+    },
+    {
       "id": "2026-10-27-analytics",
       "published_on": "2026-10-27",
       "title": "A new Analytics page",

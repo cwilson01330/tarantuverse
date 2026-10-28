@@ -440,6 +440,11 @@ export default function ImportScreen() {
               <Text style={[styles.hint, { color: colors.textTertiary }]}>
                 Pick a .csv or .xlsx from your phone or a cloud drive.
               </Text>
+              {!isColony && (
+                <Text style={[styles.hint, { color: colors.textTertiary }]}>
+                  Have a &quot;last fed&quot; column? We&apos;ll log that feeding for each animal.
+                </Text>
+              )}
 
               <View style={styles.orDivider}>
                 <View style={[styles.orLine, { backgroundColor: colors.border }]} />

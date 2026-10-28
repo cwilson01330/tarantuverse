@@ -33,6 +33,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
+import LastFedField, { NOT_SURE_LAST_FED, lastFedFromField, postFirstFeeding, type LastFedValue } from '@/components/LastFedField'
+import EmailReminderDialog, { decideAskAfterSave } from '@/components/EmailReminderDialog'
 import { INVERT_TAXA, PICKER_TAXA, isInvertTaxon, stageCountLabel, lifeStageOptions, type InvertTaxon, type LifeStageValue } from '@/lib/inverts'
 import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
 import { useUnitField } from '@/hooks/useUnitField'
@@ -208,6 +210,12 @@ function AddInvertFields() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null)
+  // "When did it last eat?" - default Not sure logs nothing; the First feeding card asks later.
+  const [lastFed, setLastFed] = useState<LastFedValue>(NOT_SURE_LAST_FED)
+  // After a successful save we may ask once about email reminders; leave the page when it closes.
+  const [ask, setAsk] = useState<{ name: string; to: string } | null>(null)
+  // Set once the animal exists: the form must not be submittable twice.
+  const [saved, setSaved] = useState(false)
   // The care sheet the husbandry came from, and the enclosure size it filled
   // (so a life-stage change can swap it only while the keeper hasn't typed
   // their own).
@@ -434,7 +442,21 @@ function AddInvertFields() {
       }
       if (!res.ok) throw new Error()
       const created = await res.json()
-      router.replace(enclosureId ? `/dashboard/enclosures/${enclosureId}` : `/dashboard/inverts/${created.id}`)
+      setSaved(true)
+      const destination = enclosureId ? `/dashboard/enclosures/${enclosureId}` : `/dashboard/inverts/${created.id}`
+
+      // First meal. A failed feeding must not block anything: the animal is
+      // saved and the First feeding card on the dashboard asks again.
+      const fedAt = lastFedFromField(lastFed)
+      if (fedAt && created?.id) await postFirstFeeding(token, created.id, fedAt)
+
+      // One-time email-reminder ask, not when adding into an enclosure or a
+      // shared collection (those aren't this keeper's own digest).
+      if (!enclosureId && !collection && (await decideAskAfterSave(token))) {
+        setAsk({ name: name.trim() || commonName.trim() || scientificName.trim() || 'your animal', to: destination })
+        return
+      }
+      router.replace(destination)
     } catch {
       alert('Could not save. Please try again.')
     } finally {
@@ -573,6 +595,8 @@ function AddInvertFields() {
             <Field label={withMmUnit(meta.sizeLabel, units)}><input value={sizeMm.value} onChange={(e) => sizeMm.setValue(e.target.value)} inputMode="decimal" placeholder={units === 'metric' ? 'e.g. 180' : 'e.g. 7'} className={inputCls} /></Field>
           </div>
 
+          <LastFedField value={lastFed} onChange={setLastFed} />
+
           <h2 className="text-sm font-bold uppercase tracking-wide text-theme-secondary pt-2">Acquisition</h2>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Date acquired"><input type="date" value={dateAcquired} onChange={(e) => setDateAcquired(e.target.value)} className={inputCls} /></Field>
@@ -629,7 +653,7 @@ function AddInvertFields() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || saved}
             className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60"
           >
             {saving ? 'Saving…' : `Save ${meta.label.toLowerCase()}`}
@@ -638,6 +662,14 @@ function AddInvertFields() {
         </>
         )}
       </div>
+
+      <EmailReminderDialog
+        open={ask !== null}
+        variant="after_save"
+        animalName={ask?.name}
+        token={token}
+        onClose={() => { if (ask) router.replace(ask.to) }}
+      />
 
       <UpgradeModal source="collection_cap"
         isOpen={upgradeMsg !== null}

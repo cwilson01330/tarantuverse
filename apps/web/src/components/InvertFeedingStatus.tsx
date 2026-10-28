@@ -1,5 +1,7 @@
 'use client'
 
+import { feedingStatusText } from '@/lib/firstFeeding'
+
 /**
  * Feeding status for any invert.
  *
@@ -40,6 +42,8 @@ export interface InvertFeedingStats {
   interval_days?: number | null
   interval_source?: string | null
   is_overdue?: boolean
+  /** Day-one: no feeding logged yet and a first meal is due (server rule). */
+  needs_first_feeding?: boolean
 }
 
 export interface FeedingVerdict {
@@ -95,9 +99,13 @@ export function feedingVerdict(s: InvertFeedingStats | null): FeedingVerdict | n
   }
 
   if (d === null || d === undefined) {
+    // Same words the lists use: "Due · no meal logged yet" when overdue with no
+    // feeding on record (red, like other overdue verdicts), "First meal not
+    // logged" when a first meal is due (feedingStatusText: needs_first_feeding wins).
+    const dueNoMeal = !!s.is_overdue && !s.needs_first_feeding
     return {
-      tone: 'muted',
-      headline: 'Not yet fed',
+      tone: dueNoMeal ? 'bad' : 'muted',
+      headline: feedingStatusText(s) ?? 'Not yet fed',
       detail: 'Log the first feeding to start tracking a cadence.',
     }
   }

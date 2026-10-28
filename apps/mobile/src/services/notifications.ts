@@ -6,6 +6,8 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { apiClient } from './api';
+import type { Permission } from '../lib/notification-ask';
 
 // Check if running in Expo Go (which doesn't support push notifications in SDK 53+)
 // Use a safe check — appOwnership is deprecated in SDK 53+; prefer executionEnvironment
@@ -75,7 +77,29 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Get Expo push notification token
+ * Current OS notification permission WITHOUT prompting (Day-one: the system
+ * dialog is only ever shown from a moment the keeper chose, never at login or
+ * on opening Settings).
+ *  - granted -> 'granted'
+ *  - denied but the OS will still show its dialog (canAskAgain) -> 'undetermined'
+ *  - denied for good -> 'denied'
+ *  - anything else, or the module throwing -> 'undetermined'
+ */
+export async function getPermissionStatus(): Promise<Permission> {
+  try {
+    const res = await Notifications.getPermissionsAsync();
+    if (res.status === 'granted') return 'granted';
+    if (res.status === 'denied') return res.canAskAgain === true ? 'undetermined' : 'denied';
+    return 'undetermined';
+  } catch {
+    return 'undetermined';
+  }
+}
+
+/**
+ * Get Expo push notification token. Never prompts: callers that need the
+ * permission dialog call requestNotificationPermissions() first, from a moment
+ * the keeper chose.
  * Note: Push notifications are not supported in Expo Go with SDK 53+
  */
 export async function getExpoPushToken(): Promise<string | null> {
@@ -86,9 +110,6 @@ export async function getExpoPushToken(): Promise<string | null> {
   }
 
   try {
-    const hasPermission = await requestNotificationPermissions();
-    if (!hasPermission) return null;
-
     // Use the app's REAL EAS project id (app.json extra.eas.projectId). A wrong
     // id makes getExpoPushTokenAsync throw → null token → nothing saved, which
     // is why 0 tokens were ever stored (ADR-009). Read it dynamically so it
@@ -104,6 +125,27 @@ export async function getExpoPushToken(): Promise<string | null> {
   } catch (error) {
     console.error('Error getting Expo push token:', error);
     return null;
+  }
+}
+
+/**
+ * Save this device's push token with the server - only when the OS permission
+ * is already granted (it never prompts). The device time zone rides along: the
+ * digest hour is this phone's hour. Resolves true when a token was saved; every
+ * failure (no permission, Expo Go, offline) is non-fatal and resolves false.
+ */
+export async function registerPushToken(): Promise<boolean> {
+  try {
+    if ((await getPermissionStatus()) !== 'granted') return false;
+    const token = await getExpoPushToken();
+    if (!token) return false;
+    await apiClient.post('/notification-preferences/push-token', {
+      token,
+      tz_offset_minutes: new Date().getTimezoneOffset(),
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 

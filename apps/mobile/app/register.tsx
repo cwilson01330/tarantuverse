@@ -31,7 +31,7 @@ interface ReferrerInfo {
 export default function RegisterScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ ref?: string }>();
-  const { register, loginWithGoogle, loginWithApple } = useAuth();
+  const { register, login, loginWithGoogle, loginWithApple } = useAuth();
   const { colors, theme } = useTheme();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -125,11 +125,24 @@ export default function RegisterScreen() {
       // Only include referral code if it's valid
       const validReferralCode = referrerInfo?.valid ? referralCode : undefined;
       const response = await register(email, username, password, displayName || username, validReferralCode);
-      // Registration doesn't establish a session — this screen hands off to
-      // /login — so the "this person is new" signal has to outlive the
-      // navigation. The next successful login consumes this marker and routes
-      // them through onboarding. See src/lib/onboarding.ts.
+      // The "this person is new" signal is parked before anything else so it
+      // survives whichever way this ends (sign-in below, the success screen's
+      // trip to /login, or a force-quit). See src/lib/onboarding.ts.
       await markOnboardingPending();
+
+      // Day-one: signing up signs you in. Only an account that must verify its
+      // email first stays on the success screen (it can't log in yet).
+      if (!response.requires_email_verification) {
+        try {
+          await login(email, password);
+          router.replace(await resolvePostAuthRoute(true));
+          return;
+        } catch {
+          // The account exists but the automatic sign-in failed (offline blip,
+          // a server hiccup): fall back to the success screen and its
+          // "Go to Login" button.
+        }
+      }
       setSuccessMessage(response.message || 'Registration successful. Your account is active and ready to log in.');
       setSuccess(true);
     } catch (error: any) {

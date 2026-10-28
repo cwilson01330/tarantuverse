@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useAuth } from '@/hooks/useAuth'
@@ -13,6 +13,9 @@ import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
 import WhatsNewCard from '@/components/WhatsNewCard'
+import FirstFeedingCard from '@/components/FirstFeedingCard'
+import EmailReminderDialog, { fetchEmailReminderPrefs, readAskState } from '@/components/EmailReminderDialog'
+import { FIRST_FEEDING_COPY, feedingStatusText, shouldAskWhenDue } from '@/lib/firstFeeding'
 import { resetWhatsNewCache } from '@/lib/whatsNew'
 import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload, Utensils } from 'lucide-react'
 import InsightsCard from '@/components/analytics/InsightsCard'
@@ -51,7 +54,8 @@ interface FeedingStatus {
 // All-taxa feeding status from /inverts/feeding-status — the SINGLE source of
 // truth shared with the Feeding Day screen + the daily digest, so the
 // dashboard's "overdue" count matches the notification (scorpions/centipedes
-// included, species-aware intervals, never-fed excluded).
+// included, species-aware intervals; a never-fed animal counts once its first
+// meal is due — it then has no days_since_last_feeding, only days_since_baseline).
 interface FeedingStatusItem {
   id: string
   name: string | null
@@ -60,8 +64,12 @@ interface FeedingStatusItem {
   taxon: string
   photo_url: string | null
   days_since_last_feeding: number | null
+  /** Days since the animal was added/acquired: what a never-fed animal is counted from. */
+  days_since_baseline?: number | null
   is_feeding_paused: boolean
   is_overdue: boolean
+  /** Day-one: never fed and past the release cutoff — no meal logged yet. */
+  needs_first_feeding?: boolean
   interval_days: number | null
   /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
    *  guess. Never render a default as a species schedule. */
@@ -118,6 +126,9 @@ export default function DashboardHub() {
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null)
   const [showWarning, setShowWarning] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  // One-time "email me on days something is due" ask (Day-one).
+  const [showDueAsk, setShowDueAsk] = useState(false)
+  const dueAskChecked = useRef(false)
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -169,7 +180,7 @@ export default function DashboardHub() {
         fetch(`${API_URL}/api/v1/colonies/`, { headers }).catch(() => null),
         // All-taxa feeding status — one call, shared with Feeding Day + the
         // daily digest, so the "Needs Feeding" widget matches the notification
-        // (scorpions included, species-aware, never-fed excluded).
+        // (scorpions included, species-aware; never-fed animals count once their first meal is due).
         fetch(`${API_URL}/api/v1/inverts/feeding-status?tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
       ])
 
@@ -219,6 +230,25 @@ export default function DashboardHub() {
       setLoading(false)
     }
   }
+
+  // Re-read the all-taxa feeding status after a first feeding was logged from
+  // the nudge card (no full-page reload).
+  const refreshFeedingStatus = useCallback(async () => {
+    if (!token) return
+    try {
+      const tzOffset = new Date().getTimezoneOffset()
+      const res = await fetch(`${API_URL}/api/v1/inverts/feeding-status?tz_offset_minutes=${tzOffset}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const fs = await res.json()
+        if (Array.isArray(fs)) setFeedingStatusItems(fs)
+      }
+    } catch {
+      // Keep what is on screen.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
 
   const fetchAllFeedingStatuses = async (authToken: string, tarantulasList: Tarantula[]) => {
     const statusMap = new Map<string, FeedingStatus>()
@@ -275,10 +305,38 @@ export default function DashboardHub() {
   // /inverts/feeding-status) — the SAME definition the Feeding Day screen and
   // the daily digest use. This replaces the old tarantula-only, flat-7-day
   // widget so the dashboard count matches the notification (a scorpion past
-  // its interval now shows here; paused + never-fed are excluded server-side).
+  // its interval now shows here; paused animals are excluded server-side, and
+  // a never-fed animal whose first meal is due is included and counted from
+  // its baseline date).
   const overdueFeedings = feedingStatusItems
     .filter(i => i.is_overdue)
-    .sort((a, b) => (b.days_since_last_feeding ?? 0) - (a.days_since_last_feeding ?? 0))
+    .sort(
+      (a, b) =>
+        (b.days_since_last_feeding ?? b.days_since_baseline ?? 0) -
+        (a.days_since_last_feeding ?? a.days_since_baseline ?? 0),
+    )
+
+  // Animals with no logged feeding that the server flags for the nudge card
+  // (grazers and paused animals are never flagged).
+  const needsFirstFeeding = feedingStatusItems.filter(i => i.needs_first_feeding)
+  const firstFeedingItems = needsFirstFeeding.slice(0, 3).map(i => ({
+    id: i.id,
+    name: i.name || i.common_name || i.scientific_name || 'Unnamed',
+  }))
+
+  // The first time something is due, offer the daily email once (never when it
+  // is already on, never twice). Reads the saved preference; any failure = no ask.
+  const anyDue = feedingStatusItems.some(i => i.is_overdue)
+  useEffect(() => {
+    if (!token || !anyDue || dueAskChecked.current) return
+    dueAskChecked.current = true
+    if (readAskState().dueShown) return
+    // No cancel flag: the checked-ref makes this run once, and a late setState
+    // after unmount is harmless.
+    fetchEmailReminderPrefs(token).then(prefs => {
+      if (prefs !== null && shouldAskWhenDue(readAskState(), prefs.emailOn, true, prefs.digestOn)) setShowDueAsk(true)
+    })
+  }, [token, anyDue])
 
   // Source of truth: the canonical `is_premolt_likely` boolean from
   // /premolt/dashboard. Same flag PremoltAlertCard / mobile use, so
@@ -390,6 +448,12 @@ export default function DashboardHub() {
                 ➕ Add First Animal
               </button>
               <button
+                onClick={() => router.push('/dashboard/tarantulas/import')}
+                className="px-8 py-4 bg-surface border border-theme text-theme-primary rounded-xl hover:bg-surface-elevated transition-all duration-200 font-semibold shadow-lg text-lg"
+              >
+                {FIRST_FEEDING_COPY.welcomeImport}
+              </button>
+              <button
                 onClick={() => router.push('/species')}
                 className="px-8 py-4 bg-surface border border-theme text-theme-primary rounded-xl hover:bg-surface-elevated transition-all duration-200 font-semibold shadow-lg text-lg"
               >
@@ -461,7 +525,7 @@ export default function DashboardHub() {
           {/* Needs Feeding */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
-            aria-label={`Needs feeding: ${overdueFeedings.length} ${overdueFeedings.length > 0 ? 'overdue for feeding' : 'all on schedule'}.`}
+            aria-label={`Needs feeding: ${overdueFeedings.length} ${overdueFeedings.length > 0 ? 'overdue for feeding' : needsFirstFeeding.length > 0 ? FIRST_FEEDING_COPY.firstMealNotLogged : 'all on schedule'}.`}
             className={`rounded-2xl shadow-lg border p-6 hover:shadow-xl transition-all text-left ${
               overdueFeedings.length > 0
                 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
@@ -482,7 +546,11 @@ export default function DashboardHub() {
               </div>
             </div>
             <p className="mt-3 text-sm text-theme-tertiary">
-              {overdueFeedings.length > 0 ? 'Overdue for feeding' : 'All on schedule'}
+              {overdueFeedings.length > 0
+                ? 'Overdue for feeding'
+                : needsFirstFeeding.length > 0
+                  ? FIRST_FEEDING_COPY.firstMealNotLogged
+                  : 'All on schedule'}
             </p>
           </button>
 
@@ -553,17 +621,35 @@ export default function DashboardHub() {
               )}
             </button>
 
+            {/* First feeding not logged (Day-one) — hides itself for 14 days on ✕ */}
+            <FirstFeedingCard items={firstFeedingItems} token={token} onLogged={refreshFeedingStatus} />
+
             {/* Feeding Alerts Section */}
             <div data-tour="feeding-alerts" className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
               <h2 className="text-xl font-bold text-theme-primary flex items-center gap-2 mb-4">
                 🍽️ Feeding Alerts
               </h2>
               {overdueFeedings.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-3">✅</div>
-                  <p className="text-theme-secondary font-medium">All animals are fed on schedule!</p>
-                  <p className="text-sm text-theme-tertiary mt-1">Great job keeping up with feedings.</p>
-                </div>
+                needsFirstFeeding.length > 0 ? (
+                  // Nothing overdue, but some animals have no meal logged: don't claim "all fed".
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-3">🍽️</div>
+                    <p className="text-theme-secondary font-medium">{FIRST_FEEDING_COPY.firstMealNotLogged}</p>
+                    <p className="text-sm text-theme-tertiary mt-1">
+                      {needsFirstFeeding
+                        .slice(0, 3)
+                        .map(i => i.name || i.common_name || i.scientific_name || 'Unnamed')
+                        .join(', ')}
+                      {needsFirstFeeding.length > 3 ? ` + ${needsFirstFeeding.length - 3} more` : ''}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-3">✅</div>
+                    <p className="text-theme-secondary font-medium">All animals are fed on schedule!</p>
+                    <p className="text-sm text-theme-tertiary mt-1">Great job keeping up with feedings.</p>
+                  </div>
+                )
               ) : (
                 <div className="space-y-3">
                   {overdueFeedings.slice(0, 10).map(t => {
@@ -593,11 +679,12 @@ export default function DashboardHub() {
                           <div>
                             <p className="font-semibold text-theme-primary">{label}</p>
                             <p className={`text-sm font-medium ${
-                              days >= 21 ? 'text-red-600 dark:text-red-400' :
+                              // Never fed (no days since a feeding) is overdue like any other overdue row: red.
+                              t.days_since_last_feeding == null || days >= 21 ? 'text-red-600 dark:text-red-400' :
                               days >= 14 ? 'text-orange-600 dark:text-orange-400' :
                               'text-yellow-600 dark:text-yellow-400'
                             }`}>
-                              {days} days since last feeding
+                              {feedingStatusText(t) ?? `${days} days since last feeding`}
                             </p>
                           </div>
                         </div>
@@ -760,6 +847,13 @@ export default function DashboardHub() {
       <DashboardTour />
 
       {/* Upgrade Modal */}
+      <EmailReminderDialog
+        open={showDueAsk}
+        variant="due"
+        token={token}
+        onClose={() => setShowDueAsk(false)}
+      />
+
       <UpgradeModal source="collection_cap"
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}

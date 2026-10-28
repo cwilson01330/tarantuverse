@@ -13,7 +13,7 @@ import { Analytics, type BeforeSendEvent } from '@vercel/analytics/react'
 function scrub(event: BeforeSendEvent): BeforeSendEvent | null {
   try {
     const u = new URL(event.url)
-    if (u.pathname === '/sit' || u.pathname.startsWith('/sit/') || u.pathname === '/invite' || u.pathname.startsWith('/c/') || u.pathname.startsWith('/care-sheet/')) return null  // /c/<code>: unlisted card links; /care-sheet/<token>: sitter sheets
+    if (u.pathname === '/sit' || u.pathname.startsWith('/sit/') || u.pathname === '/invite' || u.pathname.startsWith('/c/') || u.pathname.startsWith('/care-sheet/') || u.pathname.startsWith('/unsubscribe/')) return null  // /c/<code>: unlisted card links; /care-sheet/<token>: sitter sheets; /unsubscribe/<token>: email links
     u.hash = ''
     return { ...event, url: u.toString() }
   } catch {

@@ -34,6 +34,9 @@ import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
 import InsightsCard from '../../src/components/analytics/InsightsCard';
 import type { CollectionAnalytics } from '../../src/lib/analytics-view';
 import { setCollectionAnimalCount } from '../../src/lib/collection-summary';
+import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
+import { FirstFeedingCard } from '../../src/components/FirstFeedingCard';
+import { NotificationAskSheet, useNotificationAsk } from '../../src/components/NotificationAskSheet';
 
 /** "Good morning" / "Good afternoon" / "Good evening" from the device clock. */
 function timeGreeting(): string {
@@ -64,8 +67,9 @@ interface Tarantula {
 // One row from the all-taxa /inverts/feeding-status endpoint — the SAME
 // source Feeding Day and the daily digest read, so the dashboard's overdue
 // widget now agrees with them (was tarantula-only + flat-7-day before). The
-// server's `is_overdue` is species/life-stage aware and already excludes
-// paused animals and never-fed animals.
+// server's `is_overdue` is species/life-stage aware and excludes paused
+// animals; a never-fed animal counts once its first meal is due (it then has
+// no days_since_last_feeding, only days_since_baseline).
 interface FeedingStatusItem {
   id: string;
   name: string | null;
@@ -76,6 +80,9 @@ interface FeedingStatusItem {
   days_since_last_feeding: number | null;
   is_feeding_paused: boolean;
   is_overdue: boolean;
+  /** Day-one: no feeding logged yet and a first meal is due (server rule). */
+  needs_first_feeding?: boolean;
+  days_since_baseline?: number | null;
 }
 
 // Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction. We
@@ -218,6 +225,8 @@ function DashboardHubScreen() {
     undefined;                        // sm → base 4-up
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatusItems, setFeedingStatusItems] = useState<FeedingStatusItem[]>([]);
+  // One-time "want a reminder on days something is due?" ask (see NotificationAskSheet).
+  const ask = useNotificationAsk();
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [colonies, setColonies] = useState<ColonyListItem[]>([]);
@@ -423,7 +432,8 @@ function DashboardHubScreen() {
   const fetchAllFeedingStatuses = async () => {
     // ONE all-taxa call — the same endpoint Feeding Day + the daily digest
     // read, so all three surfaces agree. `is_overdue` is species/life-stage
-    // aware and already excludes paused + never-fed animals. Pass the device's
+    // aware, excludes paused animals and includes never-fed animals whose first
+    // meal is due (needs_first_feeding / "Due · no meal logged yet"). Pass the device's
     // local offset so days_since_last_feeding is a calendar-day diff in the
     // user's timezone, not a UTC delta.
     const tzOffset = new Date().getTimezoneOffset();
@@ -432,7 +442,11 @@ function DashboardHubScreen() {
         `/inverts/feeding-status`,
         { params: { tz_offset_minutes: tzOffset } },
       );
-      setFeedingStatusItems(response.data ?? []);
+      const rows = response.data ?? [];
+      setFeedingStatusItems(rows);
+      // After statuses load: the one-time "due" ask, only if something is due.
+      // (The hook decides whether it has been asked already.)
+      ask.maybeAskWhenDue(rows.some((r) => r.is_overdue));
     } catch {
       // leave prior items in place on transient failure
     }
@@ -463,15 +477,25 @@ function DashboardHubScreen() {
     setRefreshing(false);
   }, []);
 
-  // Overdue = the server's species/life-stage-aware `is_overdue` (already
-  // excludes paused + never-fed), across ALL taxa — matches Feeding Day and
-  // the daily digest exactly. Sorted most-overdue first.
+  // Overdue = the server's species/life-stage-aware `is_overdue` (excludes
+  // paused; includes never-fed animals whose first meal is due), across ALL
+  // taxa — matches Feeding Day and the daily digest exactly. Sorted
+  // most-overdue first; a never-fed animal counts its days since baseline.
   const overdueFeedings = feedingStatusItems
     .filter((i) => i.is_overdue)
     .sort(
       (a, b) =>
-        (b.days_since_last_feeding ?? 0) - (a.days_since_last_feeding ?? 0),
+        (b.days_since_last_feeding ?? b.days_since_baseline ?? 0) -
+        (a.days_since_last_feeding ?? a.days_since_baseline ?? 0),
     );
+
+  // Animals with no logged feeding that the server says are ready for a first
+  // meal, in API order. The nudge card shows the top three.
+  const needsFirstFeeding = feedingStatusItems.filter((i) => i.needs_first_feeding);
+  const firstFeedingItems = needsFirstFeeding.slice(0, 3).map((i) => ({
+    id: i.id,
+    name: i.name || i.common_name || i.scientific_name || 'Unnamed',
+  }));
 
   // Source of truth: the canonical `is_premolt_likely` boolean from
   // the premolt service. PremoltAlertCard on the collection screen uses
@@ -985,6 +1009,14 @@ function DashboardHubScreen() {
           >
             <Text style={styles.emptySecondaryText}>📖 Species</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.emptySecondaryButton}
+            onPress={() => router.push('/import' as any)}
+            accessibilityRole="button"
+            accessibilityLabel={FIRST_FEEDING_COPY.welcomeImport}
+          >
+            <Text style={styles.emptySecondaryText}>{FIRST_FEEDING_COPY.welcomeImport}</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -1118,6 +1150,10 @@ function DashboardHubScreen() {
             Alerts" section: they rendered the same /inverts/feeding-status
             data twice. Head row = count + taxa breakdown + Start; then up to
             three rows with one-tap mark-fed; then "See all". */}
+        {/* Day-one nudge: animals with no logged feeding. Above the hero,
+            hidden for 14 days by its X. */}
+        <FirstFeedingCard items={firstFeedingItems} onLogged={fetchAllFeedingStatuses} />
+
         <CopilotStep
           text="Animals overdue for feeding show up here, most urgent first. Tap the check to log a feeding, or Start to work through them all."
           order={2}
@@ -1137,11 +1173,22 @@ function DashboardHubScreen() {
             {'  '}Feeding
           </Text>
           {overdueFeedings.length === 0 ? (
-            <View style={styles.allFedContainer}>
-              <MaterialCommunityIcons name="check-circle-outline" size={32} color={colors.success} />
-              <Text style={styles.allFedTitle}>All animals are fed on schedule!</Text>
-              <Text style={styles.allFedSubtitle}>Great job keeping up with feedings.</Text>
-            </View>
+            needsFirstFeeding.length > 0 ? (
+              // Nothing is overdue only because some animals have no logged
+              // feeding yet: don't call that "fed on schedule".
+              <View style={styles.allFedContainer}>
+                <MaterialCommunityIcons name="clock-outline" size={32} color={colors.textTertiary} />
+                <Text style={styles.allFedSubtitle}>
+                  {feedingStatusText({ needs_first_feeding: true })}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.allFedContainer}>
+                <MaterialCommunityIcons name="check-circle-outline" size={32} color={colors.success} />
+                <Text style={styles.allFedTitle}>All animals are fed on schedule!</Text>
+                <Text style={styles.allFedSubtitle}>Great job keeping up with feedings.</Text>
+              </View>
+            )
           ) : (
             <>
               {/* Head row: count, taxa breakdown, Start */}
@@ -1168,6 +1215,8 @@ function DashboardHubScreen() {
 
               {overdueFeedings.slice(0, 3).map(item => {
                 const days = item.days_since_last_feeding ?? 0;
+                // Overdue with nothing logged: "Due · no meal logged yet", not "0 days".
+                const noMealText = item.days_since_last_feeding == null ? feedingStatusText(item) : null;
                 const label = item.common_name || item.name || item.scientific_name || 'Unnamed';
                 const href = detailHref(item);
                 const busy = heroFedBusy === item.id;
@@ -1196,8 +1245,8 @@ function DashboardHubScreen() {
                     )}
                     <View style={styles.alertInfo}>
                       <Text style={styles.alertName}>{label}</Text>
-                      <Text style={[styles.alertDays, { color: getFeedingDaysColor(days) }]}>
-                        {days} days since last feeding
+                      <Text style={[styles.alertDays, { color: noMealText ? colors.error : getFeedingDaysColor(days) }]}>
+                        {noMealText ?? `${days} days since last feeding`}
                       </Text>
                     </View>
                     {/* One-tap mark-fed. stopPropagation via a separate
@@ -1385,6 +1434,7 @@ function DashboardHubScreen() {
         </CopilotStep>
       </ScrollView>
 
+      <NotificationAskSheet {...ask.sheetProps} />
     </View>
   );
 }

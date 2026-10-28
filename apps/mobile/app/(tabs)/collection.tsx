@@ -29,6 +29,7 @@ import CollectionCapNotice from '../../src/components/CollectionCapNotice';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import { feedingStatusColor } from '../../src/utils/status-colors';
+import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
   scorpionDisplayName,
@@ -101,6 +102,8 @@ interface FeedingStatus {
    *  how far PAST DUE it is rather than how long since it last ate — those
    *  differ by the whole interval. */
   interval_days?: number | null;
+  /** Never fed and due for a first meal that was never logged (server rule). */
+  needs_first_feeding?: boolean;
 }
 
 /**
@@ -313,6 +316,7 @@ function CollectionScreen() {
           days_since_last_feeding: row.days_since_last_feeding ?? undefined,
           is_feeding_paused: row.is_feeding_paused ?? false,
           is_overdue: row.is_overdue ?? false,
+          needs_first_feeding: row.needs_first_feeding ?? false,
           location: row.location ?? null,
         });
       }
@@ -861,6 +865,7 @@ function CollectionScreen() {
           isOverdue: status?.is_overdue,
           // Lets the card say how far past due, not just days since fed.
           intervalDays: status?.interval_days,
+          needsFirstFeeding: status?.needs_first_feeding,
         }}
         premolt={showsPremolt(item.id)}
         onPress={() => router.push(`/tarantula/${item.id}`)}
@@ -912,6 +917,7 @@ function CollectionScreen() {
                 isPaused: status.is_feeding_paused,
                 isOverdue: status.is_overdue,
                 intervalDays: status.interval_days,
+                needsFirstFeeding: status.needs_first_feeding,
               }
             : undefined
         }
@@ -959,6 +965,10 @@ function CollectionScreen() {
     const premoltPrediction = premoltPredictions.get(item.id);
     const days = feedingStatus?.days_since_last_feeding;
     const feedingColor = feedingStatusColor(days, colors);
+    // "First meal not logged" / "Due · no meal logged yet" for an animal with no feeding on record.
+    const noMealText = feedingStatus ? feedingStatusText(feedingStatus) : null;
+    // Tinted pill (like Feeding Day): red tint when overdue, neutral otherwise; text from theme colours for AA contrast in both themes.
+    const noMealOverdue = !!feedingStatus?.is_overdue && !feedingStatus?.needs_first_feeding;
 
     const displayName = item.name || item.common_name || 'Unknown';
     const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
@@ -1042,6 +1052,19 @@ function CollectionScreen() {
               <Text style={styles.listBadgeText}>{days === 0 ? 'Today' : `${days}d`}</Text>
             </View>
           )}
+          {(days === undefined || days === null) && !!noMealText && (
+            <View
+              style={[styles.listBadge, styles.listBadgeShrink, { backgroundColor: `${noMealOverdue ? colors.error : colors.textTertiary}22` }]}
+              accessibilityLabel={noMealText}
+            >
+              <Text
+                numberOfLines={1}
+                style={[styles.listBadgeText, { color: noMealOverdue ? colors.textPrimary : colors.textSecondary }]}
+              >
+                {noMealText}
+              </Text>
+            </View>
+          )}
           {premoltPrediction
             && premoltPrediction.is_premolt_likely
             && premoltPrediction.data_quality !== 'insufficient' && (
@@ -1094,6 +1117,9 @@ function CollectionScreen() {
     // Paused trumps the days-since treatment, same as the tarantula row.
     const feedingDays = feedingStatus?.days_since_last_feeding;
     const feedingColor = feedingStatusColor(feedingDays, colors);
+    const noMealText = feedingStatus ? feedingStatusText(feedingStatus) : null;
+    // Tinted pill (like Feeding Day): red tint when overdue, neutral otherwise; text from theme colours for AA contrast in both themes.
+    const noMealOverdue = !!feedingStatus?.is_overdue && !feedingStatus?.needs_first_feeding;
     return (
       <TouchableOpacity
         style={styles.listItem}
@@ -1177,6 +1203,18 @@ function CollectionScreen() {
             >
               <Text style={styles.listBadgeText}>
                 {feedingDays === 0 ? 'Today' : `${feedingDays}d`}
+              </Text>
+            </View>
+          ) : noMealText ? (
+            <View
+              style={[styles.listBadge, styles.listBadgeShrink, { backgroundColor: `${noMealOverdue ? colors.error : colors.textTertiary}22` }]}
+              accessibilityLabel={noMealText}
+            >
+              <Text
+                numberOfLines={1}
+                style={[styles.listBadgeText, { color: noMealOverdue ? colors.textPrimary : colors.textSecondary }]}
+              >
+                {noMealText}
               </Text>
             </View>
           ) : null}
@@ -1542,6 +1580,12 @@ function CollectionScreen() {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    // The no-meal pill carries a sentence ("First meal not logged"), so it may
+    // shrink and truncate instead of pushing the row's name off-screen.
+    listBadgeShrink: {
+      flexShrink: 1,
+      maxWidth: 150,
+    },
     listBadgeText: {
       color: '#fff',
       fontSize: 11,
@@ -1566,56 +1610,6 @@ function CollectionScreen() {
       alignItems: 'center',
       marginHorizontal: 8,
       marginBottom: 8,
-    },
-    // Get Started Card styles
-    getStartedCard: {
-      margin: 8,
-      marginBottom: 16,
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 16,
-      borderWidth: 2,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    getStartedContent: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 12,
-      marginBottom: 12,
-    },
-    getStartedEmoji: {
-      fontSize: 32,
-      marginTop: 2,
-    },
-    getStartedTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginBottom: 4,
-    },
-    getStartedText: {
-      fontSize: 13,
-      color: colors.textSecondary,
-      lineHeight: 18,
-    },
-    getStartedButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      borderRadius: 8,
-      alignSelf: 'flex-start',
-    },
-    getStartedButtonText: {
-      color: '#fff',
-      fontSize: 14,
-      fontWeight: '600',
     },
     // Search bar styles
     searchContainer: {
@@ -1966,32 +1960,6 @@ function CollectionScreen() {
     );
   };
 
-  // Empty state card component for when collection is empty.
-  // NB: currently unused since the empty-state branch below renders
-  // the full welcome flow directly; kept around as a smaller inline
-  // nudge variant if a future iteration wants it back. Routes through
-  // openAddPicker so the taxon disambiguator stays the single entry.
-  const GetStartedCard = () => (
-    <View style={[styles.getStartedCard, { borderColor: colors.primary }]}>
-      <View style={styles.getStartedContent}>
-        <Text style={styles.getStartedEmoji}>🎯</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.getStartedTitle}>Add your first animal</Text>
-          <Text style={styles.getStartedText}>
-            Start building your collection — tarantulas or scorpions both supported.
-          </Text>
-        </View>
-      </View>
-      <PrimaryButton
-        onPress={openAddPicker}
-        style={styles.getStartedButton}
-      >
-        <MaterialCommunityIcons name="plus" size={18} color="#fff" />
-        <Text style={styles.getStartedButtonText}>Add</Text>
-      </PrimaryButton>
-    </View>
-  );
-
   // Collection is empty across ALL taxa — show the welcome flow.
   // NB: must include otherInverts (vinegaroon/true_spider/millipede/mantis/
   // roach/other) or a keeper whose only animals are those taxa wrongly sees
@@ -2216,6 +2184,25 @@ function CollectionScreen() {
             <MaterialCommunityIcons name="book-open-variant" size={20} color={colors.textPrimary} />
             <Text style={[styles.addButtonText, { color: colors.textPrimary }]}>
               Browse Species
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/import' as any)}
+            style={[
+              styles.addButton,
+              {
+                marginTop: 12,
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={FIRST_FEEDING_COPY.welcomeImport}
+          >
+            <MaterialCommunityIcons name="file-upload-outline" size={20} color={colors.textPrimary} />
+            <Text style={[styles.addButtonText, { color: colors.textPrimary }]}>
+              {FIRST_FEEDING_COPY.welcomeImport}
             </Text>
           </TouchableOpacity>
           {/* A keeper whose last animal died lands here, and the Died chip

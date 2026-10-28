@@ -24,6 +24,7 @@ from app.utils.emails import normalize_email, find_users_by_email, pick_oauth_ma
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.utils.oauth import generate_username_from_email
 from app.services.email import EmailService
+from app.services.notification_prefs import ensure_notification_preferences
 from app.services.storage import storage_service
 from app.services.oauth_verification import (
     OAuthVerificationError,
@@ -161,6 +162,10 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     )
 
     db.add(new_user)
+    db.flush()
+    # Every account has a notification-preferences row (the daily reminder
+    # lands in the in-app bell for everyone), created in the same transaction.
+    ensure_notification_preferences(db, new_user.id)
     db.commit()
     db.refresh(new_user)
 
@@ -865,6 +870,7 @@ async def oauth_login(
                 )
                 db.add(user)
                 db.flush()  # Get user.id for the OAuth account
+                ensure_notification_preferences(db, user.id)
 
                 # Create OAuth account link
                 oauth_account = UserOAuthAccount(

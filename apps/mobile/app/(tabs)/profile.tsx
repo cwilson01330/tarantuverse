@@ -289,7 +289,7 @@ function ProfileScreen() {
         <AnalyticsRow animals={animalCount} onPress={() => router.push('/analytics' as never)} />
         <MenuRow icon="bug-outline" label="Feeders" onPress={() => router.push('/feeders')}
           accessibilityHint="Your feeder colonies and stock" />
-        <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses')}
+        <MenuRow icon="receipt" label="Expenses" badge="Premium" onPress={() => router.push('/expenses')}
           accessibilityHint="Log what you spend on feeders, substrate and supplies" />
         <MenuRow icon="download-outline" label="Export your data" onPress={() => router.push('/settings/data-export')} />
         <MenuRow icon="link" label="Sitter links" onPress={() => router.push('/sitter' as never)}

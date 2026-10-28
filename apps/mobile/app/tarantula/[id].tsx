@@ -32,7 +32,7 @@
  *     gained a taxon-agnostic `POST /inverts/{id}/upload-session`.
  *   - PhotoViewer and PremoltPredictionCard were mounted on the unified screen.
  *
- * Sibling routes (`/tarantula/add-feeding`, `/tarantula/edit`, …) are separate
+ * Sibling routes (`/tarantula/edit`, …) are separate
  * files and still exist. The unified screen uses the generic `/invert/*` log
  * screens, which hit the same polymorphic endpoints.
  */

@@ -684,6 +684,8 @@ export interface InvertFeedingStats {
    *  though it were species knowledge. */
   interval_source: string | null;
   is_overdue: boolean;
+  /** Day-one: no feeding logged yet and a first meal is due (server rule). */
+  needs_first_feeding?: boolean;
 }
 
 export async function getInvertFeedingStats(id: string): Promise<InvertFeedingStats> {

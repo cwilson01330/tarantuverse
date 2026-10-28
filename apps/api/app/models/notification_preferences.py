@@ -56,5 +56,12 @@ class NotificationPreferences(Base):
     tz_offset_minutes = Column(Integer, nullable=True)  # JS getTimezoneOffset(); positive = west of UTC
     last_digest_sent_on = Column(Date, nullable=True)  # local date the digest last ran, prevents double-fire
 
+    # Opt-in daily email version of the digest (services/digest_email.py). Off
+    # until the keeper turns it on. `email_digest_last_sent_on` is the UTC date
+    # of the last send: one email per person per UTC day, and the daily cap
+    # counts rows carrying today's date.
+    email_digest_enabled = Column(Boolean, default=False, nullable=False, server_default="false")
+    email_digest_last_sent_on = Column(Date, nullable=True)
+
     # Relationship
     user = relationship("User", back_populates="notification_preferences")

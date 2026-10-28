@@ -29,6 +29,7 @@ import { LocationSheet } from '../src/components/LocationPicker';
 import PremiumIntroCard, { shouldShowPremiumIntro } from '../src/components/PremiumIntroCard';
 import { bulkSetLocation, groupByLocation, listLocations, type LocationItem } from '../src/lib/locations';
 import { maybeRequestReview } from '../src/lib/reviewPrompt';
+import { feedingStatusText } from '../src/lib/first-feeding';
 
 interface FeedingStatus {
   id: string;
@@ -44,6 +45,8 @@ interface FeedingStatus {
   days_since_last_feeding: number | null;
   is_feeding_paused: boolean;
   is_overdue: boolean;
+  /** Never fed and due for a first meal that was never logged (server rule). */
+  needs_first_feeding?: boolean;
   interval_days: number | null;
   /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
    *  guess. Never render a default as a species schedule. */
@@ -385,6 +388,14 @@ export default function FeedingDayScreen() {
 
   const statusPill = (a: FeedingStatus) => {
     if (a.is_feeding_paused) return { label: 'Paused', color: STATUS.paused };
+    // No logged feeding: the Day-one labels first, the old "Never fed" otherwise.
+    const noMeal = feedingStatusText(a);
+    if (noMeal) {
+      return {
+        label: noMeal,
+        color: a.is_overdue && !a.needs_first_feeding ? STATUS.overdue : colors.textTertiary,
+      };
+    }
     if (a.days_since_last_feeding === null) return { label: 'Never fed', color: STATUS.overdue };
     if (a.is_overdue) return { label: `${a.days_since_last_feeding}d ago`, color: STATUS.overdue };
     return { label: `${a.days_since_last_feeding}d ago`, color: colors.textTertiary };

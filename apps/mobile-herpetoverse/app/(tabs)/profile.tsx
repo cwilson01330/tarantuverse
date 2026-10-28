@@ -332,7 +332,7 @@ function YouScreen() {
             onPress={() => router.push('/whats-new' as never)}
             accessibilityHint="Opens the latest changes to the app"
           />
-          <MenuRow icon="receipt" label="Expenses" onPress={() => router.push('/expenses' as never)} />
+          <MenuRow icon="receipt" label="Expenses" badge="Premium" onPress={() => router.push('/expenses' as never)} />
           <MenuRow icon="calculator-variant" label="Morph calculator" detail="Predict offspring from any pairing."
             onPress={() => router.push('/morph-calculator' as never)} />
         </MenuSection>

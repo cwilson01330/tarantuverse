@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import HerpetoverseBanner from './HerpetoverseBanner'
+import TimezoneSync from './TimezoneSync'
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -32,6 +33,9 @@ export default function DashboardLayout({ children, userName, userEmail, userAva
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Saves this browser's time zone once per session (reminder hour = local hour) */}
+      <TimezoneSync />
+
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}

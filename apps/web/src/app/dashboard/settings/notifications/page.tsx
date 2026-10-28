@@ -12,9 +12,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
+import { FIRST_FEEDING_COPY } from '@/lib/firstFeeding';
 
 interface NotificationPreferences {
   daily_digest_enabled: boolean;
+  // Day-one: the same digest by email. Only sent from the digest run, so it
+  // does nothing while daily_digest_enabled is off.
+  email_digest_enabled: boolean;
   digest_hour: number;
   push_notifications_enabled: boolean;
   direct_messages_enabled: boolean;
@@ -60,17 +64,29 @@ function hourIsQuiet(hour: number, start: string, end: string): boolean {
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
-function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+function Toggle({
+  on,
+  onClick,
+  label,
+  disabled = false,
+}: {
+  on: boolean;
+  onClick: () => void;
+  label: string;
+  /** Truly disabled: not focusable, not operable by keyboard or pointer. */
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       role="switch"
       aria-checked={on}
       aria-label={label}
       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ml-4 ${
         on ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-      }`}
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <span
         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -90,6 +106,7 @@ export default function NotificationSettingsPage() {
 
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     daily_digest_enabled: true,
+    email_digest_enabled: false,
     digest_hour: 9,
     push_notifications_enabled: true,
     direct_messages_enabled: true,
@@ -129,6 +146,7 @@ export default function NotificationSettingsPage() {
           ...data,
           // Older API builds don't return these; keep the server's defaults.
           daily_digest_enabled: data.daily_digest_enabled ?? true,
+          email_digest_enabled: data.email_digest_enabled ?? false,
           digest_hour: typeof data.digest_hour === 'number' ? data.digest_hour : 9,
           sitter_activity_enabled: data.sitter_activity_enabled ?? true,
         }));
@@ -157,6 +175,7 @@ export default function NotificationSettingsPage() {
       // its own settings, which a full echo could overwrite.
       const updatePayload = {
         daily_digest_enabled: preferences.daily_digest_enabled,
+        email_digest_enabled: preferences.email_digest_enabled,
         digest_hour: preferences.digest_hour,
         // The digest hour is a local hour: save this browser's zone with it.
         tz_offset_minutes: new Date().getTimezoneOffset(),
@@ -267,6 +286,19 @@ export default function NotificationSettingsPage() {
                 </p>
               </div>
               <Toggle on={digestOn} onClick={() => togglePreference('daily_digest_enabled')} label="Daily feeding digest" />
+            </div>
+
+            <div className={`${row} ${digestOn ? '' : 'opacity-50'}`}>
+              <div className="flex-1">
+                <h3 className={title}>{FIRST_FEEDING_COPY.dailyEmailSwitch}</h3>
+                <p className={desc}>{FIRST_FEEDING_COPY.dailyEmailHelp}</p>
+              </div>
+              <Toggle
+                on={preferences.email_digest_enabled}
+                onClick={() => togglePreference('email_digest_enabled')}
+                label={FIRST_FEEDING_COPY.dailyEmailSwitch}
+                disabled={!digestOn}
+              />
             </div>
 
             <div className={`${row} ${digestOn ? '' : 'opacity-50'}`}>

@@ -42,6 +42,8 @@ class NotificationPreferencesBase(BaseModel):
     daily_digest_enabled: Optional[bool] = True
     digest_hour: Optional[int] = 9  # keeper's local hour, 0-23
     tz_offset_minutes: Optional[int] = None  # JS getTimezoneOffset(); positive = west of UTC
+    # Opt-in email version of the same digest.
+    email_digest_enabled: Optional[bool] = False
 
 
 # Columns that are NOT NULL in the table (plus tz_offset_minutes, which nothing
@@ -49,7 +51,7 @@ class NotificationPreferencesBase(BaseModel):
 # client is ignored rather than turned into a 500 or a silent timezone loss.
 NON_NULLABLE_FIELDS = frozenset({
     "daily_digest_enabled", "digest_hour", "tz_offset_minutes",
-    "feeder_low_stock_enabled", "sitter_activity_enabled",
+    "feeder_low_stock_enabled", "sitter_activity_enabled", "email_digest_enabled",
 })
 
 
@@ -84,6 +86,8 @@ class NotificationPreferencesUpdate(BaseModel):
     # Sent alongside digest_hour so "9 AM" means 9 AM where the keeper is.
     # Real offsets run from -14:00 to +12:00.
     tz_offset_minutes: Optional[int] = Field(None, ge=-840, le=720)
+
+    email_digest_enabled: Optional[bool] = None
 
     expo_push_token: Optional[str] = None
 

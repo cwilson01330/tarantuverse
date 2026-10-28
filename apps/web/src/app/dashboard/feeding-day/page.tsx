@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import { LocationDialog } from '@/components/LocationPicker'
 import CareSheetDialog from '@/components/CareSheetDialog'
 import PremiumIntroCard, { shouldShowPremiumIntro } from '@/components/PremiumIntroCard'
+import { feedingStatusText } from '@/lib/firstFeeding'
 import { bulkSetLocation, groupByLocation, listLocations, UNASSIGNED_KEY, type LocationItem } from '@/lib/locations'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -25,6 +26,8 @@ interface FeedingStatus {
   days_since_last_feeding: number | null
   is_feeding_paused: boolean
   is_overdue: boolean
+  /** Day-one: never fed and past the release cutoff (no meal logged yet). */
+  needs_first_feeding?: boolean
   life_stage: string | null
   /** Room / rack / shelf, when the keeper set one. */
   location?: string | null
@@ -806,6 +809,21 @@ function StatusPill({
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">
         Paused
+      </span>
+    )
+  }
+  // No logged feeding at all: "First meal not logged" / "Due · no meal logged yet".
+  const noMeal = feedingStatusText(animal)
+  if (noMeal) {
+    return (
+      <span
+        className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${
+          animal.needs_first_feeding
+            ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+            : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+        }`}
+      >
+        {noMeal}
       </span>
     )
   }

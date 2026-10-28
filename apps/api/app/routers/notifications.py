@@ -128,5 +128,10 @@ async def run_digests(
     if not secret or x_cron_secret != secret:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     # Local import avoids any import-time cycle (digest_service imports inverts router).
+    from app.services.digest_email import send_digest_emails
     from app.services.digest_service import run_feeding_digests
-    return run_feeding_digests(db, only_user_id=test_user_id, ignore_schedule=ignore_schedule)
+    result = run_feeding_digests(db, only_user_id=test_user_id, ignore_schedule=ignore_schedule)
+    # DigestEmail objects carry addresses: they are sent here and never returned.
+    emails = result.pop("emails", [])
+    result["emails_sent"] = await send_digest_emails(db, emails)
+    return result

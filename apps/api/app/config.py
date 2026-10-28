@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     # Email (Resend)
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "Tarantuverse <noreply@mail.tarantuverse.com>"
+    # Daily care-digest emails (services/digest_email.py): at most this many per
+    # UTC day. Resend's free plan allows 100/day, shared with password resets.
+    DIGEST_EMAIL_DAILY_CAP: int = 80
+    # This API's public address; the List-Unsubscribe header points back here.
+    API_PUBLIC_URL: str = "https://tarantuverse-api.onrender.com"
 
     # Stripe Payments
     STRIPE_SECRET_KEY: str = ""

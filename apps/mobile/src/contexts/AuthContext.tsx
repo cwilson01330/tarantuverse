@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
 import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable, type OAuthLoginResult } from '../services/google-signin';
-import { getExpoPushToken } from '../services/notifications';
+import { registerPushToken } from '../services/notifications';
 import { getErrorMessage } from '../utils/errors';
 import { clearSharedCache } from '../lib/co-keepers';
 import { deviceDefaultUnits, isUnits, type Units } from '../lib/units';
@@ -194,34 +194,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [handleAuthExpired]);
 
-  // Register this device's Expo push token whenever we have an auth session
-  // (fresh login OR app relaunch once the stored token hydrates). Previously
-  // this only happened if a user opened Settings > Notifications, so almost no
-  // tokens were ever stored (ADR-009). Fire-and-forget; returns null in Expo Go
-  // or if permission is denied, and never blocks the app.
+  // Re-register this device's Expo push token whenever we have an auth session
+  // (fresh login OR app relaunch once the stored token hydrates), so a token
+  // that rotated is refreshed (ADR-009). Day-one: this NEVER prompts. The
+  // permission dialog is only shown from a moment the keeper chose (the ask
+  // after saving an animal / when something is due, or Settings > Enable);
+  // registerPushToken() does nothing unless the OS permission is already
+  // granted. Fire-and-forget, non-fatal, never blocks the app.
   // Keyed on "signed in as this user", not on the token string, so the daily
   // token refresh doesn't re-post the push token.
   const hasToken = !!token;
   const userId = user?.id ?? null;
   useEffect(() => {
     if (!hasToken) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const pushToken = await getExpoPushToken();
-        if (!cancelled && pushToken) {
-          await apiClient.post('/notification-preferences/push-token', {
-            token: pushToken,
-            tz_offset_minutes: new Date().getTimezoneOffset(),
-          });
-        }
-      } catch {
-        // non-fatal — user can still enable from Settings > Notifications
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void registerPushToken();
   }, [hasToken, userId]);
 
   // A keeper who has never chosen units gets the device region's default,

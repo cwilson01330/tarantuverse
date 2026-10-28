@@ -188,6 +188,9 @@ class InvertFeedingStats(BaseModel):
     # Provenance of interval_days — see InvertFeedingStatusItem.interval_source.
     interval_source: Optional[str] = None
     is_overdue: bool = False
+    # Never-fed rule (Day one) — same meaning as on InvertFeedingStatusItem.
+    needs_first_feeding: bool = False
+    days_since_baseline: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -199,6 +202,10 @@ class InvertFeedingStatusItem(BaseModel):
     is_overdue is a soft heuristic (not fed in >= OVERDUE_DAYS, and not
     currently paused) — the screen sorts by longest-since-fed so keepers
     make the call; it's not a precise per-species schedule.
+
+    Never-fed animals (no accepted feeding) are measured from a baseline, the
+    later of when the animal was added (keeper-local day) and its acquired
+    date. See services/feeding_status.py for the full rule.
     """
     id: uuid.UUID
     name: Optional[str] = None
@@ -222,6 +229,12 @@ class InvertFeedingStatusItem(BaseModel):
     # can't support. Equally, "keeper" must not be dressed up as species
     # knowledge — it's the keeper's own judgement reflected back to them.
     interval_source: Optional[str] = None
+    # True for an animal with NO feeding log at all, a cadence, not paused and
+    # not (yet) due: the client offers "When did it last eat?".
+    needs_first_feeding: bool = False
+    # Local days since the animal's baseline (later of added / acquired), never
+    # negative. Filled for animals with no accepted feeding; None once fed.
+    days_since_baseline: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

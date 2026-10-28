@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPExc
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import date, datetime, time, timezone
 import io
 import json
 import re
@@ -31,7 +31,9 @@ from app.models.animal import Animal
 from app.models.tarantula import Sex, Source, Tarantula
 from app.schemas.animal import AnimalCreate
 from app.utils.limits import active_inverts_query, enforce_animal_limit
-from app.utils.access import policy
+from app.utils.access import invert_log_fields, policy
+from app.utils.feeding_pause import resume_if_accepted
+from app.models.feeding_log import FeedingLog
 from app.utils.locations import SCOPE_HERPETOVERSE, canonical_location
 
 router = APIRouter(
@@ -368,6 +370,40 @@ async def _import_commit_colonies(
     }
 
 
+def _add_imported_feeding(db: Session, user: User, inv, last_fed: str, *, only_if_newer: bool) -> bool:
+    """Write the spreadsheet's "last fed" date as ONE accepted feeding.
+
+    `last_fed` is an ISO date (already validated by import_service). The import
+    path has no keeper time zone, so the log lands at 12:00 UTC of that date.
+    `only_if_newer` (update mode on an existing animal): skip when an accepted
+    feeding already exists on or after that date, so re-importing the same sheet
+    never doubles up. The caller commits."""
+    day = date.fromisoformat(last_fed)
+    fed_at = datetime.combine(day, time(12, 0), tzinfo=timezone.utc)
+    if only_if_newer:
+        day_start = datetime.combine(day, time(0, 0), tzinfo=timezone.utc)
+        already = (
+            db.query(FeedingLog.id)
+            .filter(
+                FeedingLog.invert_id == inv.id,
+                FeedingLog.accepted.is_(True),
+                FeedingLog.fed_at >= day_start,
+            )
+            .first()
+        )
+        if already is not None:
+            return False
+    db.add(FeedingLog(
+        **invert_log_fields(db, inv),
+        logged_by_user_id=user.id,
+        fed_at=fed_at,
+        accepted=True,
+    ))
+    # Same as the feeding route: taking food ends a pause.
+    resume_if_accepted(inv, True, db)
+    return True
+
+
 @router.post("/import/commit", status_code=status.HTTP_200_OK)
 @policy("owner_only")
 async def import_commit(
@@ -427,6 +463,8 @@ async def import_commit(
             continue
 
         payload = norm["payload"]
+        # Not an invert column: becomes one accepted feeding log below.
+        last_fed = payload.pop("last_fed", None)
         key = (
             (payload.get("name") or "").strip().lower(),
             (payload.get("scientific_name") or "").strip().lower(),
@@ -440,6 +478,8 @@ async def import_commit(
                         continue
                     if hasattr(existing, fld):
                         setattr(existing, fld, val)
+                if last_fed:
+                    _add_imported_feeding(db, current_user, existing, last_fed, only_if_newer=True)
                 # ADR-005 dual-write. Without this a re-import updates the
                 # unified row and leaves the legacy twin stale across the whole
                 # file at once — the renamed-communal symptom multiplied by the
@@ -469,6 +509,9 @@ async def import_commit(
                 cap_reached = True
                 break
             raise
+        if last_fed:
+            _add_imported_feeding(db, current_user, inv, last_fed, only_if_newer=False)
+            db.commit()
         imported += 1
         existing_by_key[key] = inv  # dedupe later rows within the same file
 

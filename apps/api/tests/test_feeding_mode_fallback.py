@@ -12,7 +12,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.routers import inverts as inverts_router
 from app.routers import sitter_passes
 from app.routers.inverts import (
     INTERVAL_SOURCE_GENERIC_DEFAULT,
@@ -20,7 +19,7 @@ from app.routers.inverts import (
     _recommended_feeding_interval,
     _recommended_feeding_interval_with_source,
 )
-from app.services import digest_service, sitter_card
+from app.services import feeding_status, sitter_card
 from app.utils.feeding_mode import (
     TAXON_FEEDING_MODE,
     effective_feeding_mode,
@@ -84,7 +83,9 @@ def test_effective_mode():
 
 def test_every_cadence_caller_passes_the_taxon():
     """A caller that forgets `taxon=` silently brings the bug back."""
-    for module in (inverts_router, digest_service, sitter_passes):
+    # The digest and the single-animal stats no longer call the resolver
+    # themselves: they go through compute_feeding_status (feeding_status).
+    for module in (feeding_status, sitter_passes):
         src = inspect.getsource(module)
         calls = re.findall(r"_recommended_feeding_interval(?:_with_source)?\((.*?)\)\n", src, re.S)
         real = [c for c in calls if "life_stage" in c and "Optional" not in c]

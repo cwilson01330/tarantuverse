@@ -116,6 +116,17 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'private, no-store' },
         ],
       },
+      {
+        // Daily-email unsubscribe links carry a signed token in the PATH
+        // (routers/notification_preferences.py): no Referer, never indexed
+        // or cached.
+        source: '/unsubscribe/:token*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      },
     ]
   },
   //

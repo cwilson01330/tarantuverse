@@ -757,19 +757,9 @@ async def get_invert_feeding_stats(
     """
     invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Invert not found")
 
-    # Pause state — a paused animal (premolt / recovering / etc.) shouldn't
-    # trigger overdue treatment. Trumps the days-since badge on the client.
-    today_local = (
-        datetime.now(timezone.utc) + timedelta(minutes=-(tz_offset_minutes or 0))
-    ).date() if tz_offset_minutes is not None else datetime.now(timezone.utc).date()
-    is_feeding_paused = bool(
-        invert.feeding_paused_reason
-        and (
-            invert.feeding_paused_until is None
-            or invert.feeding_paused_until >= today_local
-        )
-    )
-
+    # Pause state, cadence, overdue and the never-fed fields all come from
+    # compute_feeding_status (below) — the one rule Feeding Day, analytics and
+    # the digest share. This route only adds the counts it alone reports.
     feeding_logs = (
         db.query(FeedingLog)
         .filter(FeedingLog.invert_id == invert_id)
@@ -793,24 +783,13 @@ async def get_invert_feeding_stats(
         last_feeding_date = None
         days_since_last_feeding = None
 
-    # Cadence, computed the SAME way as the list endpoint and the daily digest.
-    # Without these two fields the detail screen could only say "fed 11d ago"
-    # and had to guess whether that was fine — which is how the collection grid
-    # ended up with a flat day threshold that disagreed with everything else.
-    species = (
-        db.query(InvertSpecies).filter(InvertSpecies.id == invert.species_id).first()
-        if invert.species_id else None
-    )
-    interval_days, interval_source = _recommended_feeding_interval_with_source(
-        invert.life_stage, species, invert.feeding_interval_days, taxon=invert.taxon
-    )
-    is_overdue = (
-        (not is_feeding_paused)
-        and interval_days is not None
-        and last_feeding_date is not None
-        and days_since_last_feeding is not None
-        and days_since_last_feeding >= interval_days
-    )
+    # Cadence + overdue, computed by the SAME function as the list endpoint and
+    # the daily digest (never restate the rule here). Without these fields the
+    # detail screen could only say "fed 11d ago" and had to guess whether that
+    # was fine — which is how the collection grid ended up with a flat day
+    # threshold that disagreed with everything else.
+    status = compute_feeding_status(db, [invert], tz_offset_minutes)[0]
+    is_feeding_paused = status.is_feeding_paused
 
     return InvertFeedingStats(
         invert_id=invert_id,
@@ -822,9 +801,11 @@ async def get_invert_feeding_stats(
         is_feeding_paused=is_feeding_paused,
         feeding_paused_reason=invert.feeding_paused_reason,
         feeding_paused_until=invert.feeding_paused_until,
-        interval_days=interval_days,
-        interval_source=interval_source,
-        is_overdue=is_overdue,
+        interval_days=status.interval_days,
+        interval_source=status.interval_source,
+        is_overdue=status.is_overdue,
+        needs_first_feeding=status.needs_first_feeding,
+        days_since_baseline=status.days_since_baseline,
     )
 
 

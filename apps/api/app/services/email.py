@@ -26,21 +26,35 @@ class EmailService:
     API_URL = "https://api.resend.com/emails"
 
     @staticmethod
-    async def send_email(to_email: str, subject: str, content: str):
+    async def send_email(
+        to_email: str,
+        subject: str,
+        content: str,
+        headers: "dict[str, str] | None" = None,
+    ):
         """
         Send email using Resend, with a log-only fallback when the API key is unset.
+
+        `headers` are extra message headers (e.g. List-Unsubscribe), passed to
+        Resend's `headers` field. Logs the subject and the outcome only, never a
+        recipient address or a body: both are keepers' private data and Render
+        keeps logs.
         """
         if not settings.RESEND_API_KEY:
             logger.warning("RESEND_API_KEY is not set. Falling back to mock email.")
-            logger.info("==================================================================")
-            logger.info("MOCK EMAIL SENT TO: %s", to_email)
-            logger.info("SUBJECT: %s", subject)
-            logger.info("BODY:\n%s", content)
-            logger.info("==================================================================")
+            logger.info("mock email: %s", subject)
             return
 
-        logger.info("Attempting to send email to %s with subject: %s", to_email, subject)
-        logger.info("From email: %s", settings.RESEND_FROM_EMAIL)
+        payload = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": content,
+        }
+        if headers:
+            payload["headers"] = dict(headers)
+
+        logger.info("Sending email: %s", subject)
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -50,18 +64,13 @@ class EmailService:
                         "Authorization": f"Bearer {settings.RESEND_API_KEY}",
                         "Content-Type": "application/json",
                     },
-                    json={
-                        "from": settings.RESEND_FROM_EMAIL,
-                        "to": [to_email],
-                        "subject": subject,
-                        "html": content,
-                    },
+                    json=payload,
                 )
 
             response.raise_for_status()
-            logger.info("Email successfully sent to %s via Resend", to_email)
+            logger.info("Email sent via Resend: %s", subject)
         except Exception:
-            logger.error("Failed to send email to %s via Resend", to_email, exc_info=True)
+            logger.error("Failed to send email via Resend: %s", subject, exc_info=True)
             raise
 
     @staticmethod

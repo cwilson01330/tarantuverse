@@ -8,6 +8,8 @@ import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
 import UpgradeModal from '@/components/UpgradeModal'
+import LastFedField, { NOT_SURE_LAST_FED, lastFedFromField, postFirstFeeding, type LastFedValue } from '@/components/LastFedField'
+import EmailReminderDialog, { decideAskAfterSave } from '@/components/EmailReminderDialog'
 import { useUnits } from '@/components/UnitsProvider'
 import { parseTempInput, tempUnit } from '@/lib/units'
 
@@ -58,6 +60,12 @@ function AddTarantulaContent() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  // "When did it last eat?" - default Not sure logs nothing; the First feeding card asks later.
+  const [lastFed, setLastFed] = useState<LastFedValue>(NOT_SURE_LAST_FED)
+  // After a successful save we may ask once about email reminders; leave the page when it closes.
+  const [askName, setAskName] = useState<string | null>(null)
+  // Set once the animal exists: the form must not be submittable twice.
+  const [saved, setSaved] = useState(false)
 
   // Check for pre-filled species from URL params (from "Add to Collection" on species page)
   useEffect(() => {
@@ -170,6 +178,20 @@ function AddTarantulaContent() {
           ? detail.message || JSON.stringify(detail)
           : detail || 'Failed to add tarantula'
         throw new Error(message)
+      }
+
+      setSaved(true)
+
+      // First meal (shared primary key: the tarantula id is also its invert id).
+      // A failed feeding must not block anything: the animal is saved and the
+      // First feeding card on the dashboard asks again.
+      const fedAt = lastFedFromField(lastFed)
+      if (fedAt && data?.id) await postFirstFeeding(token, data.id, fedAt)
+
+      // One-time email-reminder ask; the page changes when it closes.
+      if (await decideAskAfterSave(token)) {
+        setAskName(formData.name || formData.common_name || formData.scientific_name || 'your animal')
+        return
       }
 
       // Redirect to dashboard
@@ -314,6 +336,8 @@ function AddTarantulaContent() {
               </select>
             </div>
           </div>
+
+          <LastFedField value={lastFed} onChange={setLastFed} />
 
           <div>
             <label className="block text-sm font-medium mb-1">Price Paid ($)</label>
@@ -519,7 +543,7 @@ function AddTarantulaContent() {
           <div className="flex gap-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || saved}
               className="flex-1 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {loading ? 'Adding...' : 'Add Tarantula'}
@@ -534,6 +558,14 @@ function AddTarantulaContent() {
           </div>
         </form>
       </div>
+
+      <EmailReminderDialog
+        open={askName !== null}
+        variant="after_save"
+        animalName={askName ?? undefined}
+        token={token}
+        onClose={() => router.push('/dashboard')}
+      />
 
       {/* Upgrade Modal - shown when free tier limit is reached */}
       <UpgradeModal source="collection_cap"
