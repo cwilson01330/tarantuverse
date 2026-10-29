@@ -93,6 +93,25 @@ def test_real_file_launch_entries():
     assert hv["2026-10-23-expenses"].action_target == "expenses"
 
 
+WEEKLY_FROM = date(2026, 11, 2)
+
+
+def test_real_file_publishes_weekly_on_mondays():
+    """One Home card a week, not one per feature: from WEEKLY_FROM on, every
+    entry is dated a Monday, so a week's entries land together (the card
+    re-appears whenever an entry newer than the keeper's last dismissal goes
+    live). Date a new entry the coming Monday. Earlier entries predate the
+    rule and keep their dates (keepers may have seen them)."""
+    feed = load_feed()
+    late = [
+        f"{app}:{e.id} ({e.published_on:%a})"
+        for app, entries in feed.items()
+        for e in entries
+        if e.published_on >= WEEKLY_FROM and e.published_on.weekday() != 0
+    ]
+    assert late == [], f"What's new entries must be dated a Monday: {late}"
+
+
 def test_real_file_is_plain_json_on_disk():
     # The file is read by path (Render runs from the repo); make sure it exists
     # where the loader looks and is UTF-8 JSON.
