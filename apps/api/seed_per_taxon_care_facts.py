@@ -58,6 +58,11 @@ CUC_ISOPODS = {
     "porcellionides pruinosus",
     "porcellio laevis",
     "armadillidium vulgare",
+    # 2026-11-02 batch (seed_isopod_species_batch2.py). Display species from
+    # that batch (Cristarmadillidium, Armadillo officinalis, Ember Bee, Titan)
+    # are left out for the same reason as Cubaris.
+    "porcellio scaber",
+    "porcellio dilatatus",
 }
 
 MILLIPEDE_SECRETION_BY_ORDER = {
