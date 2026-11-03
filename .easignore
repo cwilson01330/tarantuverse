@@ -4,11 +4,16 @@
 # ===== CRITICAL: Exclude Git (can save 100s of MB) =====
 .git/
 
-# ===== Lock files (pnpm-lock.yaml alone can be 50MB+) =====
-pnpm-lock.yaml
+# ===== Lock files =====
+# pnpm-lock.yaml is UPLOADED on purpose (2026-11-03; it is ~0.7 MB, not the
+# "50MB+" this file used to claim). Without it EAS fell back to yarn and
+# resolved the newest versions in range, so store binaries carried different
+# native module versions than the OTA bundles built locally from the lockfile
+# (the 2026-10-19 Node 22 build break; the likely cause of the HV Apple-button
+# view-manager crash). With it, EAS installs with pnpm (version pinned in each
+# app's eas.json) from exactly the versions we test.
 package-lock.json
 yarn.lock
-**/pnpm-lock.yaml
 **/package-lock.json
 **/yarn.lock
 

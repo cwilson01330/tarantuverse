@@ -1,5 +1,20 @@
 # Next native (store) build — queued items
 
+**Status 2026-11-03:** the last Tarantuverse store build is 1.8.0 (runtime
+1.1.0, 2026-09-30), so NOTHING below has shipped to TV users yet — the review
+prompt does nothing on today's binaries. Bumped for submission: TV `version`
+**1.9.0**, `runtimeVersion` **1.2.0** (OTA updates published after this only
+reach 1.9.0 installs). Added for this build:
+- `updates.fallbackToCacheTimeout: 3000` — a fresh install waits up to 3 s for
+  the latest OTA on first launch instead of running the bundled JS once.
+- Branded splash: `expo-splash-screen` ~31.0.13 + plugin, `assets/splash-icon.png`
+  (the icon's ring + spider on transparent, cut from `icon.png`), background
+  `#f8fafc` light / `#0a0a0f` dark = the app's own theme backgrounds, so the
+  splash hands over to the themed loading view without a flash.
+- Builds use the lockfile: `.easignore` no longer excludes `pnpm-lock.yaml`;
+  both `eas.json` pin pnpm 9.15.9. Do a `preview` build first to prove EAS
+  installs cleanly with pnpm before the production build.
+
 Target: new store versions of both apps within 5–7 days of 2026-10-07.
 Everything here needs a native binary (OTA `eas update` can't deliver it), so
 it ships together. Bump `runtimeVersion` in each app's `app.json` so OTA

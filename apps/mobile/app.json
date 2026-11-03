@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tarantuverse",
     "slug": "tarantuverse",
-    "version": "1.8.0",
+    "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -98,7 +98,20 @@
           "granularPermissions": []
         }
       ],
-      "expo-quick-actions"
+      "expo-quick-actions",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#f8fafc",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0a0a0f"
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {
@@ -108,9 +121,10 @@
         "projectId": "1d412361-4866-482a-a0a6-5d525508d8b8"
       }
     },
-    "runtimeVersion": "1.1.0",
+    "runtimeVersion": "1.2.0",
     "updates": {
-      "url": "https://u.expo.dev/1d412361-4866-482a-a0a6-5d525508d8b8"
+      "url": "https://u.expo.dev/1d412361-4866-482a-a0a6-5d525508d8b8",
+      "fallbackToCacheTimeout": 3000
     }
   }
 }
