@@ -1,6 +1,13 @@
 # Next native (store) build — queued items
 
-**Status 2026-11-03:** the last Tarantuverse store build is 1.8.0 (runtime
+**SHIPPED: Tarantuverse 1.9.0 (runtime 1.2.0)** — submitted to both stores
+2026-11-03; Google Play went live to Production the same day, Apple approved
+2026-11-04, and Cory confirmed the live build and its sign-ins work. Everything listed below for
+Tarantuverse is in that binary. From now on `eas update --branch production`
+reaches only 1.9.0+ installs; 1.8.0 installs keep their last update. The next
+native build starts a fresh list.
+
+**Status 2026-11-03 (before submission):** the last Tarantuverse store build is 1.8.0 (runtime
 1.1.0, 2026-09-30), so NOTHING below has shipped to TV users yet — the review
 prompt does nothing on today's binaries. Bumped for submission: TV `version`
 **1.9.0**, `runtimeVersion` **1.2.0** (OTA updates published after this only
