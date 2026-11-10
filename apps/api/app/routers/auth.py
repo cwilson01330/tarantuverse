@@ -1314,6 +1314,15 @@ RESEND_VERIFICATION_MESSAGE = (
 )
 
 
+def _token_still_valid(token, expires_at) -> bool:
+    """True when a verification token exists and hasn't expired (naive = UTC)."""
+    if not token or expires_at is None:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at > datetime.now(timezone.utc)
+
+
 @router.post("/resend-verification")
 @limiter.limit("3/minute")
 async def resend_verification(
@@ -1348,11 +1357,21 @@ async def resend_verification(
         )
 
     # Any letter case; every still-unverified account behind the address gets
-    # its own fresh link.
+    # a working link.
     for user in find_users_by_email(db, address):
         if user.is_verified:
             continue
-        verification_token, verification_token_expires_at = new_email_verification_token()
+        fresh_token, verification_token_expires_at = new_email_verification_token()
+        # A link that hasn't expired yet is re-sent, not replaced (2026-11-10):
+        # keepers tapped "send a fresh one" seconds after signing up, the
+        # rotation killed the first email's link, and the first email (which
+        # arrives first) then said "This link didn't work". Either email now
+        # verifies; the window still restarts from now.
+        verification_token = (
+            user.verification_token
+            if _token_still_valid(user.verification_token, user.verification_token_expires_at)
+            else fresh_token
+        )
         user.verification_token = verification_token
         user.verification_token_expires_at = verification_token_expires_at
         db.commit()

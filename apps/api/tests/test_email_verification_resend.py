@@ -190,6 +190,27 @@ def test_an_unverified_account_gets_a_fresh_token_and_email(sent):
     assert user.verification_token in sent[0][1]
 
 
+def test_a_link_that_still_works_is_resent_not_replaced(sent):
+    """2026-11-07/08: two HV keepers tapped "send a fresh one" seconds after
+    signing up. Rotating the token killed the first email's link, so the
+    first email (which lands first) said "This link didn't work". Now an
+    unexpired token is re-sent, and only its window restarts."""
+    user = _user(verified=False)
+    user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=70)
+    _resend(_DB(user), body=ResendVerificationRequest(email=user.email))
+
+    assert user.verification_token == "old-token"
+    assert "old-token" in sent[0][1]
+    assert user.verification_token_expires_at > datetime.now(timezone.utc) + timedelta(hours=71)
+
+
+def test_a_naive_stored_expiry_is_read_as_utc(sent):
+    user = _user(verified=False)
+    user.verification_token_expires_at = (datetime.now(timezone.utc) + timedelta(hours=5)).replace(tzinfo=None)
+    _resend(_DB(user), body=ResendVerificationRequest(email=user.email))
+    assert user.verification_token == "old-token"
+
+
 def test_an_expired_link_is_exactly_the_case_this_rescues(sent):
     user = _user(verified=False)  # expiry is in 2020
     _resend(_DB(user), body=ResendVerificationRequest(email=user.email))

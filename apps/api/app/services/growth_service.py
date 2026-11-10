@@ -77,10 +77,13 @@ def compute_growth_fields(molt_logs: List[MoltLog]) -> dict:
     if len(molt_logs) > 1:
         months = (last_molt.molted_at - first_molt.molted_at).days / 30.44
         if months > 0:
+            # Measurements are Numeric columns (Decimal); Decimal / float
+            # raises TypeError, which 500'd /inverts/{id}/growth on
+            # 2026-10-29 for animals with first and last molts measured.
             if total_weight_gain:
-                growth_rate_weight = total_weight_gain / months
+                growth_rate_weight = float(total_weight_gain) / months
             if total_leg_span_gain:
-                growth_rate_leg_span = total_leg_span_gain / months
+                growth_rate_leg_span = float(total_leg_span_gain) / months
 
     return {
         "data_points": data_points,
