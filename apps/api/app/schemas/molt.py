@@ -38,6 +38,10 @@ class MoltLogBase(BaseModel):
     complication_notes: Optional[str] = None
     notes: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
+    # Days feeding reminders pause after THIS molt when the owner's "pause
+    # after a molt" is on. NULL = the taxon/stage default
+    # (utils/post_molt_pause.py), 0 = don't pause.
+    feeding_pause_days: Optional[int] = Field(None, ge=0, le=60)
 
     @field_validator("outcome")
     @classmethod
@@ -74,6 +78,8 @@ class MoltLogUpdate(BaseModel):
     complication_notes: Optional[str] = None
     notes: Optional[str] = None
     image_url: Optional[str] = None
+    # Send null to go back to the default window, 0 for no pause.
+    feeding_pause_days: Optional[int] = Field(None, ge=0, le=60)
 
     @field_validator("outcome")
     @classmethod

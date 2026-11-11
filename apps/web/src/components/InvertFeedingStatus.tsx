@@ -1,6 +1,7 @@
 'use client'
 
 import { feedingStatusText } from '@/lib/firstFeeding'
+import { pauseLabel } from '@/lib/postMolt'
 
 /**
  * Feeding status for any invert.
@@ -39,6 +40,9 @@ export interface InvertFeedingStats {
   is_feeding_paused?: boolean
   feeding_paused_reason?: string | null
   feeding_paused_until?: string | null
+  /** Effortless logging: the automatic wait after a molt (local YYYY-MM-DD).
+   *  Separate from the keeper pause above, which always wins. */
+  post_molt_pause_until?: string | null
   interval_days?: number | null
   interval_source?: string | null
   is_overdue?: boolean
@@ -95,6 +99,17 @@ export function feedingVerdict(s: InvertFeedingStats | null): FeedingVerdict | n
           ? `${reason} · until ${fmtDate(s.feeding_paused_until)}`
           : reason
         : 'No overdue alerts until you resume.',
+    }
+  }
+
+  // The automatic post-molt wait: same muted treatment as a keeper pause,
+  // never the overdue red. (The keeper's own pause wins above.)
+  const afterMolt = pauseLabel(s.post_molt_pause_until)
+  if (afterMolt) {
+    return {
+      tone: 'muted',
+      headline: afterMolt,
+      detail: 'Feeding reminders pick up again on their own.',
     }
   }
 

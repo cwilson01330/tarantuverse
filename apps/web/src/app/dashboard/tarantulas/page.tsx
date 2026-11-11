@@ -15,6 +15,7 @@ import CollectionCapNotice from '@/components/CollectionCapNotice'
 import CareSheetDialog from '@/components/CareSheetDialog'
 import { formatLocalDate } from '@/lib/date'
 import { feedingStatusText } from '@/lib/firstFeeding'
+import { pauseLabel } from '@/lib/postMolt'
 import {
   listColonies,
   listPastColonies,
@@ -50,6 +51,9 @@ interface FeedingStatus {
   // Pause state — see pst_20260502. A paused animal reads "Feeding paused",
   // never overdue, so a 7-month premolt sling doesn't look like an emergency.
   is_feeding_paused?: boolean
+  // Effortless logging: automatic wait after a molt (local YYYY-MM-DD). Shown
+  // like a pause, never as overdue.
+  post_molt_pause_until?: string | null
   // Server-computed from the species + life stage (or the keeper's own
   // cadence). Detritivores are never overdue; a never-fed animal is once its
   // first meal is due (then days_since_last_feeding is null).
@@ -66,6 +70,8 @@ interface FeedingStatus {
  */
 function feedingLine(s: FeedingStatus): { text: string; tone: 'muted' | 'ok' | 'overdue' } {
   if (s.is_feeding_paused) return { text: 'Feeding paused', tone: 'muted' }
+  const afterMolt = pauseLabel(s.post_molt_pause_until)
+  if (afterMolt) return { text: afterMolt, tone: 'muted' }
   // No logged feeding: "First meal not logged" / "Due · no meal logged yet".
   const noMeal = feedingStatusText(s)
   if (noMeal) return { text: noMeal, tone: s.needs_first_feeding ? 'muted' : 'overdue' }

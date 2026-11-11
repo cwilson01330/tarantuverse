@@ -30,6 +30,7 @@ import PremiumIntroCard, { shouldShowPremiumIntro } from '../src/components/Prem
 import { bulkSetLocation, groupByLocation, listLocations, type LocationItem } from '../src/lib/locations';
 import { maybeRequestReview } from '../src/lib/reviewPrompt';
 import { feedingStatusText } from '../src/lib/first-feeding';
+import { pauseLabel } from '../src/lib/post-molt';
 
 interface FeedingStatus {
   id: string;
@@ -44,6 +45,8 @@ interface FeedingStatus {
   last_feeding_date: string | null;
   days_since_last_feeding: number | null;
   is_feeding_paused: boolean;
+  /** Automatic post-molt wait: reminders resume on this day (YYYY-MM-DD, local). */
+  post_molt_pause_until?: string | null;
   is_overdue: boolean;
   /** Never fed and due for a first meal that was never logged (server rule). */
   needs_first_feeding?: boolean;
@@ -388,6 +391,9 @@ export default function FeedingDayScreen() {
 
   const statusPill = (a: FeedingStatus) => {
     if (a.is_feeding_paused) return { label: 'Paused', color: STATUS.paused };
+    // The automatic post-molt wait looks like a pause (same colour), never overdue.
+    const afterMolt = pauseLabel(a.post_molt_pause_until ?? null);
+    if (afterMolt) return { label: afterMolt, color: STATUS.paused };
     // No logged feeding: the Day-one labels first, the old "Never fed" otherwise.
     const noMeal = feedingStatusText(a);
     if (noMeal) {

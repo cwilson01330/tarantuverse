@@ -48,6 +48,10 @@ def ensure_notification_preferences(db: Session, user_id) -> NotificationPrefere
         daily_digest_enabled=True,
         digest_hour=9,
         email_digest_enabled=False,
+        # Effortless logging: on for new accounts; existing rows stay off.
+        smart_reminders_enabled=True,
+        refusal_restarts_wait=True,
+        post_molt_pause_enabled=True,
     )
     savepoint = db.begin_nested()
     try:

@@ -22,7 +22,8 @@ class PushNotificationService:
         data: Optional[Dict[str, Any]] = None,
         badge: Optional[int] = None,
         sound: str = "default",
-        priority: str = "default"
+        priority: str = "default",
+        category_id: Optional[str] = None,
     ) -> bool:
         """
         Send a single push notification
@@ -35,6 +36,10 @@ class PushNotificationService:
             badge: Optional badge count
             sound: Sound to play (default, null, or custom sound name)
             priority: Priority level (default, normal, high)
+            category_id: Optional Expo `categoryId` — the notification
+                category registered by the app, which decides the action
+                buttons shown (e.g. "feeding_due": Fed / Refused / Tomorrow).
+                Omitted from the message when None.
 
         Returns:
             bool: True if sent successfully, False otherwise
@@ -56,6 +61,9 @@ class PushNotificationService:
 
         if badge is not None:
             message["badge"] = badge
+
+        if category_id:
+            message["categoryId"] = category_id
 
         try:
             with httpx.Client() as client:

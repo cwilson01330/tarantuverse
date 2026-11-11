@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
@@ -10,6 +10,13 @@ import {
   initPostHog,
   resetPostHog,
 } from '../src/services/posthog';
+import { ReminderToast, showReminderToast } from '../src/components/ReminderToast';
+import { apiClient } from '../src/services/api';
+import {
+  handleNotificationResponse,
+  registerReminderCategories,
+  type ResponseLike,
+} from '../src/services/reminder-notifications';
 import {
   cleanupQuickActions,
   setupQuickActions,
@@ -79,6 +86,74 @@ function QuickActionsBridge() {
   return null;
 }
 
+/**
+ * Notification taps (Effortless logging). Registers the Fed / Refused /
+ * Tomorrow button sets once, turns a button tap into one API call plus a toast,
+ * and routes a body tap to its deeplink. The cold-start response is handled
+ * once; handled response ids are remembered so a response is never run twice.
+ * Everything native is guarded - a build without the module just does nothing.
+ */
+function ReminderBridge() {
+  const router = useRouter();
+  const { token } = useAuth();
+  const tokenRef = useRef<string | null>(token);
+  tokenRef.current = token;
+  const handled = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    let sub: { remove: () => void } | null = null;
+    let cancelled = false;
+
+    const run = (response: ResponseLike | null | undefined) => {
+      if (!response) return;
+      const key = `${response.notification?.request?.identifier ?? ''}|${response.actionIdentifier}`;
+      if (handled.current.has(key)) return;
+      handled.current.add(key);
+      void handleNotificationResponse(response, {
+        post: async (invertId, body) => {
+          const res = await apiClient.post(`/inverts/${invertId}/reminder-action`, body);
+          return res.data;
+        },
+        navigate: (href) => {
+          try {
+            router.push(href as never);
+          } catch (error) {
+            console.warn('[Reminders] navigate failed for', href, error);
+          }
+        },
+        showToast: showReminderToast,
+        isSignedIn: () => !!tokenRef.current,
+        dismiss: async (notificationId) => {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const Notifications = require('expo-notifications');
+          await Notifications.dismissNotificationAsync(notificationId);
+        },
+      });
+    };
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Notifications = require('expo-notifications');
+      void registerReminderCategories();
+      sub = Notifications.addNotificationResponseReceivedListener(run);
+      Promise.resolve(Notifications.getLastNotificationResponseAsync?.())
+        .then((last: ResponseLike | null) => {
+          if (!cancelled) run(last);
+        })
+        .catch(() => {});
+    } catch (error) {
+      console.warn('[Reminders] notification responses unavailable', error);
+    }
+
+    return () => {
+      cancelled = true;
+      sub?.remove();
+    };
+  }, [router]);
+
+  return null;
+}
+
 function RootLayoutContent() {
   const { user, isLoading } = useAuth();
   const { colors } = useTheme();
@@ -102,6 +177,7 @@ function RootLayoutContent() {
     <>
       <PostHogBridge />
       <QuickActionsBridge />
+      <ReminderBridge />
       <UpdateBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
@@ -109,6 +185,7 @@ function RootLayoutContent() {
         <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
+      <ReminderToast />
     </>
   );
 }

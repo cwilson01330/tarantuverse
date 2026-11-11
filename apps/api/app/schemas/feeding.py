@@ -2,8 +2,8 @@
 Feeding log schemas
 """
 from pydantic import BaseModel, Field
-from typing import List, Optional
-from datetime import datetime
+from typing import List, Literal, Optional
+from datetime import date, datetime
 from decimal import Decimal
 import uuid
 
@@ -76,6 +76,23 @@ class BulkFeedingResult(BaseModel):
     # is the keeper's deliberate judgment and quietly undoing it would be worse
     # than leaving it. Empty on a refusal, by design.
     resumed_ids: List[uuid.UUID] = []
+
+
+class ReminderActionRequest(BaseModel):
+    """A button on a per-animal feeding reminder (Effortless logging).
+
+    `reminder_date` is the keeper-local day the reminder was sent for (from the
+    push data). It is the idempotency key: one reminder logs one outcome.
+    """
+    action: Literal["fed", "refused", "tomorrow"]
+    reminder_date: date
+
+
+class ReminderActionResponse(BaseModel):
+    action: Literal["fed", "refused", "tomorrow"]
+    created: bool
+    animal_name: str
+    message: str
 
 
 # --- Herpetoverse animals (Feeding Day) ---

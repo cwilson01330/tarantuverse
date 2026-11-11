@@ -10,6 +10,7 @@ import { LocationDialog } from '@/components/LocationPicker'
 import CareSheetDialog from '@/components/CareSheetDialog'
 import PremiumIntroCard, { shouldShowPremiumIntro } from '@/components/PremiumIntroCard'
 import { feedingStatusText } from '@/lib/firstFeeding'
+import { pauseLabel } from '@/lib/postMolt'
 import { bulkSetLocation, groupByLocation, listLocations, UNASSIGNED_KEY, type LocationItem } from '@/lib/locations'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -25,6 +26,8 @@ interface FeedingStatus {
   last_feeding_date: string | null
   days_since_last_feeding: number | null
   is_feeding_paused: boolean
+  /** Effortless logging: automatic wait after a molt (local YYYY-MM-DD). */
+  post_molt_pause_until?: string | null
   is_overdue: boolean
   /** Day-one: never fed and past the release cutoff (no meal logged yet). */
   needs_first_feeding?: boolean
@@ -809,6 +812,16 @@ function StatusPill({
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">
         Paused
+      </span>
+    )
+  }
+  // Automatic wait after a molt: the paused styling, never the overdue one.
+  // (The keeper's own pause wins above.)
+  const afterMolt = pauseLabel(animal.post_molt_pause_until)
+  if (afterMolt) {
+    return (
+      <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">
+        {afterMolt}
       </span>
     )
   }

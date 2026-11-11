@@ -27,6 +27,9 @@ const PASSTHROUGH_PREFIXES = [
 
 const PASSTHROUGH_EXACT = ['/feeding-day', '/sitter'];
 
+/** Per-animal feeding reminders deep-link to /invert/<id> (app/invert/[id].tsx). */
+const INVERT_PATH = /^\/invert\/[A-Za-z0-9-]+$/;
+
 /** Canonical route → this app's route, where the shapes differ. */
 const EXACT_MAP: Record<string, string> = {
   '/shared': '/sharing', // co-keeper invites / membership changes
@@ -41,6 +44,7 @@ export function resolveDeeplink(deeplink: string | null | undefined): string | n
 
   if (PASSTHROUGH_EXACT.includes(deeplink)) return deeplink;
   if (EXACT_MAP[deeplink]) return EXACT_MAP[deeplink];
+  if (INVERT_PATH.test(deeplink)) return deeplink;
 
   for (const prefix of PASSTHROUGH_PREFIXES) {
     if (deeplink.startsWith(prefix) && deeplink.length > prefix.length) {

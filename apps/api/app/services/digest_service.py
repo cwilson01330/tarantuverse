@@ -14,6 +14,13 @@ Opt-in email: after the in-app notification, a keeper with
 `email_digest_enabled` (active, real address, not already emailed this UTC day)
 gets a `DigestEmail` in the result's "emails". The caller sends them
 (services/digest_email.py::send_digest_emails) — the run itself stays synchronous.
+
+Per-animal reminders (Effortless logging): with the keeper's
+`smart_reminders_enabled` on, 1–3 due TV animals and nothing due in HV, the run
+sends one notification per animal (Fed / Refused / Tomorrow buttons) instead of
+the summary; animals snoozed with "Tomorrow" are left out of those. The choice
+lives in services/reminder_pushes.py. With the switch off the summary call is
+exactly what it was before.
 """
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -26,11 +33,13 @@ from app.models.notification_preferences import NotificationPreferences
 from app.models.user import User
 from app.models.feeding_log import FeedingLog
 from app.models.animal import Animal
+from app.models.invert import Invert
 from app.schemas.invert import InvertFeedingStatusItem
 from app.utils.limits import active_animals_query, active_inverts_query
 from app.services.feeding_status import compute_feeding_status
 from app.services.notification_service import create_notification
 from app.services.digest_email import MAX_NAMES, DigestEmail, display_name, is_reachable_address
+from app.services.reminder_pushes import plan_reminder_pushes
 # HV (`animals`) keeps its own overdue engine; TV goes through
 # compute_feeding_status, the same function Feeding Day uses.
 from app.routers.inverts import _calendar_day_diff
@@ -48,6 +57,28 @@ def _overdue_items(db: Session, user_id, tz_offset: Optional[int]) -> List[Inver
 
 def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
     return len(_overdue_items(db, user_id, tz_offset))
+
+
+def _snoozed_ids(db: Session, items: List[InvertFeedingStatusItem], local_today) -> set:
+    """Due animals the keeper put off with "Tomorrow".
+
+    `reminder_snoozed_until` is the day reminders RESUME ("no reminder until
+    this local date"): "Tomorrow" stores today + 1, so tomorrow's digest
+    reminds again — strictly greater than today means still snoozed. (Spec §5
+    wrote ">="; that would skip tomorrow's digest too and break "We'll remind
+    you tomorrow".)"""
+    if not items:
+        return set()
+    rows = (
+        db.query(Invert.id)
+        .filter(
+            Invert.id.in_([i.id for i in items]),
+            Invert.reminder_snoozed_until.isnot(None),
+            Invert.reminder_snoozed_until > local_today,
+        )
+        .all()
+    )
+    return {r[0] for r in rows}
 
 
 def _animal_overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
@@ -153,18 +184,35 @@ def run_feeding_digests(
         items = _overdue_items(db, prefs.user_id, tz)
         overdue = len(items) + _animal_overdue_count(db, prefs.user_id, tz)
         if overdue > 0:
-            create_notification(
-                db,
-                user_id=prefs.user_id,
-                type="feeding_digest",
-                title="Feeding day",
-                body=f"{overdue} {'animal is' if overdue == 1 else 'animals are'} due for feeding.",
-                deeplink="/feeding-day",
-                data={"overdue": overdue},
-                push=True,
-                push_category=None,
+            smart_on = bool(getattr(prefs, "smart_reminders_enabled", False))
+            local_today = local.date()
+            pushes = plan_reminder_pushes(
+                items,
+                overdue - len(items),
+                smart_on,
+                local_today,
+                f"{overdue} {'animal is' if overdue == 1 else 'animals are'} due for feeding.",
+                snoozed_ids=_snoozed_ids(db, items, local_today) if smart_on else (),
+                tz_offset_minutes=tz,
+                now=now,
             )
-            sent += 1
+            for p in pushes:
+                kwargs = dict(
+                    user_id=prefs.user_id,
+                    type=p.type,
+                    title=p.title,
+                    body=p.body,
+                    deeplink=p.deeplink,
+                    data=p.data,
+                    push=True,
+                    push_category=None,
+                )
+                # Only with a category, so the switch-off call is exactly today's.
+                if p.category_id:
+                    kwargs["push_category_id"] = p.category_id
+                create_notification(db, **kwargs)
+            if pushes:
+                sent += 1
 
             # Opt-in email. Never twice in one UTC day, even in test mode.
             user = prefs.user

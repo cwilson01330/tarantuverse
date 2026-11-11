@@ -30,6 +30,7 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import { feedingStatusColor } from '../../src/utils/status-colors';
 import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
+import { pauseLabel } from '../../src/lib/post-molt';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
   scorpionDisplayName,
@@ -92,6 +93,8 @@ interface FeedingStatus {
   // collection grid renders a quiet "Paused" pill instead of the
   // red overdue treatment.
   is_feeding_paused?: boolean;
+  /** Automatic post-molt wait (YYYY-MM-DD, local), from feeding-status. */
+  post_molt_pause_until?: string | null;
   // Species + life-stage aware, computed server-side. NOT a day threshold:
   // a sling eating every 5 days and an adult Grammostola eating every 30 are
   // both "overdue" at their own interval. This screen used to infer overdue
@@ -315,6 +318,7 @@ function CollectionScreen() {
           tarantula_id: row.id,
           days_since_last_feeding: row.days_since_last_feeding ?? undefined,
           is_feeding_paused: row.is_feeding_paused ?? false,
+          post_molt_pause_until: row.post_molt_pause_until ?? null,
           is_overdue: row.is_overdue ?? false,
           needs_first_feeding: row.needs_first_feeding ?? false,
           location: row.location ?? null,
@@ -690,6 +694,7 @@ function CollectionScreen() {
           days_since_last_feeding: response.data.days_since_last_feeding,
           acceptance_rate: response.data.acceptance_rate,
           is_feeding_paused: response.data.is_feeding_paused,
+          post_molt_pause_until: response.data.post_molt_pause_until ?? null,
           is_overdue: response.data.is_overdue ?? false,
           interval_days: response.data.interval_days ?? null,
         });
@@ -707,6 +712,7 @@ function CollectionScreen() {
           days_since_last_feeding: 0,
           acceptance_rate: existing?.acceptance_rate ?? 0,
           is_feeding_paused: existing?.is_feeding_paused,
+          post_molt_pause_until: existing?.post_molt_pause_until ?? null,
           is_overdue: false,
           interval_days: existing?.interval_days ?? null,
         });
@@ -861,6 +867,7 @@ function CollectionScreen() {
         feeding={{
           daysSince: status?.days_since_last_feeding,
           isPaused: status?.is_feeding_paused,
+          postMoltPauseUntil: status?.post_molt_pause_until,
           // Server-computed, per species + life stage — see loadFeedingStatuses.
           isOverdue: status?.is_overdue,
           // Lets the card say how far past due, not just days since fed.
@@ -915,6 +922,7 @@ function CollectionScreen() {
             ? {
                 daysSince: status.days_since_last_feeding,
                 isPaused: status.is_feeding_paused,
+                postMoltPauseUntil: status.post_molt_pause_until,
                 isOverdue: status.is_overdue,
                 intervalDays: status.interval_days,
                 needsFirstFeeding: status.needs_first_feeding,
@@ -1191,6 +1199,13 @@ function CollectionScreen() {
             <View
               style={[styles.listBadge, { backgroundColor: colors.textTertiary }]}
               accessibilityLabel="Feeding paused"
+            >
+              <Text style={styles.listBadgeText}>⏸</Text>
+            </View>
+          ) : pauseLabel(feedingStatus?.post_molt_pause_until ?? null) ? (
+            <View
+              style={[styles.listBadge, { backgroundColor: colors.textTertiary }]}
+              accessibilityLabel={pauseLabel(feedingStatus?.post_molt_pause_until ?? null) ?? undefined}
             >
               <Text style={styles.listBadgeText}>⏸</Text>
             </View>

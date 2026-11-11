@@ -45,6 +45,11 @@ class NotificationPreferencesBase(BaseModel):
     # Opt-in email version of the same digest.
     email_digest_enabled: Optional[bool] = False
 
+    # Effortless logging switches (pre-existing rows read back False).
+    smart_reminders_enabled: bool = False
+    refusal_restarts_wait: bool = False
+    post_molt_pause_enabled: bool = False
+
 
 # Columns that are NOT NULL in the table (plus tz_offset_minutes, which nothing
 # should clear: the digest would fall back to UTC). An explicit null from a
@@ -52,6 +57,7 @@ class NotificationPreferencesBase(BaseModel):
 NON_NULLABLE_FIELDS = frozenset({
     "daily_digest_enabled", "digest_hour", "tz_offset_minutes",
     "feeder_low_stock_enabled", "sitter_activity_enabled", "email_digest_enabled",
+    "smart_reminders_enabled", "refusal_restarts_wait", "post_molt_pause_enabled",
 })
 
 
@@ -88,6 +94,10 @@ class NotificationPreferencesUpdate(BaseModel):
     tz_offset_minutes: Optional[int] = Field(None, ge=-840, le=720)
 
     email_digest_enabled: Optional[bool] = None
+
+    smart_reminders_enabled: Optional[bool] = None
+    refusal_restarts_wait: Optional[bool] = None
+    post_molt_pause_enabled: Optional[bool] = None
 
     expo_push_token: Optional[str] = None
 

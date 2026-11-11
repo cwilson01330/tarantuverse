@@ -1,7 +1,7 @@
 """
 Molt log model
 """
-from sqlalchemy import Column, Numeric, Boolean, DateTime, ForeignKey, Text, String, CheckConstraint
+from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey, Text, String, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
@@ -22,6 +22,11 @@ class MoltLog(Base):
             'OR scorpion_id IS NOT NULL OR invert_id IS NOT NULL '
             'OR colony_id IS NOT NULL',
             name='molt_log_must_have_parent'
+        ),
+        # eff_20261110_effortless_logging (keeper-set pause after this molt).
+        CheckConstraint(
+            'feeding_pause_days IS NULL OR (feeding_pause_days >= 0 AND feeding_pause_days <= 60)',
+            name='ck_molt_logs_feeding_pause_days',
         ),
     )
 
@@ -70,6 +75,9 @@ class MoltLog(Base):
     )
 
     molted_at = Column(DateTime(timezone=True), nullable=False)
+    # Keeper-set pause on feeding reminders after this molt (days; 0 = don't
+    # pause, NULL = use the taxon default). CHECK 0-60 in eff_20261110.
+    feeding_pause_days = Column(Integer, nullable=True)
     premolt_started_at = Column(DateTime(timezone=True))
     # "Found a molt but don't know who." Meaningful for an enclosure-level or
     # communal record; for a colony-parented row it's implied — a colony molt

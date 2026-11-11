@@ -15,6 +15,8 @@ interface DateInputProps {
   onChange: (date: Date) => void;
   maximumDate?: Date;
   label?: string;
+  /** Extra years offered after the current one (default 0), for dates that look ahead. */
+  futureYears?: number;
 }
 
 const MONTHS = [
@@ -22,7 +24,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-export default function DateInput({ value, onChange, maximumDate, label }: DateInputProps) {
+export default function DateInput({ value, onChange, maximumDate, label, futureYears = 0 }: DateInputProps) {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const [selectedYear, setSelectedYear] = useState(value.getFullYear());
@@ -30,7 +32,7 @@ export default function DateInput({ value, onChange, maximumDate, label }: DateI
   const [selectedDay, setSelectedDay] = useState(value.getDate());
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: 30 + futureYears }, (_, i) => currentYear + futureYears - i);
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();

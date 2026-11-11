@@ -33,6 +33,11 @@ export function resolveDeeplink(deeplink: string | null | undefined): string | n
   const thread = deeplink.match(/^\/forums\/thread\/([0-9a-fA-F-]+)$/)
   if (thread) return `/community/forums/thread/${thread[1]}`
 
+  // /invert/<uuid> (per-animal feeding reminder) → the web animal page. Only the
+  // bare one-segment form with a UUID-shaped id; nested paths are refused.
+  const invert = deeplink.match(/^\/invert\/([0-9a-fA-F-]+)$/)
+  if (invert) return `/dashboard/inverts/${invert[1]}`
+
   // /messages/<username> and /community/<username> are served verbatim.
   if (/^\/messages\/[^/]+$/.test(deeplink)) return deeplink
   if (/^\/community\/[^/]+$/.test(deeplink)) return deeplink

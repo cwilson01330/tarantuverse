@@ -1,7 +1,7 @@
 """
 Feeding log model
 """
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Numeric, Text, CheckConstraint
+from sqlalchemy import Column, String, Boolean, Integer, Date, DateTime, ForeignKey, Numeric, Text, CheckConstraint, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
@@ -26,6 +26,12 @@ class FeedingLog(Base):
             'OR (num_nonnulls(tarantula_id, enclosure_id, animal_id, scorpion_id) = 0 '
             'AND num_nonnulls(invert_id, colony_id) = 1)',
             name='feeding_logs_must_have_exactly_one_parent',
+        ),
+        # eff_20261110_effortless_logging: one reminder logs one outcome.
+        # Partial on Postgres; SQLite ignores postgresql_where.
+        Index(
+            "uq_feeding_logs_reminder", "invert_id", "reminder_date",
+            unique=True, postgresql_where=text("reminder_date IS NOT NULL"),
         ),
     )
 
@@ -65,6 +71,10 @@ class FeedingLog(Base):
     )
 
     fed_at = Column(DateTime(timezone=True), nullable=False)
+    # Set only by a notification-button log: the local day of the reminder. The
+    # unique partial index uq_feeding_logs_reminder (invert_id, reminder_date)
+    # makes a double tap create one log.
+    reminder_date = Column(Date, nullable=True)
     food_type = Column(String(100))  # e.g., "cricket", "roach", "mealworm"
     food_size = Column(String(50))  # e.g., "small", "medium", "large"
     quantity = Column(Integer, default=1)  # For group feedings: "fed 8 roaches"

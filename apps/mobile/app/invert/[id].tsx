@@ -62,6 +62,7 @@ import { clearMarkDied, hasMarkDied } from '../../src/lib/pending-intent';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { formatLengthMm, formatTempRange, stripUnit } from '../../src/lib/units';
 import { feedingStatusText } from '../../src/lib/first-feeding';
+import { pauseLabel } from '../../src/lib/post-molt';
 import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
 function InvertDetailScreen() {
@@ -521,6 +522,17 @@ function InvertDetailScreen() {
             ? `${feedingStats.feeding_paused_reason} · until ${fmtDate(feedingStats.feeding_paused_until)}`
             : feedingStats.feeding_paused_reason
           : 'Resume from the ⋯ menu when she starts taking food again.',
+      };
+    }
+    // The automatic post-molt wait: same muted treatment as a keeper pause,
+    // never the overdue red. (The keeper's own pause wins above.)
+    const afterMolt = pauseLabel(feedingStats.post_molt_pause_until ?? null);
+    if (afterMolt) {
+      return {
+        tone: 'muted' as const,
+        icon: 'pause-circle-outline',
+        headline: afterMolt,
+        detail: 'Feeding reminders pick up again on their own.',
       };
     }
     if (d === null || d === undefined) {

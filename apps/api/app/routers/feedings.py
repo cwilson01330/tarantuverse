@@ -1,12 +1,13 @@
 """
 Feeding log routes
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.user import User
@@ -22,6 +23,8 @@ from app.schemas.feeding import (
     BulkFeedingRequest,
     BulkFeedingResult,
     BulkFeedingSkip,
+    ReminderActionRequest,
+    ReminderActionResponse,
 )
 from app.schemas.feeding_reminder import FeedingReminderSummary
 from app.utils.dependencies import get_current_user
@@ -36,7 +39,10 @@ from app.utils.access import (
     require_can_change,
     scope_collection,
 )
-from app.utils.feeding_pause import resume_if_accepted
+from app.utils.feeding_pause import resume_if_accepted, today_for_offset
+from app.utils.rate_limit import limiter, user_or_ip
+from app.models.notification_preferences import NotificationPreferences
+from app.services.reminder_pushes import animal_title
 from app.services.activity_service import create_activity
 from app.services.feeding_reminder_service import get_user_feeding_reminders
 # ADR-005 Phase A2 — opportunistically populate invert_id on new logs.
@@ -499,19 +505,153 @@ async def create_invert_feeding_log(
     """
     invert, access = load_invert(db, current_user, invert_id, "logger")
     refuse_if_closed_invert(invert)  # no new logs on a died / transferred animal
+    new_feeding = _create_invert_feeding(db, invert, feeding_data, access)
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
+def _create_invert_feeding(
+    db: Session,
+    invert: Invert,
+    data: FeedingLogCreate,
+    access,
+    reminder_date: Optional[date] = None,
+) -> FeedingLog:
+    """One invert feeding, the way POST /inverts/{id}/feedings makes it: closed
+    animals refused (409), the tarantula twin FK, co-keeper attribution, pause
+    cleared by an accepted meal. Adds and flushes; the caller commits.
+
+    `access` is the caller's `utils.access.Access` for this invert (it decides
+    `logged_by_user_id`). `reminder_date` marks a log made from a reminder
+    button (unique per animal + day, see uq_feeding_logs_reminder).
+    """
+    refuse_if_closed_invert(invert)  # also here, so no caller can skip it
     new_feeding = FeedingLog(
         **invert_log_fields(db, invert),
         logged_by_user_id=access.logged_by_user_id,
-        **feeding_data.model_dump(),
+        reminder_date=reminder_date,
+        **data.model_dump(),
     )
     # Taking food ends a pause; a refusal confirms it. Applied on the single-
     # feeding path too, not just Feeding Day — otherwise which screen you
     # happened to use would decide whether the pause survived.
-    resume_if_accepted(invert, feeding_data.accepted, db)
+    resume_if_accepted(invert, data.accepted, db)
     db.add(new_feeding)
-    db.commit()
-    db.refresh(new_feeding)
+    db.flush()
     return new_feeding
+
+
+REMINDER_NOTE = "Logged from reminder"
+ALREADY_LOGGED = "Already logged from this reminder"
+
+
+def _reminder_feeding(db: Session, invert_id: uuid.UUID, reminder_date: date) -> Optional[FeedingLog]:
+    """The log a reminder for this animal + day already made, if any."""
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.invert_id == invert_id, FeedingLog.reminder_date == reminder_date)
+        .first()
+    )
+
+
+def _owner_today(db: Session, owner_id: uuid.UUID) -> date:
+    """The collection owner's local today — the digest that sent the reminder
+    runs on the owner's clock (notification_preferences.tz_offset_minutes)."""
+    tz = (
+        db.query(NotificationPreferences.tz_offset_minutes)
+        .filter(NotificationPreferences.user_id == owner_id)
+        .scalar()
+    )
+    return today_for_offset(tz)
+
+
+@router.post(
+    "/inverts/{invert_id}/reminder-action",
+    response_model=ReminderActionResponse,
+)
+@limiter.limit("60/hour", key_func=user_or_ip)
+@policy("logger")
+async def invert_reminder_action(
+    request: Request,
+    invert_id: uuid.UUID,
+    payload: ReminderActionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fed / Refused / Tomorrow from a per-animal feeding reminder.
+
+    fed / refused log a feeding through `_create_invert_feeding` (food copied
+    from the latest accepted meal, notes "Logged from reminder", fed now). One
+    reminder logs one outcome: a later tap — a second phone, or Refused after
+    Fed — returns the first log with created=False. The unique partial index
+    on (invert_id, reminder_date) settles a race between two phones.
+
+    tomorrow sets `reminder_snoozed_until` to the owner's local today + 1. It is
+    not a feeding pause (due status is unchanged) and never creates a log.
+
+    Closed (died / transferred) animals: 409 for every action.
+    """
+    invert, access = load_invert(db, current_user, invert_id, "logger")
+    refuse_if_closed_invert(invert)
+    name = animal_title(invert)
+
+    if payload.action == "tomorrow":
+        invert.reminder_snoozed_until = _owner_today(db, invert.user_id) + timedelta(days=1)
+        db.commit()
+        return ReminderActionResponse(
+            action="tomorrow", created=False, animal_name=name, message="We'll remind you tomorrow"
+        )
+
+    def already(existing_log: Optional[FeedingLog]) -> ReminderActionResponse:
+        # Say what was actually recorded, not what this tap asked for.
+        accepted_flag = getattr(existing_log, "accepted", None)
+        if accepted_flag is True:
+            message = f"Already logged: {name} ate"
+        elif accepted_flag is False:
+            message = f"Already logged: {name} refused"
+        else:
+            message = ALREADY_LOGGED
+        return ReminderActionResponse(
+            action=payload.action, created=False, animal_name=name, message=message
+        )
+
+    existing = _reminder_feeding(db, invert.id, payload.reminder_date)
+    if existing is not None:
+        return already(existing)
+
+    last_meal = (
+        db.query(FeedingLog.food_type, FeedingLog.food_size)
+        .filter(tarantula_logs(FeedingLog, invert.id), FeedingLog.accepted.is_(True))
+        .order_by(FeedingLog.fed_at.desc())
+        .first()
+    )
+    accepted = payload.action == "fed"
+    data = FeedingLogCreate(
+        fed_at=datetime.now(timezone.utc),
+        food_type=last_meal[0] if last_meal else None,
+        food_size=last_meal[1] if last_meal else None,
+        accepted=accepted,
+        notes=REMINDER_NOTE,
+    )
+    savepoint = db.begin_nested()
+    try:
+        _create_invert_feeding(db, invert, data, access, reminder_date=payload.reminder_date)
+        savepoint.commit()
+    except IntegrityError:
+        # Another tap won between our check and our insert.
+        savepoint.rollback()
+        existing = _reminder_feeding(db, invert.id, payload.reminder_date)
+        if existing is None:
+            raise
+        return already(existing)
+    db.commit()
+    return ReminderActionResponse(
+        action=payload.action,
+        created=True,
+        animal_name=name,
+        message=f"Logged: {name} ate" if accepted else f"Logged: {name} refused",
+    )
 
 
 @router.get("/colonies/{colony_id}/feedings", response_model=List[FeedingLogResponse])

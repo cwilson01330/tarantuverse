@@ -42,7 +42,31 @@ interface NotificationPreferences {
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  /** Effortless logging switches. Older APIs omit them. */
+  smart_reminders_enabled?: boolean;
+  refusal_restarts_wait?: boolean;
+  post_molt_pause_enabled?: boolean;
 }
+
+type ReminderSwitchKey = 'smart_reminders_enabled' | 'refusal_restarts_wait' | 'post_molt_pause_enabled';
+
+const REMINDER_SWITCHES: { key: ReminderSwitchKey; title: string; line: string }[] = [
+  {
+    key: 'smart_reminders_enabled',
+    title: 'Reminders for each animal',
+    line: 'When 1–3 animals are due, get a reminder for each with Fed, Refused and Tomorrow buttons. With more due, you get one summary.',
+  },
+  {
+    key: 'refusal_restarts_wait',
+    title: 'A refusal restarts the wait',
+    line: "A refused meal counts as an offer, so you're not reminded again until the next normal feeding time.",
+  },
+  {
+    key: 'post_molt_pause_enabled',
+    title: 'Pause after a molt',
+    line: 'Feeding reminders pause for a few days after a logged molt while the fangs harden.',
+  },
+];
 
 /** "9:00 AM" from 9, "12:00 PM" from 12. */
 function formatHour(h: number): string {
@@ -186,6 +210,21 @@ export default function NotificationSettingsScreen() {
     // Re-read rather than assume: a refusal leaves 'denied' (button becomes
     // "Open phone settings") or, where the OS will ask again, 'undetermined'.
     setPermission(await getPermissionStatus());
+  };
+
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  // Optimistic: flip now, PUT just this field, revert with a short line on failure.
+  const toggleReminderSwitch = async (key: ReminderSwitchKey, value: boolean) => {
+    const previous = preferences[key] ?? false;
+    setSwitchError(null);
+    setPreferences((p) => ({ ...p, [key]: value }));
+    try {
+      await apiClient.put('/notification-preferences/', { [key]: value });
+    } catch {
+      setPreferences((p) => ({ ...p, [key]: previous }));
+      setSwitchError("Couldn't save that change. Please try again.");
+    }
   };
 
   const stepHour = (delta: number) =>
@@ -437,7 +476,7 @@ export default function NotificationSettingsScreen() {
           {/* Opt-in email on the same days and at the same hour. The server
               sends it from the daily digest run, so it follows the digest
               switch above (off there = no email either). */}
-          <View style={[styles.settingRow, styles.settingRowLast, !digestOn && styles.disabled]}>
+          <View style={[styles.settingRow, !digestOn && styles.disabled]}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>{FIRST_FEEDING_COPY.dailyEmailSwitch}</Text>
               <Text style={styles.settingDescription}>{FIRST_FEEDING_COPY.dailyEmailHelp}</Text>
@@ -450,6 +489,40 @@ export default function NotificationSettingsScreen() {
               accessibilityLabel={FIRST_FEEDING_COPY.dailyEmailSwitch}
             />
           </View>
+          {REMINDER_SWITCHES.map((item, i) => {
+            // Per-animal reminders go out from the daily digest run, so that one
+            // does nothing while the digest is off.
+            const needsDigest = item.key === 'smart_reminders_enabled';
+            const locked = needsDigest && !digestOn;
+            return (
+              <View
+                key={item.key}
+                style={[
+                  styles.settingRow,
+                  i === REMINDER_SWITCHES.length - 1 && styles.settingRowLast,
+                  locked && styles.disabled,
+                ]}
+              >
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{item.title}</Text>
+                  <Text style={styles.settingDescription}>{item.line}</Text>
+                </View>
+                <Switch
+                  value={preferences[item.key] ?? false}
+                  onValueChange={(value) => void toggleReminderSwitch(item.key, value)}
+                  disabled={locked}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  accessibilityLabel={item.title}
+                  accessibilityState={{ disabled: locked }}
+                />
+              </View>
+            );
+          })}
+          {switchError ? (
+            <Text style={styles.settingDescription} accessibilityLiveRegion="polite">
+              {switchError}
+            </Text>
+          ) : null}
         </View>
 
         {/* Push Notifications */}

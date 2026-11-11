@@ -477,7 +477,7 @@ def test_revive_reopens_logging(monkeypatch, owner):
 
 REFUSING = [
     fr.create_feeding_log, fr.create_scorpion_feeding_log, fr.create_centipede_feeding_log,
-    fr.create_whip_spider_feeding_log, fr.create_invert_feeding_log, fr.bulk_create_invert_feedings,
+    fr.create_whip_spider_feeding_log, fr.create_invert_feeding_log, fr.bulk_create_invert_feedings, fr.invert_reminder_action,
     ml.create_molt_log, ml.create_scorpion_molt_log, ml.create_centipede_molt_log,
     ml.create_whip_spider_molt_log, ml.create_invert_molt_log,
     sc.create_substrate_change, sc.create_scorpion_substrate_change, sc.create_centipede_substrate_change,

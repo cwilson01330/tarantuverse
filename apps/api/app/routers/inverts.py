@@ -45,11 +45,12 @@ from app.schemas.invert import (
     InvertResponse,
     InvertUpdate,
 )
-from app.services.feeding_status import compute_feeding_status
+from app.services.feeding_status import FeedingRules, compute_feeding_status, load_feeding_rules
 from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.feeding_mode import has_feeding_cadence
+from app.utils.post_molt_pause import default_pause_days
 from app.utils.limits import active_inverts_query, enforce_collection_limit
 from app.utils.locations import canonical_location, list_locations, rename_location
 from app.utils.access import (
@@ -806,6 +807,35 @@ async def get_invert_feeding_stats(
         is_overdue=status.is_overdue,
         needs_first_feeding=status.needs_first_feeding,
         days_since_baseline=status.days_since_baseline,
+        post_molt_pause_until=status.post_molt_pause_until,
+        last_offered_date=status.last_offered_date,
+    )
+
+
+class PostMoltPauseInfo(BaseModel):
+    enabled: bool
+    default_days: Optional[int] = None
+
+
+@router.get("/{invert_id}/post-molt-pause", response_model=PostMoltPauseInfo)
+@policy("logger")
+async def get_post_molt_pause(
+    invert_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """What the molt form needs to offer the post-molt feeding pause.
+
+    `enabled` is the collection OWNER's "Pause after a molt" switch (a
+    co-keeper logs under the owner's rule, not their own); `default_days` is
+    the window for this animal's taxon + life stage (None = no automatic
+    pause). See utils/post_molt_pause.py and services/feeding_status.py.
+    """
+    invert, _access = load_invert(db, current_user, invert_id, "logger", not_found="Invert not found")
+    rules = load_feeding_rules(db, [invert.user_id]).get(invert.user_id, FeedingRules())
+    return PostMoltPauseInfo(
+        enabled=rules.post_molt_pause,
+        default_days=default_pause_days(invert.taxon, invert.life_stage),
     )
 
 

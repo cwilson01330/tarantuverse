@@ -30,12 +30,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getImageUrl } from '../utils/image-url';
 import { taxonMdiIcon } from '../lib/inverts';
 import { feedingStatusText } from '../lib/first-feeding';
+import { pauseLabel } from '../lib/post-molt';
 
 export interface AnimalCardFeeding {
   /** null / undefined = never fed (or no ACCEPTED feeding). Not the same as 0. */
   daysSince?: number | null;
   isOverdue?: boolean;
   isPaused?: boolean;
+  /** From /inverts/feeding-status: reminders are paused after a molt until this day (YYYY-MM-DD). */
+  postMoltPauseUntil?: string | null;
   /** Recommended days between feedings, from /inverts/feeding-status. Needed to
    *  say how far PAST DUE an animal is; without it the card says "Overdue"
    *  rather than guessing a number. */
@@ -99,6 +102,10 @@ export interface AnimalCardProps {
 function feedingLine(f: AnimalCardFeeding | undefined, colors: any) {
   if (!f) return null;
   if (f.isPaused) return { text: 'Feeding paused', color: colors.textTertiary };
+  // The keeper's own pause wins above; this one is the automatic post-molt wait,
+  // shown quiet like a pause — never the red overdue treatment.
+  const afterMolt = pauseLabel(f.postMoltPauseUntil ?? null);
+  if (afterMolt) return { text: afterMolt, color: colors.textTertiary };
   // No logged feeding at all: "First meal not logged" / "Due · no meal logged yet".
   // Anything else falls through to the sentences below.
   const noMeal = feedingStatusText({

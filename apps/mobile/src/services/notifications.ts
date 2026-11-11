@@ -54,6 +54,10 @@ export interface NotificationPreferences {
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  /** Effortless logging switches (older APIs omit them). */
+  smart_reminders_enabled?: boolean;
+  refusal_restarts_wait?: boolean;
+  post_molt_pause_enabled?: boolean;
 }
 
 /**

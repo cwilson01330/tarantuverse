@@ -1,6 +1,14 @@
 {
   "tarantuverse": [
     {
+      "id": "2026-11-16-smarter-reminders",
+      "published_on": "2026-11-16",
+      "title": "Smarter feeding reminders",
+      "body": "Get a reminder for each due animal with Fed and Refused buttons, let a refusal restart the wait, and pause reminders after a molt. Turn them on in Settings.",
+      "premium": false,
+      "action": { "label": "Turn them on", "target": "settings" }
+    },
+    {
       "id": "2026-11-02-first-meal",
       "published_on": "2026-11-02",
       "title": "Reminders that work from day one",

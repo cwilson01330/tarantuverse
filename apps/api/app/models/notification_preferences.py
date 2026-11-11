@@ -63,5 +63,11 @@ class NotificationPreferences(Base):
     email_digest_enabled = Column(Boolean, default=False, nullable=False, server_default="false")
     email_digest_last_sent_on = Column(Date, nullable=True)
 
+    # Effortless logging switches. Existing rows are FALSE (server default);
+    # only ensure_notification_preferences creates rows with TRUE.
+    smart_reminders_enabled = Column(Boolean, default=False, nullable=False, server_default="false")
+    refusal_restarts_wait = Column(Boolean, default=False, nullable=False, server_default="false")
+    post_molt_pause_enabled = Column(Boolean, default=False, nullable=False, server_default="false")
+
     # Relationship
     user = relationship("User", back_populates="notification_preferences")

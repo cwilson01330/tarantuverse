@@ -28,7 +28,32 @@ interface NotificationPreferences {
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  // Effortless logging. Older APIs omit them; loadPreferences defaults to off.
+  smart_reminders_enabled: boolean;
+  refusal_restarts_wait: boolean;
+  post_molt_pause_enabled: boolean;
 }
+
+type ReminderSwitchKey = 'smart_reminders_enabled' | 'refusal_restarts_wait' | 'post_molt_pause_enabled';
+
+// Same words as apps/mobile/app/settings/notifications.tsx.
+const REMINDER_SWITCHES: { key: ReminderSwitchKey; title: string; line: string }[] = [
+  {
+    key: 'smart_reminders_enabled',
+    title: 'Reminders for each animal',
+    line: 'When 1–3 animals are due, get a reminder for each with Fed, Refused and Tomorrow buttons. With more due, you get one summary.',
+  },
+  {
+    key: 'refusal_restarts_wait',
+    title: 'A refusal restarts the wait',
+    line: "A refused meal counts as an offer, so you're not reminded again until the next normal feeding time.",
+  },
+  {
+    key: 'post_molt_pause_enabled',
+    title: 'Pause after a molt',
+    line: 'Feeding reminders pause for a few days after a logged molt while the fangs harden.',
+  },
+];
 
 type BoolKey = {
   [K in keyof NotificationPreferences]: NotificationPreferences[K] extends boolean ? K : never
@@ -116,6 +141,9 @@ export default function NotificationSettingsPage() {
     quiet_hours_enabled: false,
     quiet_hours_start: '22:00',
     quiet_hours_end: '08:00',
+    smart_reminders_enabled: false,
+    refusal_restarts_wait: false,
+    post_molt_pause_enabled: false,
   });
 
   useEffect(() => {
@@ -149,6 +177,9 @@ export default function NotificationSettingsPage() {
           email_digest_enabled: data.email_digest_enabled ?? false,
           digest_hour: typeof data.digest_hour === 'number' ? data.digest_hour : 9,
           sitter_activity_enabled: data.sitter_activity_enabled ?? true,
+          smart_reminders_enabled: data.smart_reminders_enabled ?? false,
+          refusal_restarts_wait: data.refusal_restarts_wait ?? false,
+          post_molt_pause_enabled: data.post_molt_pause_enabled ?? false,
         }));
       }
     } catch (error) {
@@ -184,6 +215,9 @@ export default function NotificationSettingsPage() {
         new_followers_enabled: preferences.new_followers_enabled,
         sitter_activity_enabled: preferences.sitter_activity_enabled ?? true,
         quiet_hours_enabled: preferences.quiet_hours_enabled,
+        smart_reminders_enabled: preferences.smart_reminders_enabled,
+        refusal_restarts_wait: preferences.refusal_restarts_wait,
+        post_molt_pause_enabled: preferences.post_molt_pause_enabled,
       };
 
       const response = await fetch(`${API_URL}/api/v1/notification-preferences/`, {
@@ -321,6 +355,26 @@ export default function NotificationSettingsPage() {
                 ))}
               </select>
             </div>
+
+            {REMINDER_SWITCHES.map((sw) => {
+              // Per-animal reminders go out from the daily digest run, so that
+              // one does nothing while the digest is off.
+              const locked = sw.key === 'smart_reminders_enabled' && !digestOn;
+              return (
+                <div key={sw.key} className={`${row} ${locked ? 'opacity-50' : ''}`}>
+                  <div className="flex-1">
+                    <h3 className={title}>{sw.title}</h3>
+                    <p className={desc}>{sw.line}</p>
+                  </div>
+                  <Toggle
+                    on={preferences[sw.key]}
+                    onClick={() => togglePreference(sw.key)}
+                    label={sw.title}
+                    disabled={locked}
+                  />
+                </div>
+              );
+            })}
           </div>
         </section>
 

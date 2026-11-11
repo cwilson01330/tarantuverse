@@ -8,6 +8,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import MoltNote from '@/components/MoltNote'
+import PostMoltPauseLine, { usePostMoltPause } from '@/components/PostMoltPauseLine'
 import { INVERT_TAXA, isInvertTaxon, growthLengthLabel, finalMoltCopy } from '@/lib/inverts'
 import { useUnitField } from '@/hooks/useUnitField'
 
@@ -59,6 +60,8 @@ export default function AddInvertMoltPage() {
   // suppresses premolt prediction, so a pre-ticked box would switch the feature
   // off for animals that are still growing.
   const [isUltimate, setIsUltimate] = useState(false)
+  const pause = usePostMoltPause()
+  const loadPause = pause.load
   const [saving, setSaving] = useState(false)
   const isEdit = !!logId
 
@@ -85,6 +88,7 @@ export default function AddInvertMoltPage() {
             if (m.outcome) setOutcome(m.outcome)
             if (m.complication_notes) setComplication(m.complication_notes)
             if (m.is_ultimate) setIsUltimate(true)
+            loadPause(m.feeding_pause_days)
             if (m.weight_before != null) setWeightBefore(String(m.weight_before))
             if (m.weight_after != null) setWeightAfter(String(m.weight_after))
           } catch { /* leave blank */ }
@@ -100,7 +104,7 @@ export default function AddInvertMoltPage() {
         setPrefix(isInvertTaxon(t) ? INVERT_TAXA[t].prefix : null)
       } catch { /* leave null */ }
     })()
-  }, [id, token, isAuthenticated, isLoading, router, loadBefore, loadAfter])
+  }, [id, token, isAuthenticated, isLoading, router, loadBefore, loadAfter, loadPause])
 
   const lengthLabel = growthLengthLabel(taxon ?? '')
   const parseMeasure = (v: string): number | null => {
@@ -128,6 +132,8 @@ export default function AddInvertMoltPage() {
             outcome: outcome || null,
             is_ultimate: isUltimate,
             complication_notes: complication.trim() || null,
+            // Only when the keeper changed it; untouched keeps the default.
+            ...pause.payload,
           }),
         },
       )
@@ -233,6 +239,7 @@ export default function AddInvertMoltPage() {
             </p>
           </div>
           )}
+          <PostMoltPauseLine invertId={id} token={token} moltDate={date} override={pause.override} onChoose={pause.choose} />
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
           <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update molt' : 'Save molt'}</button>
         </div>

@@ -57,6 +57,18 @@ DEEPLINK_PATTERNS = (
 
 _COMPILED_DEEPLINK_PATTERNS = tuple(re.compile(p) for p in DEEPLINK_PATTERNS)
 
+# Patterns allowed for ONE notification type only. A per-animal feeding
+# reminder opens that animal; mobile serves /invert/<id> directly. Web has no
+# push buttons and the digest summary keeps /feeding-day, so the link stays
+# scoped to the type that needs it rather than widening the shared vocabulary.
+TYPE_DEEPLINK_PATTERNS = {
+    "feeding_due": (r"^/invert/[0-9a-fA-F-]+$",),
+}
+
+_COMPILED_TYPE_DEEPLINK_PATTERNS = {
+    t: tuple(re.compile(p) for p in pats) for t, pats in TYPE_DEEPLINK_PATTERNS.items()
+}
+
 
 def _validate_deeplink(deeplink: Optional[str], notification_type: str) -> Optional[str]:
     """Drop deeplinks outside the vocabulary instead of shipping a dead tap.
@@ -68,6 +80,8 @@ def _validate_deeplink(deeplink: Optional[str], notification_type: str) -> Optio
     if deeplink is None:
         return None
     if any(p.match(deeplink) for p in _COMPILED_DEEPLINK_PATTERNS):
+        return deeplink
+    if any(p.match(deeplink) for p in _COMPILED_TYPE_DEEPLINK_PATTERNS.get(notification_type, ())):
         return deeplink
     logger.warning(
         "Dropping unrecognized notification deeplink %r for type %r. "
@@ -129,12 +143,16 @@ def create_notification(
     data: Optional[Dict[str, Any]] = None,
     push: bool = True,
     push_category: Optional[str] = None,
+    push_category_id: Optional[str] = None,
 ) -> Notification:
     """Write a notification row and (best-effort) push it.
 
     push_category: name of the per-category boolean on NotificationPreferences
       (e.g. 'direct_messages_enabled'); when set, push is suppressed if that
       flag is off. The in-app row is ALWAYS written regardless of push settings.
+    push_category_id: Expo notification category (`categoryId`) for the push —
+      the action buttons the app registered under that name. Not stored on the
+      row; the push simply doesn't carry one when None.
     """
     notif = Notification(
         user_id=user_id,
@@ -174,6 +192,9 @@ def create_notification(
                     payload["deeplink"] = notif.deeplink
                 if data:
                     payload.update(data)
+                extra: Dict[str, Any] = {}
+                if push_category_id:
+                    extra["category_id"] = push_category_id
                 PushNotificationService.send_notification(
                     expo_push_token=prefs.expo_push_token,
                     title=title,
@@ -182,6 +203,7 @@ def create_notification(
                     badge=1,
                     sound="default",
                     priority="high" if type == "direct_message" else "default",
+                    **extra,
                 )
         except Exception:
             # Push is best-effort; the in-app row is the source of truth.

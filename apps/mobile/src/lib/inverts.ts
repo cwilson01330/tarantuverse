@@ -405,6 +405,8 @@ export interface InvertMoltLog {
    *  hooks and emboli and is done. Not tarantula-only: mantids terminate in
    *  both sexes. */
   is_ultimate?: boolean;
+  /** Keeper-set post-molt feeding pause in days (null = the default, 0 = none). */
+  feeding_pause_days?: number | null;
   notes: string | null;
   // Per-molt measurements (ADR-008 growth module). Columns are named
   // leg_span_* for legacy reasons; for non-spider taxa the value is the
@@ -431,6 +433,8 @@ export interface InvertMoltMeasurements {
    *  prediction for this animal. Sent explicitly rather than omitted so an
    *  edit can UNSET it, not just set it. */
   is_ultimate?: boolean;
+  /** Post-molt pause override, 0–60 days. Omitted = leave as is / use the default. */
+  feeding_pause_days?: number | null;
   leg_span_before?: number | null;
   leg_span_after?: number | null;
   weight_before?: number | null;
@@ -674,6 +678,10 @@ export interface InvertFeedingStats {
   is_feeding_paused: boolean;
   feeding_paused_reason: string | null;
   feeding_paused_until: string | null;
+  /** Automatic post-molt wait: reminders resume on this day (YYYY-MM-DD, local). Not a keeper pause. */
+  post_molt_pause_until?: string | null;
+  /** Last day an animal was offered food (accepted or refused), YYYY-MM-DD. */
+  last_offered_date?: string | null;
   /** Species + life-stage aware. null = detritivore (no live-prey cadence).
    *  NOTE: for everything else the backend supplies a fallback rather than
    *  null, so check interval_source before presenting this as a schedule. */

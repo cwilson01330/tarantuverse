@@ -17,6 +17,8 @@ import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { useUnitField } from '../../src/hooks/useUnitField';
+import { PostMoltPauseLine, usePostMoltPause } from '../../src/components/PostMoltPauseLine';
+import { toISODateLocal } from '../../src/utils/date';
 
 const MOLT_OUTCOMES = [
   { value: 'successful', label: 'Went fine', color: (c: any) => c.success ?? '#22c55e' },
@@ -51,6 +53,7 @@ export default function AddMoltScreen() {
   const [outcome, setOutcome] = useState('');
   const [complication, setComplication] = useState('');
   const [saving, setSaving] = useState(false);
+  const pause = usePostMoltPause();
 
   useEffect(() => {
     if (isEdit && moltId) loadExistingMolt(moltId as string);
@@ -70,6 +73,7 @@ export default function AddMoltScreen() {
       setNotes(m.notes ?? '');
       if (m.outcome) setOutcome(m.outcome);
       if (m.complication_notes) setComplication(m.complication_notes);
+      pause.load(m.feeding_pause_days);
     } catch (error) {
       console.error('Failed to load molt for edit:', error);
       Alert.alert('Error', "Couldn't load this molt to edit.");
@@ -90,6 +94,7 @@ export default function AddMoltScreen() {
         outcome: outcome || null,
         complication_notes: complication.trim() || null,
         notes: notes.trim() || undefined,
+        ...pause.payload,
       };
 
       if (isEdit && moltId) {
@@ -142,6 +147,8 @@ export default function AddMoltScreen() {
             label="Molt Date"
           />
         </View>
+
+        <PostMoltPauseLine invertId={id} moltDate={toISODateLocal(moltDate)} override={pause.override} onChoose={pause.choose} />
 
         {/* Premolt Start Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>

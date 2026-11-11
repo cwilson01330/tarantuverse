@@ -191,6 +191,10 @@ class InvertFeedingStats(BaseModel):
     # Never-fed rule (Day one) — same meaning as on InvertFeedingStatusItem.
     needs_first_feeding: bool = False
     days_since_baseline: Optional[int] = None
+    # Effortless logging: last day of the post-molt pause and the latest
+    # offered meal (refusal switch) — same meaning as on InvertFeedingStatusItem.
+    post_molt_pause_until: Optional[date] = None
+    last_offered_date: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -235,6 +239,16 @@ class InvertFeedingStatusItem(BaseModel):
     # Local days since the animal's baseline (later of added / acquired), never
     # negative. Filled for animals with no accepted feeding; None once fed.
     days_since_baseline: Optional[int] = None
+    # Effortless logging (owner switches; None while the switch is off).
+    # Newest feeding log of EITHER kind when the owner's "a refusal restarts
+    # the wait" is on — is_overdue then counts from it. last_feeding_date /
+    # days_since_last_feeding still mean the last MEAL.
+    last_offered_date: Optional[datetime] = None
+    # Last paused day (keeper-local, inclusive) after the newest molt when the
+    # owner's "pause after a molt" is on. While set, is_overdue and
+    # needs_first_feeding are False; is_feeding_paused stays the keeper-set
+    # pause only (which wins: this is None while it holds).
+    post_molt_pause_until: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True)
 

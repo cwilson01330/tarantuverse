@@ -16,6 +16,7 @@ import { COPY as LIFECYCLE_COPY, pronounsFor } from '../../src/lib/lifecycle-cop
 import { requestMarkDied } from '../../src/lib/pending-intent';
 import { finalMoltCopy, growthLengthLabel } from '../../src/lib/taxon-modules';
 import { MoltNote } from '../../src/components/MoltNote';
+import { PostMoltPauseLine, usePostMoltPause } from '../../src/components/PostMoltPauseLine';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 import { useUnitField } from '../../src/hooks/useUnitField';
 import { maybeRequestReview } from '../../src/lib/reviewPrompt';
@@ -77,6 +78,8 @@ export default function AddInvertMoltScreen() {
    *  the feature off for animals that are still growing. */
   const [isUltimate, setIsUltimate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const pause = usePostMoltPause();
+  const loadPause = pause.load;
 
   useEffect(() => { if (id) getInvert(id).then((i) => { setTaxon(i.taxon); setAnimal(i); }).catch(() => {}); }, [id]);
 
@@ -90,6 +93,7 @@ export default function AddInvertMoltScreen() {
       if (m.outcome) setOutcome(m.outcome);
       if (m.complication_notes) setComplication(m.complication_notes);
       if (m.is_ultimate) setIsUltimate(true);
+      loadPause(m.feeding_pause_days);
       if (m.weight_before != null) setWeightBefore(String(m.weight_before));
       if (m.weight_after != null) setWeightAfter(String(m.weight_after));
       if (m.premolt_started_at) {
@@ -97,7 +101,7 @@ export default function AddInvertMoltScreen() {
         setPremoltStart(toISODateLocal(new Date(m.premolt_started_at)));
       }
     }).catch(() => {});
-  }, [logId, loadBefore, loadAfter]);
+  }, [logId, loadBefore, loadAfter, loadPause]);
 
   const lengthLabel = growthLengthLabel(taxon ?? '');
 
@@ -126,6 +130,7 @@ export default function AddInvertMoltScreen() {
         outcome: outcome || null,
         complication_notes: complication.trim() || null,
         is_ultimate: isUltimate,
+        ...pause.payload,
       };
       let created: { id: string } | null = null;
       if (isEdit && logId) {
@@ -192,6 +197,7 @@ export default function AddInvertMoltScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
           <MoltNote taxon={taxon} style={{ marginBottom: 16 }} />
           <Field label="Date molted" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Date molted" /></Field>
+          <PostMoltPauseLine invertId={id} moltDate={date} override={pause.override} onChoose={pause.choose} />
           <Field label="Molt number (optional)" colors={colors}><TextInput style={styles.input} value={moltNum} onChangeText={setMoltNum} placeholder="e.g. 4" placeholderTextColor={colors.textTertiary} keyboardType="number-pad" /></Field>
           {/* Premolt start. Hidden behind a toggle so an unrecorded date stays
               unrecorded rather than silently defaulting to today. */}

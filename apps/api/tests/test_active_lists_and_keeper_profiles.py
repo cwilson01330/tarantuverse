@@ -28,6 +28,7 @@ from app.models.feeding_log import FeedingLog
 from app.models.invert import Invert
 from app.models.invert_species import InvertSpecies
 from app.models.molt_log import MoltLog
+from app.models.notification_preferences import NotificationPreferences
 from app.models.photo import Photo
 from app.models.scorpion import Scorpion
 from app.models.substrate_change import SubstrateChange
@@ -51,7 +52,8 @@ def _tsvector_as_text(_type, _compiler, **_kw):
     return "TEXT"
 
 
-TABLES = (Invert, Scorpion, FeedingLog, MoltLog, SubstrateChange, Photo, InvertSpecies)
+# NotificationPreferences: the feeding-status rule reads the owner's switches.
+TABLES = (Invert, Scorpion, FeedingLog, MoltLog, SubstrateChange, Photo, InvertSpecies, NotificationPreferences)
 
 
 @pytest.fixture()
