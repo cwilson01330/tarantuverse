@@ -143,6 +143,26 @@ def _newest_molts(db: Session, ids: List[UUID]) -> Dict[UUID, tuple]:
     return newest
 
 
+def _matured_at(db: Session, ids: List[UUID]) -> Dict[UUID, datetime]:
+    """Newest `is_ultimate` molt per animal, ONE grouped query. Matches either
+    parent column, like _newest_molts (tarantula molts may carry only
+    tarantula_id)."""
+    if not ids:
+        return {}
+    key = func.coalesce(MoltLog.invert_id, MoltLog.tarantula_id)
+    rows = (
+        db.query(key, func.max(MoltLog.molted_at))
+        .filter(
+            MoltLog.is_ultimate.is_(True),
+            or_(MoltLog.invert_id.in_(ids), MoltLog.tarantula_id.in_(ids)),
+        )
+        .group_by(key)
+        .all()
+    )
+    wanted = set(ids)
+    return {animal_id: at for animal_id, at in rows if animal_id in wanted and at is not None}
+
+
 def compute_feeding_status(
     db: Session,
     inverts: List[Invert],
@@ -200,6 +220,7 @@ def compute_feeding_status(
         }
 
     newest_molt_by_id = _newest_molts(db, molt_ids)
+    matured_by_id = _matured_at(db, ids)
 
     # Batch-load the species referenced by this collection (avoid N+1).
     species_ids = {inv.species_id for inv in inverts if inv.species_id}
@@ -295,6 +316,11 @@ def compute_feeding_status(
                 interval_source=interval_source,
                 last_offered_date=last_offered,
                 post_molt_pause_until=post_molt_until,
+                current_instar=inv.current_instar,
+                matured_at=(
+                    _local_date(matured_by_id[inv.id], tz_offset_minutes)
+                    if inv.id in matured_by_id else None
+                ),
             )
         )
 

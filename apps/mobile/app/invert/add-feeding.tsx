@@ -14,7 +14,9 @@ import {
   type InvertTaxon,
 } from '../../src/lib/inverts';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
-import { SPACING } from '../../src/theme/tokens';
+import { SPACING, TYPE } from '../../src/theme/tokens';
+import { countsPrey } from '../../src/lib/taxon-modules';
+import { clampQuantity, PREY_QUANTITY_MAX, PREY_QUANTITY_MIN } from '../../src/lib/everyday-logging-ui';
 
 // Food chips come from the per-taxon FOOD_VOCABULARY (src/lib/inverts.ts):
 // a mantis gets flies, an isopod gets leaf litter, not a tarantula feeder list.
@@ -28,8 +30,8 @@ export default function AddInvertFeedingScreen() {
   const router = useRouter();
   // logId present ⇒ edit mode (PUT). The detail screen passes the current
   // values as params so we prefill without a single-log GET endpoint.
-  const { id, logId, fed_at, food_type, food_size, accepted: acceptedParam, notes: notesParam } =
-    useLocalSearchParams<{ id?: string; logId?: string; fed_at?: string; food_type?: string; food_size?: string; accepted?: string; notes?: string }>();
+  const { id, logId, fed_at, food_type, food_size, accepted: acceptedParam, notes: notesParam, quantity: quantityParam } =
+    useLocalSearchParams<{ id?: string; logId?: string; fed_at?: string; food_type?: string; food_size?: string; accepted?: string; notes?: string; quantity?: string }>();
   const isEdit = !!logId;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
@@ -55,6 +57,8 @@ export default function AddInvertFeedingScreen() {
   const [accepted, setAccepted] = useState(acceptedParam ? acceptedParam === 'true' : true);
   const [notes, setNotes] = useState(notesParam || '');
   const [saving, setSaving] = useState(false);
+  /** How many prey items were offered (1..20). Only shown for taxa that count prey. */
+  const [quantity, setQuantity] = useState(quantityParam ? clampQuantity(quantityParam) : 1);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
 
@@ -77,7 +81,7 @@ export default function AddInvertFeedingScreen() {
     if (!id || !taxon) return;
     try {
       setSaving(true);
-      const payload: { fed_at: string; food_type: string | null; food_size?: string | null; accepted: boolean; notes: string | null } = {
+      const payload: { fed_at: string; food_type: string | null; food_size?: string | null; accepted: boolean; notes: string | null; quantity?: number } = {
         fed_at: new Date(date + 'T12:00:00').toISOString(),
         food_type: foodTypeToSave(foodType, otherFood),
         accepted,
@@ -88,6 +92,7 @@ export default function AddInvertFeedingScreen() {
       // prey-size picker leave the stored value alone on edit.
       if (vocab.preySize) payload.food_size = foodSize || null;
       else if (!isEdit) payload.food_size = null;
+      if (countsPrey(taxon)) payload.quantity = clampQuantity(quantity);
       if (isEdit && logId) {
         await updateInvertFeeding(logId, payload);
       } else {
@@ -98,7 +103,7 @@ export default function AddInvertFeedingScreen() {
     finally { setSaving(false); }
   };
 
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, layout);
   return (
     <View style={styles.flex}>
       <AppHeader title={isEdit ? 'Edit feeding' : 'Log feeding'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
@@ -143,6 +148,29 @@ export default function AddInvertFeedingScreen() {
             </View>
           </Field>
           )}
+          {taxon && countsPrey(taxon) && (
+          <Field label="How many" colors={colors}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <TouchableOpacity
+                onPress={() => setQuantity((q) => clampQuantity(q - 1))}
+                disabled={quantity <= PREY_QUANTITY_MIN}
+                accessibilityRole="button"
+                accessibilityLabel="One fewer"
+                style={[styles.stepBtn, quantity <= PREY_QUANTITY_MIN && { opacity: 0.4 }]}>
+                <MaterialCommunityIcons name="minus" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={styles.stepValue} accessibilityLabel={`${quantity} prey items`}>{quantity}</Text>
+              <TouchableOpacity
+                onPress={() => setQuantity((q) => clampQuantity(q + 1))}
+                disabled={quantity >= PREY_QUANTITY_MAX}
+                accessibilityRole="button"
+                accessibilityLabel="One more"
+                style={[styles.stepBtn, quantity >= PREY_QUANTITY_MAX && { opacity: 0.4 }]}>
+                <MaterialCommunityIcons name="plus" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </Field>
+          )}
           <Field label="Outcome" colors={colors}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {[{ v: true, l: 'Accepted', i: 'check-circle' as const }, { v: false, l: 'Refused', i: 'close-circle' as const }].map((opt) => { const sel = opt.v === accepted; return (
@@ -165,12 +193,14 @@ export default function AddInvertFeedingScreen() {
 function Field({ label, colors, children }: { label: string; colors: ReturnType<typeof useTheme>['colors']; children: React.ReactNode }) {
   return (<View style={{ marginBottom: 16 }}><Text style={{ fontSize: 13, fontWeight: '600', color: colors.textTertiary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</Text>{children}</View>);
 }
-const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors'], layout: ReturnType<typeof useTheme>['layout']) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, paddingBottom: 48 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
   otherInput: { marginTop: SPACING.sm },
+  stepBtn: { width: 44, height: 44, borderRadius: layout.radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  stepValue: { minWidth: 32, textAlign: 'center', ...TYPE.heading, color: colors.textPrimary },
   saveButton: { marginTop: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   saveText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

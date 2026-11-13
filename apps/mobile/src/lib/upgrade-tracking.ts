@@ -28,6 +28,8 @@ export const UPGRADE_SOURCES = [
   'feeding_day_intro',
   // Expense tracking is premium: create / update answer 403 premium_required
   'expenses',
+  // Splitting animals out of a sling group past the free cap
+  'split_out',
   // Premium Scope features, reserved so their previews slot straight in
   'forecast',
   'benchmark',

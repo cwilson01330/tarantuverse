@@ -363,6 +363,9 @@ def _py_subsets():
          set(re.findall(r':\s*"(\w+)"', inspect.getsource(import_service._normalize_taxon))),
          "free-text spellings (pillbug, mantid) that map onto a taxon"),
     ]
+    from app.utils import broods
+    out.append(("BROOD_TAXA", "apps/api/app/utils/broods.py", set(broods.BROOD_TAXA),
+                "taxa whose females lay sacs/oothecae or bear broods the keeper groups"))
     try:
         from app.services import share_card
         out.append(("_LEG_SPAN_TAXA", "apps/api/app/services/share_card.py", set(share_card._LEG_SPAN_TAXA),
@@ -383,6 +386,9 @@ def _ts_subsets():
         ("INSTAR_TAXA", I, lambda: ts_str_list(I, r"const INSTAR_TAXA = new Set<string>\(\["),
          "taxa whose keepers count instars (the others count molts or nothing)"),
         ("INSTAR_TAXA", TM, lambda: ts_str_list(TM, r"const INSTAR_TAXA = new Set<string>\(\["), "same, mobile copy"),
+        ("COUNTS_PREY_TAXA", I, lambda: ts_str_list(I, r"const COUNTS_PREY_TAXA = new Set<string>\(\["),
+         "taxa whose keepers count the small prey they offer (flies); the rest log one feeding per offer"),
+        ("COUNTS_PREY_TAXA", TM, lambda: ts_str_list(TM, r"const COUNTS_PREY_TAXA = new Set<string>\(\["), "same, mobile copy"),
         ("GROWTH_NEEDS_MEASUREMENT", I, lambda: ts_str_list(I, r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\["),
          "taxa that rarely get measured: the growth chart waits for a measurement"),
         ("GROWTH_NEEDS_MEASUREMENT", TM, lambda: ts_str_list(TM, r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\["), "same, mobile copy"),
@@ -446,6 +452,7 @@ def test_web_and_mobile_module_registries_agree():
 @pytest.mark.parametrize("name,anchor_web,anchor_mob", [
     ("INSTAR_TAXA", r"const INSTAR_TAXA = new Set<string>\(\[", r"const INSTAR_TAXA = new Set<string>\(\["),
     ("GROWTH_NEEDS_MEASUREMENT", r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\[", r"const GROWTH_NEEDS_MEASUREMENT = new Set<string>\(\["),
+    ("COUNTS_PREY_TAXA", r"const COUNTS_PREY_TAXA = new Set<string>\(\[", r"const COUNTS_PREY_TAXA = new Set<string>\(\["),
     ("MOLT_NOTES", r"const MOLT_NOTES: Record<string, string> = \{", r"const MOLT_NOTES: Record<string, string> = \{"),
     ("STAGE_LABELS",
      r"const STAGE_LABELS: Record<string, Partial<Record<LifeStageValue, string>>> = \{",
@@ -523,6 +530,10 @@ def test_generic_taxa_plus_legacy_is_complete():
 # Files holding a cluster of taxon names that the registry above does not
 # check, each with the reason that is fine.
 KNOWN_NON_LISTS = {
+    "apps/mobile/src/lib/__tests__/broods.test.ts":
+        "unit test asserting per-taxon expectations of the registry helpers; not a taxon list",
+    "apps/mobile/src/lib/__tests__/everyday-logging.test.ts":
+        "unit test asserting per-taxon expectations of the helpers; not a taxon list",
     "apps/api/app/services/colony_import_service.py":
         "_young_bucket: per-taxon wording for 'young', falls back to 'juveniles'",
     "apps/api/app/models/invert_species.py":
@@ -620,3 +631,14 @@ def _assert_subset(label: str, where: str, taxa: set[str]) -> None:
     extra = taxa - CANONICAL
     assert not extra, f"{where}: {label} names {sorted(extra)}, which are not in INVERT_TAXON_VALUES (typo or a removed taxon)"
     assert taxa, f"{where}: {label} is empty"
+
+
+def test_egg_sac_module_taxa_equal_python_brood_taxa():
+    from app.utils import broods
+    web = ts_module_lists(WEB_MODULES, r"export const TAXON_MODULES: Record<InvertTaxon, FeatureModule\[\]> = \{")
+    mob = ts_module_lists(MOB_MODULES, r"export const TAXON_MODULES: Record<string, FeatureModule\[\]> = \{")
+    for label, reg in (("web", web), ("mobile", mob)):
+        got = {t for t, mods in reg.items() if "eggSacs" in mods}
+        assert got == set(broods.BROOD_TAXA), (
+            f"{label} TAXON_MODULES 'eggSacs' taxa {sorted(got)} != BROOD_TAXA {sorted(broods.BROOD_TAXA)}"
+        )

@@ -124,6 +124,19 @@ class InvertUpdate(InvertBase):
     colony_id: Optional[uuid.UUID] = None
 
 
+class AnimalRef(BaseModel):
+    """{id, name} of a related animal or group."""
+    id: uuid.UUID
+    name: Optional[str] = None
+
+
+class InvertParentage(BaseModel):
+    """Where a split-out animal came from (detail only; never public)."""
+    egg_sac_id: uuid.UUID
+    mother: Optional[AnimalRef] = None
+    colony: Optional[AnimalRef] = None
+
+
 class InvertResponse(InvertBase):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -146,6 +159,10 @@ class InvertResponse(InvertBase):
     died_at: Optional[date] = None
     death_cause: Optional[str] = None
     death_notes: Optional[str] = None
+
+    # Filled by GET /inverts/{id} only (from an offspring row); lists leave it
+    # None. Never on public routes, share cards, sitter passes or care sheets.
+    parentage: Optional[InvertParentage] = None
 
     # Pattern-free overrides for serialization. These columns are plain VARCHAR and
     # store UPPERCASE enum casing (the shared DB convention: sex/source are
@@ -249,6 +266,11 @@ class InvertFeedingStatusItem(BaseModel):
     # needs_first_feeding are False; is_feeding_paused stays the keeper-set
     # pause only (which wins: this is None while it holds).
     post_molt_pause_until: Optional[date] = None
+    # Card fields: the stored instar / molt count, and the keeper-local day of
+    # the newest molt marked as the ultimate (maturing) molt, else None. Never
+    # turned into a time-remaining figure (see ult_20260911_ultimate_molt).
+    current_instar: Optional[int] = None
+    matured_at: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True)
 

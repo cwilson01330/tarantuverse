@@ -20,7 +20,7 @@ Design notes:
   never a PG enum, per the enum-double-create memory.
 """
 from sqlalchemy import (
-    Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Numeric,
+    Boolean, CheckConstraint, Column, Date, DateTime, ForeignKey, Index, Numeric,
     Integer, String, Text,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -50,6 +50,7 @@ COLONY_END_REASONS = ("crashed", "sold", "merged", "other")
 class Colony(Base):
     __tablename__ = "colonies"
     __table_args__ = (
+        Index("uq_colonies_egg_sac_id", "egg_sac_id", unique=True),
         CheckConstraint(
             "end_reason IS NULL OR end_reason IN "
             "('crashed', 'sold', 'merged', 'other')",
@@ -98,6 +99,14 @@ class Colony(Base):
     )
 
     name = Column(String(100), nullable=False)
+
+    # The egg sac this group hatched from (UNIQUE: one group per sac). SET NULL
+    # so deleting the sac leaves the group, minus its banner.
+    egg_sac_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("egg_sacs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # Provenance
     date_acquired = Column(Date, nullable=True)

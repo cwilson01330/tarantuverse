@@ -15,6 +15,7 @@ import CollectionCapNotice from '@/components/CollectionCapNotice'
 import CareSheetDialog from '@/components/CareSheetDialog'
 import { formatLocalDate } from '@/lib/date'
 import { feedingStatusText } from '@/lib/firstFeeding'
+import { matureBadge, stageChip } from '@/lib/everydayLogging'
 import { pauseLabel } from '@/lib/postMolt'
 import {
   listColonies,
@@ -61,6 +62,9 @@ interface FeedingStatus {
   // Day-one: never fed and past the release cutoff (no meal logged yet).
   needs_first_feeding?: boolean
   interval_days?: number | null
+  // Everyday logging: instar count and the date of the final molt.
+  current_instar?: number | null
+  matured_at?: string | null
 }
 
 /**
@@ -756,6 +760,24 @@ export default function TarantulasPage() {
                                     )}
                                   </div>
                                 </div>
+                                {/* Stage chip + mature badge. Tarantulas never get a
+                                    stage chip (their count is molts, not instars). */}
+                                {(() => {
+                                  const row = feedingStatuses.get(animal.id)
+                                  const chip = animal.taxon === 'tarantula' ? null : stageChip(animal.taxon, row?.current_instar)
+                                  const mature = matureBadge(row?.matured_at ?? null, new Date())
+                                  if (!chip && !mature) return null
+                                  return (
+                                    <div className="flex flex-wrap gap-1">
+                                      {chip && (
+                                        <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">{chip}</span>
+                                      )}
+                                      {mature && (
+                                        <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">{mature}</span>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             </div>
 

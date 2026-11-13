@@ -36,6 +36,11 @@ import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import QRSheet from '../../src/components/QRSheet';
 import { EndColonySheet } from '../../src/components/EndColonySheet';
+import { SplitOutSheet } from '../../src/components/SplitOutSheet';
+import UpgradeModal from '../../src/components/UpgradeModal';
+import { colonyBannerText, splitToastText } from '../../src/lib/egg-sacs';
+import { splitNoun } from '../../src/lib/broods';
+import { taxonHasModule } from '../../src/lib/taxon-modules';
 import { ColonyTransferSheet } from '../../src/components/colony/ColonyTransferSheet';
 import ColonyPopulationCard from '../../src/components/colony/ColonyPopulationCard';
 import ColonyQuickLogSheet, { type QuickKind } from '../../src/components/colony/ColonyQuickLogSheet';
@@ -211,6 +216,9 @@ export default function ColonyDetailScreen() {
   const canLog = can(role, 'logger') && !isEnded && !isTransferred;
   const canKeep = canKeepRole && !isEnded && !isTransferred;
   const [endOpen, setEndOpen] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitUpgradeOpen, setSplitUpgradeOpen] = useState(false);
+  const [splitNote, setSplitNote] = useState('');
   const [transferOpen, setTransferOpen] = useState(false);
   const [reopening, setReopening] = useState(false);
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
@@ -912,6 +920,39 @@ export default function ColonyDetailScreen() {
           {ownerName ? `${ownerName}'s colony. ` : ''}You're a {ROLE_LABEL[role]} — {ROLE_HELP[role]}
         </Text>
       )}
+
+      {/* Where this group came from, linking to the sac. */}
+      {colony.from_egg_sac ? (
+        <TouchableOpacity
+          onPress={() => router.push(`/breeding/egg-sacs/${colony.from_egg_sac!.id}` as any)}
+          accessibilityRole="link"
+          style={{ paddingHorizontal: 16, paddingTop: 8 }}
+        >
+          <Text style={[styles.detailBody, { color: colors.textSecondary, textDecorationLine: 'underline' }]}>
+            {colonyBannerText(
+              colony.taxon,
+              colony.from_egg_sac.mother?.name ?? null,
+              formatLocalDate(colony.from_egg_sac.laid_date, { month: 'short', day: 'numeric', year: 'numeric' }),
+            )}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {splitNote !== '' ? (
+        <View
+          style={[styles.partialFail, { borderColor: colors.border, backgroundColor: colors.surface, borderRadius: layout.radius.md }]}
+          accessibilityLiveRegion="polite"
+        >
+          <Text style={[styles.detailBody, { color: colors.textPrimary }]}>{splitNote}</Text>
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/collection' as any)} accessibilityRole="button" style={styles.partialFailRetry}>
+              <Text style={[styles.addEventLink, { color: colors.primary }]}>View collection</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setSplitNote('')} accessibilityRole="button" style={styles.partialFailRetry}>
+              <Text style={[styles.addEventLink, { color: colors.textTertiary }]}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
         <ScrollView
@@ -1661,6 +1702,16 @@ export default function ColonyDetailScreen() {
             <Text style={styles.ghostBtnText}>Transfer or sell</Text>
           </TouchableOpacity>}
 
+          {/* Split out: turn some of the group into individual animals.
+              Keeper only, running groups of taxa that make sac groups. */}
+          {canKeep && colony.is_active && colony.total_count > 0 && taxonHasModule(colony.taxon, 'eggSacs') && <TouchableOpacity
+            onPress={() => setSplitOpen(true)}
+            style={[styles.ghostBtn, { alignItems: 'center', marginBottom: SPACING.md, borderRadius: layout.radius.md }]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.ghostBtnText}>Split out</Text>
+          </TouchableOpacity>}
+
           {/* End colony. Neutral, above delete: a colony that crashed or was
               sold shouldn't have to be deleted to leave the collection. */}
           {canKeep && <TouchableOpacity
@@ -1702,6 +1753,23 @@ export default function ColonyDetailScreen() {
         estimated={colony.count_is_estimated}
         shareLabel={colony.species_scientific_name || colony.species_display_name || colony.name}
       />
+
+      <SplitOutSheet
+        visible={splitOpen}
+        onClose={() => setSplitOpen(false)}
+        colonyId={colony.id}
+        taxon={colony.taxon}
+        total={colony.total_count}
+        name={colony.name}
+        onDone={(res) => {
+          setSplitOpen(false);
+          setSplitNote(splitToastText(res.created.length, splitNoun(colony.taxon)));
+          fetchColony();
+        }}
+        isOwner={isOwner}
+        onUpgrade={() => { setSplitOpen(false); setSplitUpgradeOpen(true); }}
+      />
+      <UpgradeModal source="split_out" visible={splitUpgradeOpen} onClose={() => setSplitUpgradeOpen(false)} />
 
       <EndColonySheet
         visible={endOpen}

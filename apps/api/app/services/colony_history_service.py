@@ -40,7 +40,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.colony import Colony, ColonyEvent
-from app.utils.colony_counts import STARTING_COUNT_NOTE, bucket_for
+from app.utils.colony_counts import STARTING_COUNT_NOTES, bucket_for
 
 # A growth rate needs at least this many observations spanning at least this
 # many days before it means anything. Two points a day apart would produce an
@@ -126,7 +126,8 @@ def _growth(points: list[dict]) -> dict:
 
 
 def _is_starting_count(e) -> bool:
-    return e.event_type == "added" and (getattr(e, "notes", None) or "") == STARTING_COUNT_NOTE
+    # Create, import and egg-sac hatch all record a starting headcount.
+    return e.event_type == "added" and (getattr(e, "notes", None) or "") in STARTING_COUNT_NOTES
 
 
 def colony_population_history(db: Session, colony: Colony) -> dict:

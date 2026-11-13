@@ -15,7 +15,7 @@ import { getInvert, uploadInvertPhoto, type InvertTaxon } from '../../src/lib/in
 
 export default function AddInvertPhotoScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, mode } = useLocalSearchParams<{ id?: string; mode?: string }>();
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
@@ -36,6 +36,15 @@ export default function AddInvertPhotoScreen() {
   };
   const take = async () => { if (!(await ensure('camera'))) return; const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.8 }); if (!r.canceled && r.assets[0]) setImageUri(r.assets[0].uri); };
   const pick = async () => { if (!(await ensure('gallery'))) return; const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.8 }); if (!r.canceled && r.assets[0]) setImageUri(r.assets[0].uri); };
+
+  // Arriving from the molt photo prompt: open the camera or library straight away.
+  const autoOpened = React.useRef(false);
+  useEffect(() => {
+    if (autoOpened.current) return;
+    if (mode === 'camera') { autoOpened.current = true; void take(); }
+    else if (mode === 'gallery') { autoOpened.current = true; void pick(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const handleUpload = async () => {
     if (!id || !taxon || !imageUri) { if (!imageUri) Alert.alert('Pick a photo first.'); return; }

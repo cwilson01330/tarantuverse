@@ -34,11 +34,11 @@
  * When the backing data lands for another taxon, add the module to its list
  * and render it in the shared spot — the gate is already here.
  */
-export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding';
+export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding' | 'eggSacs';
 
 export const TAXON_MODULES: Record<string, FeatureModule[]> = {
-  tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
-  scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-021 Phase D (web + mobile)
+  tarantula: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
+  scorpion: ['feedingStats', 'growth', 'breeding', 'eggSacs'], // breeding pilot — ADR-021 Phase D (web + mobile)
   // Centipede breeding enabled 2026-10-06 (consistency audit C): the female
   // broods a clutch of eggs (no egg sac), which is exactly what the 'Clutch' /
   // 'plings' entry in BREEDING_VOCABULARY below says. The word 'plings' still
@@ -56,7 +56,7 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   // pairing → sac → offspring chain is biologically the same shape.
   // Growth (2026-10-07): keepers measure huntsmen, wolf spiders and big
   // jumpers after a molt; the chart only appears once a molt has a size.
-  true_spider: ['feedingStats', 'growth', 'breeding'],
+  true_spider: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Detritivore: no live-prey cadence. Growth is opt-in (2026-10-07): most
   // millipedes molt underground and are never measured, but some keepers of
   // giants do; the chart shows only once a molt carries a measurement
@@ -66,7 +66,7 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   // the ootheca → nymphs vocabulary below is correct and now actually read by
   // the hubs, so a mantis breeder is no longer offered a spider's "egg sac".
   // Demand is real — the first premium subscriber keeps 15 mantids.
-  mantis: ['feedingStats', 'growth', 'breeding'],
+  mantis: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Omnivore grazer, and kept as a colony far more often than individually —
   // colonies are a separate table with their own screen (ADR-010), so an
   // individual roach genuinely has nothing here. Not an oversight.
@@ -222,7 +222,7 @@ export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = {
   scorpion: {
     // Viviparous — no egg stage exists. See the note above.
     clutch: null,
-    liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'instars' },
+    liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'scorplings' },
   },
   isopod: {
     // No egg stage the keeper ever sees. The female broods eggs internally in
@@ -484,4 +484,45 @@ export function elapsedSince(iso: string): string {
   if (days < 63) return `${Math.round(days / 7)} weeks`
   const months = Math.round(days / 30.4);
   return `${months} ${months === 1 ? 'month' : 'months'}`;
+}
+
+// ---------------------------------------------------------------------------
+// Broods (jumping-spiders plan). KEEP IN LOCKSTEP with
+// apps/web/src/lib/inverts.ts.
+
+/** Taxa whose keepers count the prey they offer (small prey, offered in numbers). */
+const COUNTS_PREY_TAXA = new Set<string>(['true_spider', 'mantis'])
+
+export function countsPrey(taxon: string): boolean {
+  return COUNTS_PREY_TAXA.has(taxon)
+}
+
+/** Name of the group a hatched sac/brood becomes. */
+export function broodBucket(taxon: string): string {
+  switch (taxon) {
+    case 'true_spider':
+    case 'tarantula':
+      return 'slings'
+    case 'mantis':
+      return 'nymphs'
+    case 'scorpion':
+      return 'scorplings'
+    default:
+      return 'young'
+  }
+}
+
+export function isLiveBirth(taxon: string): boolean {
+  return breedingVocabulary(taxon).liveBirth != null
+}
+
+export function hatchButtonLabel(taxon: string): string {
+  switch (taxon) {
+    case 'mantis':
+      return 'Hatched: start a nymph group'
+    case 'scorpion':
+      return 'Start a scorpling group'
+    default:
+      return 'Hatched: start a sling group'
+  }
 }

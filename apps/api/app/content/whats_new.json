@@ -1,6 +1,14 @@
 {
   "tarantuverse": [
     {
+      "id": "2026-11-23-egg-sacs-to-sling-groups",
+      "published_on": "2026-11-23",
+      "title": "From egg sac to individual animals",
+      "body": "Log egg sacs, oothecae and broods, hatch them into a group, then split animals out one by one. Cards show stage and mature badges, and feedings for true spiders (jumpers too) and mantids can record how many prey.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    },
+    {
       "id": "2026-11-16-smarter-reminders",
       "published_on": "2026-11-16",
       "title": "Smarter feeding reminders",

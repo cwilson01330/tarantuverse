@@ -58,7 +58,7 @@ interface Pairing {
 
 interface EggSac {
   id: string
-  pairing_id: string
+  pairing_id: string | null
   laid_date: string
   pulled_date: string | null
   hatch_date: string | null
@@ -721,6 +721,7 @@ export default function BreedingPage() {
                           className="min-w-0 flex-1 cursor-pointer"
                         >
                           <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {formatLocalDate(sac.laid_date)}</p>
+                          {!sac.pairing_id && <p className="text-xs text-gray-500 dark:text-gray-400">No pairing recorded</p>}
                           {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} {youngNoun}</p>}
                           {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
                           {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}

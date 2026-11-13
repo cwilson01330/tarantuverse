@@ -30,6 +30,7 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import { feedingStatusColor } from '../../src/utils/status-colors';
 import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
+import { matureBadge, stageChip } from '../../src/lib/everyday-logging';
 import { pauseLabel } from '../../src/lib/post-molt';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
@@ -107,6 +108,9 @@ interface FeedingStatus {
   interval_days?: number | null;
   /** Never fed and due for a first meal that was never logged (server rule). */
   needs_first_feeding?: boolean;
+  /** Instar / molt count and the day of the newest ultimate molt, from feeding-status. */
+  current_instar?: number | null;
+  matured_at?: string | null;
 }
 
 /**
@@ -322,6 +326,8 @@ function CollectionScreen() {
           is_overdue: row.is_overdue ?? false,
           needs_first_feeding: row.needs_first_feeding ?? false,
           location: row.location ?? null,
+          current_instar: row.current_instar ?? null,
+          matured_at: row.matured_at ?? null,
         });
       }
       setFeedingStatuses(next);
@@ -875,6 +881,8 @@ function CollectionScreen() {
           needsFirstFeeding: status?.needs_first_feeding,
         }}
         premolt={showsPremolt(item.id)}
+        stageChip={stageChip('tarantula', status?.current_instar)}
+        matureBadge={matureBadge(status?.matured_at ?? null, new Date())}
         onPress={() => router.push(`/tarantula/${item.id}`)}
         onLongPress={() => openActions(item.id, 'tarantula', getDisplayName(item))}
         onQuickFeed={
@@ -929,6 +937,8 @@ function CollectionScreen() {
               }
             : undefined
         }
+        stageChip={stageChip(taxon, feedingStatuses.get(item.id)?.current_instar)}
+        matureBadge={matureBadge(feedingStatuses.get(item.id)?.matured_at ?? null, new Date())}
         onPress={() => router.push(`/invert/${item.id}` as any)}
         onLongPress={() =>
           openActions(item.id, taxon, item.name || item.common_name || item.scientific_name || 'this animal')

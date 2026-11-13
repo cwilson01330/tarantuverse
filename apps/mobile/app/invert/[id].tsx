@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, FlatList, Image, Linking, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -38,14 +38,19 @@ import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
-  tracksInstars, formatStage, stageSummary, elapsedSince, adultStageHint,
+  tracksInstars, formatStage, stageSummary, elapsedSince, adultStageHint, countsPrey,
 } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
 import { MoltNote } from '../../src/components/MoltNote';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
+import { matureBadge, matureMaleNote, preyLabel } from '../../src/lib/everyday-logging';
+import { maturedAtFromMolts } from '../../src/lib/everyday-logging-ui';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import PhotoTimeline from '../../src/components/PhotoTimeline';
 import CostOfKeepingCard from '../../src/components/CostOfKeepingCard';
+import { EggSacsCard } from '../../src/components/EggSacsCard';
+import type { EggSac, Parentage } from '../../src/lib/egg-sacs';
+import { listInvertEggSacs } from '../../src/lib/egg-sacs-api';
 import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { FeedingCadenceSheet } from '../../src/components/FeedingCadenceSheet';
@@ -82,6 +87,12 @@ function InvertDetailScreen() {
   // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
   const [moltsToAdult, setMoltsToAdult] = useState<number | null>(null);
   const [pairings, setPairings] = useState<InvertPairing[]>([]);
+  // Egg sacs (null = not loaded / not applicable). Loaded with the focus
+  // reload only; the sac screen refreshes its own list.
+  const [eggSacs, setEggSacs] = useState<EggSac[] | null>(null);
+  // Only ever set from a GET: PUT / died / change-taxon responses carry
+  // parentage: null and must not wipe a known value.
+  const [parentage, setParentage] = useState<Parentage | null>(null);
   const [transferring, setTransferring] = useState(false);
   const [loading, setLoading] = useState(true);
   // Bumped when fetchAll finishes; the cost card refetches on it (not on focus).
@@ -163,6 +174,7 @@ function InvertDetailScreen() {
     try {
       const i = await getInvert(id);
       setInvert(i);
+      setParentage(((i as unknown as { parentage?: Parentage | null }).parentage) ?? null);
       // Each slice still degrades on its own so one bad endpoint doesn't blank
       // the screen — but a failure is RECORDED, not swallowed. `.catch(() => [])`
       // on its own made a failed load indistinguishable from "nothing logged"
@@ -170,7 +182,7 @@ function InvertDetailScreen() {
       const failed: string[] = [];
       const soft = <T,>(p: Promise<T>, fallback: T, what: string): Promise<T> =>
         p.catch(() => { failed.push(what); return fallback; });
-      const [f, m, sub, p, g, pr, fs, ev, care] = await Promise.all([
+      const [f, m, sub, p, g, pr, fs, ev, care, sacs] = await Promise.all([
         soft(listInvertFeedings(i.taxon, id), [] as InvertFeedingLog[], 'feedings'),
         soft(listInvertMolts(i.taxon, id), [] as InvertMoltLog[], 'molts'),
         soft(listInvertSubstrateChanges(i.taxon, id), [] as InvertSubstrateChange[], 'substrate changes'),
@@ -192,7 +204,12 @@ function InvertDetailScreen() {
         // Not registry-gated. Every taxon on this screen needs water in some
         // form, even the ones that never touch a dish — those get misted.
         soft(listInvertCareLogs(id), [] as InvertCareLog[], 'water logs'),
+        // Keepers only (viewers get 403): a failure just hides the card.
+        taxonHasModule(i.taxon, 'eggSacs') && i.sex !== 'male'
+          ? listInvertEggSacs(id).catch(() => null)
+          : Promise.resolve(null),
       ]);
+      setEggSacs(sacs);
       // Optional hint only, so a failure here isn't reported as missing data.
       if (tracksInstars(i.taxon) && i.species_id) {
         getInvertSpecies(i.species_id)
@@ -327,7 +344,7 @@ function InvertDetailScreen() {
   };
 
   const editFeeding = (f: InvertFeedingLog) => router.push(
-    `/invert/add-feeding?id=${id}&logId=${f.id}&fed_at=${encodeURIComponent(f.fed_at)}&food_type=${encodeURIComponent(f.food_type ?? '')}&food_size=${encodeURIComponent(f.food_size ?? '')}&accepted=${f.accepted}&notes=${encodeURIComponent(f.notes ?? '')}` as any,
+    `/invert/add-feeding?id=${id}&logId=${f.id}&fed_at=${encodeURIComponent(f.fed_at)}&food_type=${encodeURIComponent(f.food_type ?? '')}&food_size=${encodeURIComponent(f.food_size ?? '')}&accepted=${f.accepted}&quantity=${f.quantity ?? 1}&notes=${encodeURIComponent(f.notes ?? '')}` as any,
   );
   const editMolt = (m: InvertMoltLog) => router.push(
     `/invert/add-molt?id=${id}&logId=${m.id}&molted_at=${encodeURIComponent(m.molted_at)}&notes=${encodeURIComponent(m.notes ?? '')}` as any,
@@ -644,13 +661,17 @@ function InvertDetailScreen() {
       // Size goes in front of the prey — "a medium cricket". Omitted entirely
       // when unrecorded rather than substituted, so a blank stays a blank.
       title: (() => {
-        const prey = [f.food_size?.trim().toLowerCase(), f.food_type?.trim().toLowerCase()]
+        const kind = [f.food_size?.trim().toLowerCase(), f.food_type?.trim().toLowerCase()]
           .filter(Boolean)
           .join(' ');
+        // More than one item: "3 × medium cricket" instead of "a medium cricket".
+        const many = (f.quantity ?? 1) > 1 && countsPrey(invert?.taxon ?? '');
+        const prey = many ? preyLabel(kind || null, f.quantity) : kind;
         // Grazers are fed leaf litter or veg, not "a" prey item.
         if (!foodVocabularyFor(invert?.taxon).preySize) {
           return f.accepted ? `Fed ${prey || 'food'}` : `Refused ${prey || 'food'}`;
         }
+        if (many) return f.accepted ? `Ate ${prey}` : `Refused ${prey}`;
         return f.accepted
           ? `Ate ${prey ? `a ${prey}` : 'a feeder'}`
           : `Refused ${prey ? `a ${prey}` : 'food'}`;
@@ -836,11 +857,41 @@ function InvertDetailScreen() {
               {invert.current_instar ? (
                 <Text style={styles.heroMeta}>· {formatStage(invert.taxon, invert.current_instar)}</Text>
               ) : null}
+              {matureBadge(maturedAtFromMolts(molts), new Date()) ? (
+                <Text style={styles.heroMeta}>· {matureBadge(maturedAtFromMolts(molts), new Date())}</Text>
+              ) : null}
               {lastMoltAgo(molts) ? (
                 <Text style={styles.heroMeta}>· molted {lastMoltAgo(molts)}</Text>
               ) : null}
               <Text style={styles.heroMeta}>· {meta?.label ?? 'Invert'}</Text>
             </View>
+            {parentage && (parentage.colony || parentage.mother) ? (
+              <View style={styles.heroSubtitleRow}>
+                <Text style={styles.heroMeta}>From</Text>
+                {parentage.colony ? (
+                  <Text
+                    style={[styles.heroMeta, styles.heroLink]}
+                    onPress={() => router.push(`/colony/${parentage.colony!.id}` as any)}
+                    accessibilityRole="link"
+                  >
+                    {parentage.colony.name}
+                  </Text>
+                ) : null}
+                {parentage.colony && parentage.mother ? <Text style={styles.heroMeta}>·</Text> : null}
+                {parentage.mother ? (
+                  <>
+                    <Text style={styles.heroMeta}>mother</Text>
+                    <Text
+                      style={[styles.heroMeta, styles.heroLink]}
+                      onPress={() => router.push(`/invert/${parentage.mother!.id}` as any)}
+                      accessibilityRole="link"
+                    >
+                      {parentage.mother.name}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -1289,6 +1340,28 @@ function InvertDetailScreen() {
         </View>
       )}
 
+      {/* Mature males: one sourced sentence about lifespan after the final
+          molt (tarantulas only; the helper decides). Never a countdown. */}
+      {maturedAtFromMolts(molts) && (() => {
+        const note = matureMaleNote(invert.taxon, invert.sex);
+        if (!note) return null;
+        return (
+          <View style={{ marginHorizontal: SPACING.lg, marginVertical: SPACING.xs }}>
+            <Text style={[TYPE.caption, { color: colors.textSecondary }]}>
+              {note.text}{' '}
+              <Text
+                style={{ color: colors.primary, textDecorationLine: 'underline' }}
+                accessibilityRole="link"
+                accessibilityLabel="Source for this sentence"
+                onPress={() => { void Linking.openURL(note.sourceUrl).catch(() => {}); }}
+              >
+                Source
+              </Text>
+            </Text>
+          </View>
+        );
+      })()}
+
       {/* Stages (2026-10-07): for instar animals the stage, not size, is what
           keepers track — each molt as the stage it reached, days per stage,
           problem molts, and time since adulthood. Plus the care sheet's
@@ -1391,6 +1464,16 @@ function InvertDetailScreen() {
           )}
         </Section>
       )}
+
+      {/* Egg sacs: keepers + co-keepers, females / unknown sex. Stays on a
+          closed animal (a mother that died after laying still has sacs to
+          hatch); only "Log ..." goes. */}
+      <EggSacsCard
+        invert={{ id: invert.id, taxon: invert.taxon, sex: invert.sex, name: invertDisplayName(invert) }}
+        canKeep={canKeep}
+        isClosed={!!invert.died_at || !!invert.transferred_out_at}
+        sacs={eggSacs}
+      />
 
       <View onLayout={(e) => { photosY.current = e.nativeEvent.layout.y; }}>
       <Section title="Photos" actionLabel={canLog ? 'Add photo' : undefined} onAction={canLog ? () => router.push(`/invert/add-photo?id=${id}` as any) : undefined}>
@@ -1906,6 +1989,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     heroSubtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
     heroScientific: { ...TYPE.label, color: 'rgba(255,255,255,0.86)', fontStyle: 'italic' },
     heroMeta: { ...TYPE.label, color: 'rgba(255,255,255,0.72)' },
+    heroLink: { textDecorationLine: 'underline' },
     logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
     logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
     feedHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },

@@ -87,7 +87,7 @@ interface Pairing {
 
 interface EggSac {
   id: string;
-  pairing_id: string;
+  pairing_id: string | null;
   laid_date: string;
   pulled_date: string | null;
   hatch_date: string | null;
@@ -630,6 +630,9 @@ function BreedingOverviewScreen() {
                         : ''}
                       {s.hatch_date
                         ? ` · hatched ${fmtDate(s.hatch_date)}`
+                        : ''}
+                      {s.pairing_id == null
+                        ? `${s.spiderling_count != null || s.viable_count != null || s.hatch_date ? ' · ' : ''}No pairing recorded`
                         : ''}
                     </Text>
                   </View>

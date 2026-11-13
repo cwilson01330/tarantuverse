@@ -22,7 +22,12 @@ const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
 const ShareCardModal = dynamic(() => import('@/components/ShareCardModal'), { ssr: false })
 import EditPanel, { type EditField, type EditValues } from './EditPanel'
 import TransferPanel from './TransferPanel'
-import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, clutchSingularLabel, isInvertTaxon, taxonHasModule } from '@/lib/inverts'
+import SplitOutDialog from '@/components/SplitOutDialog'
+import UpgradeModal from '@/components/UpgradeModal'
+import { splitNoun } from '@/lib/broods'
+import { colonyBannerText, splitToastText } from '@/lib/eggSacs'
+import { formatLocalDate } from '@/lib/date'
 import {
   COLONY_EVENT_TYPES,
   colonyEventMeta,
@@ -157,6 +162,10 @@ export default function ColonyDetailPage() {
   const canLog = can(viewerRole, 'logger') && !isEnded && !isTransferred
   const canChange = (x: { logged_by_user_id?: string | null }) =>
     canKeep || (canLog && !!user?.id && x.logged_by_user_id === user.id)
+  // Split out: turn some of a sling group into individual animals.
+  const [splitOpen, setSplitOpen] = useState(false)
+  const [splitUpgradeOpen, setSplitUpgradeOpen] = useState(false)
+  const [splitNote, setSplitNote] = useState('')
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
   const [history, setHistory] = useState<PopulationHistory | null>(null)
   const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([])
@@ -927,6 +936,36 @@ export default function ColonyDetailPage() {
           </p>
         )}
 
+        {/* Where this group came from, linking to the sac. */}
+        {colony.from_egg_sac && (
+          <Link
+            href={`/dashboard/breeding/egg-sacs/${colony.from_egg_sac.id}`}
+            className="mt-2 inline-block text-sm text-theme-secondary underline hover:text-theme-primary"
+          >
+            {colonyBannerText(
+              clutchSingularLabel(colony.taxon),
+              colony.from_egg_sac.mother?.name ?? null,
+              formatLocalDate(colony.from_egg_sac.laid_date),
+            )}
+          </Link>
+        )}
+        {splitNote !== '' && (
+          <div
+            role="status"
+            className="mt-2 flex items-center justify-between gap-3 flex-wrap px-3 py-2 rounded-xl bg-surface border border-theme text-sm text-theme-primary"
+          >
+            <span>{splitNote}</span>
+            <span className="flex items-center gap-4">
+              <Link href="/dashboard/tarantulas" className="font-semibold text-primary-600 hover:underline">
+                View collection
+              </Link>
+              <button type="button" onClick={() => setSplitNote('')} className="text-theme-tertiary hover:text-theme-primary">
+                Dismiss
+              </button>
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mt-2 mb-6">
           <div className="flex items-start gap-3 min-w-0">
@@ -983,6 +1022,15 @@ export default function ColonyDetailPage() {
               className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition disabled:opacity-50"
             >
               {archiveBusy ? 'Saving…' : colony.is_active ? 'Archive' : 'Unarchive'}
+            </button>}
+            {/* Split out: some of the group become their own animals. Free;
+                the server refuses at the free animal cap. */}
+            {canKeep && colony.is_active && (colony.total_count ?? 0) > 0 && taxonHasModule(colony.taxon, 'eggSacs') && <button
+              type="button"
+              onClick={() => setSplitOpen(true)}
+              className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition"
+            >
+              Split out
             </button>}
             {/* Neutral, not red: ending a colony destroys nothing. */}
             {canKeep && <button
@@ -2409,6 +2457,34 @@ export default function ColonyDetailPage() {
             onPhotoAdded={fetchAll}
           />
         )}
+        {colony && (
+          <SplitOutDialog
+            open={splitOpen}
+            onClose={() => setSplitOpen(false)}
+            token={token ?? null}
+            colonyId={colony.id}
+            taxon={colony.taxon}
+            total={colony.total_count ?? 0}
+            name={colony.name}
+            isOwner={isOwner}
+            onDone={(res) => {
+              setSplitOpen(false)
+              setSplitNote(splitToastText(res.created.length, splitNoun(colony.taxon)))
+              fetchAll()
+            }}
+            onUpgrade={() => {
+              setSplitOpen(false)
+              setSplitUpgradeOpen(true)
+            }}
+          />
+        )}
+        <UpgradeModal
+          source="split_out"
+          isOpen={splitUpgradeOpen}
+          onClose={() => setSplitUpgradeOpen(false)}
+          feature="More animals"
+          description="Splitting these out would go past the free plan's animal limit. Upgrade to Premium to keep every one of them in your collection."
+        />
         {token && colony && (
           <ShareCardModal
             open={shareOpen}

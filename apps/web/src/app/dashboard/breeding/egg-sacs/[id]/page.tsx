@@ -17,8 +17,11 @@
  *     rows.
  *   - Link back to the parent pairing in the header crumb.
  *
- * No inline edit yet — delete + recreate is the recovery path for
- * incorrect data, same as HV clutch detail's v1.
+ *   - Edit (keepers): date laid / born, expected hatch (egg layers),
+ *     count (live birth), notes -- PUT /egg-sacs/{id}, partial.
+ *
+ * Taxon-dependent words (Laid/Born, egg sac/ootheca/brood) render only once
+ * the mother's taxon is known, so a scorpion brood never flashes "Laid".
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -27,20 +30,17 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import { formatLocalDate } from '@/lib/date'
+import HatchDialog from '@/components/HatchDialog'
+import UpgradeModal from '@/components/UpgradeModal'
+import { can, useCollectionRole } from '@/lib/coKeepers'
+import { clutchSingularLabel, hatchButtonLabel, isLiveBirth, offspringNoun } from '@/lib/inverts'
+import { sacStatus, sacStatusLabel } from '@/lib/broods'
+import { buildSacEditPayload, type EggSac } from '@/lib/eggSacs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-interface EggSac {
-  id: string
-  pairing_id: string
-  laid_date: string
-  pulled_date: string | null
-  hatch_date: string | null
-  spiderling_count: number | null
-  viable_count: number | null
-  notes: string | null
-  created_at: string
-}
+const editInputCls =
+  'w-full px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+const editLabelCls = 'block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1'
 
 interface Offspring {
   id: string
@@ -65,12 +65,52 @@ export default function EggSacDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
-  const { token, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
 
   const [sac, setSac] = useState<EggSac | null>(null)
   const [offspring, setOffspring] = useState<Offspring[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+
+  // Hatch / fail. The mother's taxon picks the words (egg sac, ootheca...).
+  const shared = useCollectionRole(token, user?.id, sac?.user_id)
+  const isMine = !!sac?.user_id && !!user?.id && sac.user_id === user.id
+  const role = isMine ? 'owner' : shared.role
+  const isOwner = role === 'owner'
+  const canKeep = can(role, 'keeper')
+  // null until the mother is read; a sac with no mother (older pairing
+  // sacs) or an unreadable one falls back to tarantula, as before.
+  const [motherTaxon, setMotherTaxon] = useState<string | null>(null)
+  const [motherFailed, setMotherFailed] = useState(false)
+  const [hatchOpen, setHatchOpen] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [failing, setFailing] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const motherId = sac?.mother_invert_id ?? null
+  useEffect(() => {
+    if (!motherId || !token) return
+    fetch(`${API_URL}/api/v1/inverts/${motherId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m) => {
+        if (m?.taxon) setMotherTaxon(m.taxon)
+        else setMotherFailed(true)
+      })
+      .catch(() => setMotherFailed(true))
+  }, [motherId, token])
+  const taxonPending = !!motherId && motherTaxon === null && !motherFailed
+  const taxon = motherTaxon ?? 'tarantula'
+  const live = isLiveBirth(taxon)
+  const noun = clutchSingularLabel(taxon)
+  const dateWord = live ? 'Born' : 'Laid'
+
+  // Edit (keepers). Seeded from the sac each time it opens.
+  const [editOpen, setEditOpen] = useState(false)
+  const [editLaid, setEditLaid] = useState('')
+  const [editExpected, setEditExpected] = useState('')
+  const [editCount, setEditCount] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -108,6 +148,83 @@ export default function EggSacDetailPage() {
     fetchAll()
   }, [authLoading, isAuthenticated, token, router, fetchAll])
 
+  async function reloadSac() {
+    if (!token) return
+    try {
+      const r = await fetch(`${API_URL}/api/v1/egg-sacs/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      if (r.ok) setSac(await r.json())
+    } catch {
+      /* the next load will try again */
+    }
+  }
+
+  function openEdit() {
+    if (!sac) return
+    setEditLaid(sac.laid_date)
+    setEditExpected(sac.expected_hatch_date ?? '')
+    setEditCount(sac.spiderling_count != null ? String(sac.spiderling_count) : '')
+    setEditNotes(sac.notes ?? '')
+    setEditError('')
+    setEditOpen(true)
+  }
+
+  async function handleSaveEdit() {
+    if (!sac || !token || editSaving) return
+    const built = buildSacEditPayload({
+      laidDate: editLaid,
+      expectedHatch: editExpected || null,
+      countText: editCount,
+      notes: editNotes,
+      liveBirth: live,
+    })
+    if (!built.ok) {
+      setEditError(built.error)
+      return
+    }
+    setEditSaving(true)
+    setEditError('')
+    try {
+      const res = await fetch(`${API_URL}/api/v1/egg-sacs/${sac.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(built.payload),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(typeof body?.detail === 'string' ? body.detail : '')
+      }
+      setSac(await res.json())
+      setEditOpen(false)
+    } catch (e) {
+      setEditError(e instanceof Error && e.message ? e.message : 'Couldn’t save that. Nothing has changed. Try again.')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleFail() {
+    if (!sac || !token || failing) return
+    if (!window.confirm(`Mark as didn't hatch?\n\nThis ${noun.toLowerCase()} stays in your records, marked as not hatched.`)) return
+    setFailing(true)
+    setActionError('')
+    try {
+      const res = await fetch(`${API_URL}/api/v1/egg-sacs/${sac.id}/fail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(typeof body?.detail === 'string' ? body.detail : '')
+      }
+      await reloadSac()
+    } catch (e) {
+      setActionError(e instanceof Error && e.message ? e.message : 'Couldn’t save that. Nothing has changed. Try again.')
+    } finally {
+      setFailing(false)
+    }
+  }
+
   async function handleDelete() {
     if (!sac || !token || deleting) return
     setDeleting(true)
@@ -141,6 +258,17 @@ export default function EggSacDetailPage() {
     chip: string
   } | null => {
     if (!sac) return null
+    if (live) {
+      // A brood is born, not laid: no incubation step to show.
+      const st = sacStatus(sac)
+      return {
+        label: sacStatusLabel(st, true),
+        chip:
+          st === 'waiting'
+            ? 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-700'
+            : 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700',
+      }
+    }
     if (sac.hatch_date) {
       return {
         label: 'Hatched',
@@ -221,14 +349,18 @@ export default function EggSacDetailPage() {
             Breeding
           </Link>
           <span className="text-gray-400">›</span>
-          <Link
-            href={`/dashboard/breeding/pairings/${sac.pairing_id}`}
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            Pairing
-          </Link>
-          <span className="text-gray-400">›</span>
-          <span className="text-gray-600 dark:text-gray-400">Egg sac</span>
+          {sac.pairing_id ? (
+            <>
+              <Link
+                href={`/dashboard/breeding/pairings/${sac.pairing_id}`}
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Pairing
+              </Link>
+              <span className="text-gray-400">›</span>
+            </>
+          ) : null}
+          <span className="text-gray-600 dark:text-gray-400">{taxonPending ? '' : noun}</span>
         </div>
 
         {/* Hero */}
@@ -236,22 +368,34 @@ export default function EggSacDetailPage() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                Laid
+                {taxonPending ? '\u00a0' : dateWord}
               </p>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatLocalDate(sac.laid_date)}
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-semibold uppercase tracking-wider ${lifecycle.chip}`}
-              >
-                {lifecycle.label}
-              </span>
+              {!taxonPending && (
+                <span
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-semibold uppercase tracking-wider ${lifecycle.chip}`}
+                >
+                  {sac.outcome ? sacStatusLabel(sacStatus(sac), live) : lifecycle.label}
+                </span>
+              )}
+              {canKeep && !taxonPending && !editOpen && (
+                <button
+                  type="button"
+                  onClick={openEdit}
+                  className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Edit
+                </button>
+              )}
+              {canKeep && (
               <button
                 onClick={() => setDeleteConfirm(true)}
-                aria-label="Delete egg sac"
-                title="Delete egg sac"
+                aria-label={`Delete ${noun.toLowerCase()}`}
+                title={`Delete ${noun.toLowerCase()}`}
                 className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <svg
@@ -273,6 +417,7 @@ export default function EggSacDetailPage() {
                   <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
                 </svg>
               </button>
+              )}
             </div>
           </div>
 
@@ -284,7 +429,7 @@ export default function EggSacDetailPage() {
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {survivalRate}%
                 <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
-                  {sac.viable_count} of {sac.spiderling_count} spiderlings
+                  {sac.viable_count} of {sac.spiderling_count} {offspringNoun(taxon)}
                 </span>
               </p>
             </div>
@@ -295,12 +440,15 @@ export default function EggSacDetailPage() {
             {sac.pulled_date && (
               <KV label="Pulled" value={formatLocalDate(sac.pulled_date)} />
             )}
+            {!live && !taxonPending && sac.expected_hatch_date && !sac.hatch_date && (
+              <KV label="Expected hatch" value={formatLocalDate(sac.expected_hatch_date)} />
+            )}
             {sac.hatch_date && (
-              <KV label="Hatched" value={formatLocalDate(sac.hatch_date)} />
+              <KV label={live ? 'Grouped' : 'Hatched'} value={formatLocalDate(sac.hatch_date)} />
             )}
             {sac.spiderling_count != null && (
               <KV
-                label="Spiderlings"
+                label={live ? 'Count' : offspringNoun(taxon).charAt(0).toUpperCase() + offspringNoun(taxon).slice(1)}
                 value={String(sac.spiderling_count)}
               />
             )}
@@ -309,12 +457,102 @@ export default function EggSacDetailPage() {
             )}
           </div>
 
-          {sac.notes && (
+          {sac.notes && !editOpen && (
             <p className="mt-4 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
               {sac.notes}
             </p>
           )}
+
+          {editOpen && (
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-4">
+              <div>
+                <label htmlFor="edit-sac-laid" className={editLabelCls}>{live ? 'Date born' : 'Date laid'}</label>
+                <input id="edit-sac-laid" type="date" value={editLaid} onChange={(e) => setEditLaid(e.target.value)} className={editInputCls} />
+              </div>
+              {!live && (
+                <div>
+                  <label htmlFor="edit-sac-expected" className={editLabelCls}>Expected hatch (optional)</label>
+                  <input id="edit-sac-expected" type="date" value={editExpected} min={editLaid || undefined} onChange={(e) => setEditExpected(e.target.value)} className={editInputCls} />
+                  {editExpected && (
+                    <button type="button" onClick={() => setEditExpected('')} className="mt-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                      Clear expected hatch
+                    </button>
+                  )}
+                </div>
+              )}
+              {live && (
+                <div>
+                  <label htmlFor="edit-sac-count" className={editLabelCls}>Count (optional)</label>
+                  <input id="edit-sac-count" type="text" inputMode="numeric" value={editCount} onChange={(e) => setEditCount(e.target.value)} className={editInputCls} />
+                </div>
+              )}
+              <div>
+                <label htmlFor="edit-sac-notes" className={editLabelCls}>Notes (optional)</label>
+                <textarea id="edit-sac-notes" rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className={editInputCls} />
+              </div>
+              {editError !== '' && (
+                <p role="alert" className="text-sm text-red-700 dark:text-red-300">{editError}</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(false)}
+                  disabled={editSaving}
+                  className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={editSaving}
+                  className="px-4 py-2 text-sm font-semibold rounded-md bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 disabled:opacity-60"
+                >
+                  {editSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Group made from this sac, or the way to make one. Works without a
+            pairing; needs the mother (the API answers 400 without one). */}
+        {sac.hatched_colony ? (
+          <Link
+            href={`/dashboard/colonies/${sac.hatched_colony.id}`}
+            className="mt-4 flex items-center justify-between gap-3 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-700 transition"
+          >
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Group</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{sac.hatched_colony.name}</p>
+            </div>
+            <span className="text-gray-400 dark:text-gray-500 text-xl">›</span>
+          </Link>
+        ) : null}
+        {canKeep && !taxonPending && sac.mother_invert_id && (sacStatus(sac) === 'waiting' || sacStatus(sac) === 'failed') ? (
+          <div className="mt-4 space-y-2">
+            <button
+              type="button"
+              onClick={() => { setActionError(''); setHatchOpen(true) }}
+              className="w-full px-4 py-3 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold hover:opacity-90"
+            >
+              {hatchButtonLabel(taxon)}
+            </button>
+            {sacStatus(sac) === 'waiting' && !live ? (
+              <button
+                type="button"
+                onClick={handleFail}
+                disabled={failing}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60"
+              >
+                {failing ? 'Saving…' : "Didn't hatch"}
+              </button>
+            ) : null}
+            {actionError !== '' && (
+              <p role="alert" className="text-sm text-red-700 dark:text-red-300">{actionError}</p>
+            )}
+          </div>
+        ) : null}
 
         {/* Offspring section */}
         <section className="mt-6">
@@ -322,19 +560,27 @@ export default function EggSacDetailPage() {
             <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Offspring ({offspring.length})
             </h2>
-            <Link
-              href={`/dashboard/breeding/offspring/add?egg_sac_id=${sac.id}`}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-purple-700 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300"
-            >
-              + Add offspring
-            </Link>
+            {canKeep && (
+              <Link
+                href={`/dashboard/breeding/offspring/add?egg_sac_id=${sac.id}`}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-purple-700 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300"
+              >
+                + Add offspring
+              </Link>
+            )}
           </div>
           {offspring.length === 0 ? (
             <div className="p-6 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 text-center">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                No offspring recorded for this sac yet. Click{' '}
-                <strong>Add offspring</strong> to log a spiderling — status,
-                sale info, and buyer notes per individual.
+                {canKeep ? (
+                  <>
+                    No offspring recorded for this {noun.toLowerCase()} yet. Click{' '}
+                    <strong>Add offspring</strong> to log one — status,
+                    sale info, and buyer notes per individual.
+                  </>
+                ) : (
+                  <>No offspring recorded for this {noun.toLowerCase()} yet.</>
+                )}
               </p>
             </div>
           ) : (
@@ -367,6 +613,30 @@ export default function EggSacDetailPage() {
         </section>
       </div>
 
+      {sac.mother_invert_id ? (
+        <HatchDialog
+          open={hatchOpen}
+          onClose={() => setHatchOpen(false)}
+          token={token ?? null}
+          sacId={sac.id}
+          taxon={taxon}
+          initialCount={sac.spiderling_count}
+          isOwner={isOwner}
+          onHatched={(colonyId) => {
+            setHatchOpen(false)
+            router.replace(`/dashboard/colonies/${colonyId}`)
+          }}
+          onUpgrade={() => { setHatchOpen(false); setUpgradeOpen(true) }}
+        />
+      ) : null}
+      <UpgradeModal
+        source="collection_cap"
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        feature="More animals"
+        description="Starting this group would go past the free plan's animal limit. Upgrade to Premium to keep every one of them in your collection."
+      />
+
       {/* Delete confirmation modal */}
       {deleteConfirm && (
         <div
@@ -381,12 +651,12 @@ export default function EggSacDetailPage() {
           >
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                Delete egg sac?
+                Delete {noun.toLowerCase()}?
               </h3>
             </div>
             <div className="px-5 py-4">
               <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                <strong>Laid {formatLocalDate(sac.laid_date)}</strong>
+                <strong>{dateWord} {formatLocalDate(sac.laid_date)}</strong>
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {cascadeCopy}

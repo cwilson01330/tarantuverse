@@ -19,6 +19,8 @@ import GrowthChart from '@/components/GrowthChart'
 import ShareCardModal from '@/components/ShareCardModal'
 import UpgradeModal from '@/components/UpgradeModal'
 import CostOfKeepingCard from '@/components/CostOfKeepingCard'
+import EggSacsCard from '@/components/EggSacsCard'
+import type { EggSac, Parentage } from '@/lib/eggSacs'
 import {
   ANIMAL_EVENT_LABELS,
   DEATH_CAUSE_LABELS,
@@ -33,9 +35,11 @@ import AnimalEventDialog from '@/components/AnimalEventDialog'
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
   tracksInstars, formatStage, stageSummary, elapsedSince, stageCountLabel, adultStageHint,
-  INVERT_TAXA, isInvertTaxon, type InvertTaxon,
+  INVERT_TAXA, isInvertTaxon, countsPrey, type InvertTaxon,
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
+import { matureBadge, matureMaleNote, preyLabel } from '@/lib/everydayLogging'
+import { maturedAtFromMolts } from '@/lib/everydayLoggingUi'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
 import SpeciesLinkBanner from '@/components/SpeciesLinkBanner'
 import MoltNote from '@/components/MoltNote'
@@ -134,7 +138,7 @@ interface Invert {
 }
 
 interface Attributed { logged_by_user_id?: string | null; logged_by_name?: string | null; sitter_name?: string | null }
-interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; food_size?: string | null; accepted: boolean; notes?: string | null }
+interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; food_size?: string | null; quantity?: number | null; accepted: boolean; notes?: string | null }
 interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null; outcome?: string | null; is_ultimate?: boolean; leg_span_after?: string | number | null }
 interface SubstrateChange extends Attributed { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
 /** Hydration events (car_20260909). Three types, because a top-up, a
@@ -245,6 +249,12 @@ export default function InvertDetailPage() {
   const [pairings, setPairings] = useState<any[]>([])
   const [mates, setMates] = useState<Invert[]>([])
   const [pairOpen, setPairOpen] = useState(false)
+  // Egg sacs (mothers of eggSacs taxa). null = not loaded or the load failed.
+  const [eggSacs, setEggSacs] = useState<EggSac[] | null>(null)
+  // Where this animal came from (a split-out group + its mother). Its OWN
+  // state, set only from GET /inverts/{id}: PUT, died and change-taxon
+  // responses carry parentage: null and must not wipe a known value.
+  const [parentage, setParentage] = useState<Parentage | null>(null)
   // Mark-as-died. Its own dialog rather than a field on edit, so this can't
   // happen as a side effect of an incidental save.
   const [cadenceOpen, setCadenceOpen] = useState(false)
@@ -303,6 +313,7 @@ export default function InvertDetailPage() {
       if (!res.ok) throw new Error('Could not load this animal.')
       const data: Invert = await res.json()
       setInvert(data)
+      setParentage((data as unknown as { parentage?: Parentage | null }).parentage ?? null)
 
       // Logs go through the generic /inverts/{id}/… endpoints (ADR-007),
       // so this works for every taxon without a per-taxon prefix.
@@ -364,6 +375,16 @@ export default function InvertDetailPage() {
       setFeedingStats(fs)
       setTarantulaStats(ts)
 
+      // Egg sacs: mothers only (not males), taxa with the module. The API
+      // lets any viewer read them; the card itself is keeper-only.
+      if (taxonHasModule(data.taxon, 'eggSacs') && data.sex !== 'male') {
+        fetch(`${API_URL}/api/v1/inverts/${id}/egg-sacs`, { headers })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          .then((l) => setEggSacs(Array.isArray(l) ? l : null))
+      } else {
+        setEggSacs(null)
+      }
+
       // Breeding module (registry-gated — ADR-021 Phase D). Fetch this
       // animal's pairings + the same-taxon collection for the mate picker.
       if (taxonHasModule(data.taxon, 'breeding')) {
@@ -401,7 +422,7 @@ export default function InvertDetailPage() {
    * a new hero or a new pairing used to rerun all ~12 requests and blank the
    * page for it. Mirrors mobile's refreshSlices.
    */
-  type Slice = 'invert' | 'feedings' | 'molts' | 'substrate' | 'photos' | 'care' | 'events' | 'growth' | 'stats' | 'pairings'
+  type Slice = 'invert' | 'feedings' | 'molts' | 'substrate' | 'photos' | 'care' | 'events' | 'growth' | 'stats' | 'pairings' | 'eggSacs'
   const refreshSlices = async (slices: Slice[]) => {
     if (!id || !token) return
     const headers = { Authorization: `Bearer ${token}` }
@@ -422,6 +443,7 @@ export default function InvertDetailPage() {
         if (r.ok) {
           const fresh: Invert = await r.json()
           setInvert(fresh)
+          setParentage((fresh as unknown as { parentage?: Parentage | null }).parentage ?? null)
           taxon = fresh.taxon
         }
       } catch { /* keep what's on screen */ }
@@ -459,6 +481,13 @@ export default function InvertDetailPage() {
         setFeedingStats(fs)
         setTarantulaStats(ts)
       })())
+    }
+    if (want.has('eggSacs') && taxon && taxonHasModule(taxon, 'eggSacs')) {
+      tasks.push(
+        fetch(`${API_URL}/api/v1/inverts/${id}/egg-sacs`, { headers })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          .then((l) => { if (Array.isArray(l)) setEggSacs(l) }),
+      )
     }
     if (want.has('pairings') && taxon && taxonHasModule(taxon, 'breeding')) {
       tasks.push(
@@ -738,6 +767,10 @@ export default function InvertDetailPage() {
       .join('&')
 
   const meta = invert ? taxonMeta(invert.taxon) : null
+  // Matured date comes from the molts the page already loaded (newest final
+  // molt); the badge is computed once and never shows a time remaining.
+  const maturedAt = maturedAtFromMolts(molts)
+  const matureLabel = matureBadge(maturedAt, new Date())
 
   return (
     <DashboardLayout
@@ -905,6 +938,21 @@ export default function InvertDetailPage() {
               </div>
             )}
 
+            {/* Mature males: one sourced sentence about lifespan after the final
+                molt (tarantulas only; the helper decides). Never a countdown. */}
+            {maturedAt && (() => {
+              const note = matureMaleNote(invert.taxon, invert.sex ?? null)
+              if (!note) return null
+              return (
+                <p className="mb-6 -mt-3 text-xs text-theme-secondary">
+                  {note.text}{' '}
+                  <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 underline">
+                    Source
+                  </a>
+                </p>
+              )
+            })()}
+
             {/* Identity */}
             <div className="mb-6">
               <div className="flex items-center gap-2">
@@ -917,9 +965,35 @@ export default function InvertDetailPage() {
                   </Link>
                 )}
               </div>
-              <h1 className="text-3xl font-bold text-theme-primary mt-2">
-                {invert.name || invert.common_name || 'Unnamed'}
-              </h1>
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <h1 className="text-3xl font-bold text-theme-primary">
+                  {invert.name || invert.common_name || 'Unnamed'}
+                </h1>
+                {matureLabel && (
+                  <span className="px-3 py-1 rounded-full bg-surface border border-theme text-theme-secondary text-xs font-semibold">
+                    {matureLabel}
+                  </span>
+                )}
+              </div>
+              {parentage && (parentage.colony || parentage.mother) ? (
+                <p className="text-sm text-theme-secondary mt-1">
+                  From{' '}
+                  {parentage.colony ? (
+                    <Link href={`/dashboard/colonies/${parentage.colony.id}`} className="text-primary-600 hover:underline">
+                      {parentage.colony.name}
+                    </Link>
+                  ) : null}
+                  {parentage.colony && parentage.mother ? ' · ' : null}
+                  {parentage.mother ? (
+                    <>
+                      mother{' '}
+                      <Link href={`/dashboard/inverts/${parentage.mother.id}`} className="text-primary-600 hover:underline">
+                        {parentage.mother.name}
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
               {invert.scientific_name && (
                 <p className="text-lg italic text-theme-secondary">{invert.scientific_name}</p>
               )}
@@ -985,10 +1059,10 @@ export default function InvertDetailPage() {
               onRetry={fetchAll}
               rows={feedings.map((x) => ({
                 key: x.id,
-                left: `${[x.food_size, x.food_type].filter(Boolean).join(' ') || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
+                left: `${[x.food_size, countsPrey(invert.taxon) ? preyLabel(x.food_type ?? null, x.quantity) : x.food_type].filter(Boolean).join(' ') || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
                 right: formatLocalDate(x.fed_at),
                 sub: attribution(x),
-                onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`) : undefined,
+                onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes, quantity: x.quantity })}`) : undefined,
                 onDelete: canChange(x) ? () => deleteLog(`feedings/${x.id}`, 'feeding', ['feedings', 'stats', 'invert']) : undefined,
               }))}
             />
@@ -1221,6 +1295,16 @@ export default function InvertDetailPage() {
                   </div>
                 )}
               </Section>
+            )}
+
+            {/* Egg sacs: mother's own list; keeper-only (the card decides). */}
+            {invert && (
+              <EggSacsCard
+                invert={{ id: invert.id, taxon: invert.taxon, sex: invert.sex, name: invert.name || invert.common_name || 'she' }}
+                canKeep={canKeep}
+                isClosed={isClosed}
+                sacs={eggSacs}
+              />
             )}
 
             {/* Water. Sits above substrate because it happens far more often —

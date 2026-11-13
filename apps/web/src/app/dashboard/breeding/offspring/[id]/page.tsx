@@ -37,6 +37,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import { formatLocalDate } from '@/lib/date'
+import { NO_PARENT_MESSAGE, resolveOffspringParent } from '@/lib/eggSacs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -57,18 +58,12 @@ interface Offspring {
 
 interface EggSac {
   id: string
-  pairing_id: string
+  // A sac logged on a female has no pairing (jumpers etc.); one of the two
+  // is always set.
+  pairing_id: string | null
+  mother_invert_id: string | null
   laid_date: string
   hatch_date: string | null
-}
-
-interface Pairing {
-  id: string
-  // Legacy FKs — NULL for every taxon except tarantula.
-  male_id: string | null
-  female_id: string | null
-  male_invert_id: string | null
-  female_invert_id: string | null
 }
 
 interface Tarantula {
@@ -318,10 +313,10 @@ export default function OffspringDetailPage() {
    * info on first open. Cached for the lifetime of the page — if the
    * keeper closes the modal and reopens it we don't re-fetch.
    *
-   * Failure case: if the pairing or parent fetch fails (parent deleted,
-   * permissions changed, etc.) we still let the modal open with empty
-   * prefills + a soft inline message. The keeper can type the species
-   * manually.
+   * Failure case: if neither the sac's mother nor the pairing's parents can
+   * be read (deleted, permissions changed), the modal says so and "Create &
+   * link" stays disabled -- without a parent there is no taxon, and guessing
+   * one is how bred jumpers were filed as tarantulas. Reopening retries.
    */
   async function openAddToCollection() {
     setAddOpen(true)
@@ -339,44 +334,18 @@ export default function OffspringDetailPage() {
       if (!sacRes.ok) throw new Error('Could not load parent egg sac.')
       const sac: EggSac = await sacRes.json()
 
-      const pRes = await fetch(
-        `${API_URL}/api/v1/pairings/${sac.pairing_id}`,
-        { headers },
-      )
-      if (!pRes.ok) throw new Error('Could not load parent pairing.')
-      const pairing: Pairing = await pRes.json()
-
-      // Read the male (arbitrary choice — the pairing endpoint rejects
-      // mismatched taxa, and both parents should share a species). Fall back
-      // to the female if that fetch fails.
-      //
-      // Resolve through `/inverts/` and prefer the `*_invert_id` columns: the
-      // legacy `male_id`/`female_id` are NULL for every non-tarantula, so the
-      // old form fetched `/tarantulas/null` and the prefill came back empty
-      // for exactly the keepers who most needed it.
-      const maleKey = pairing.male_invert_id || pairing.male_id
-      const femaleKey = pairing.female_invert_id || pairing.female_id
-
-      let parent: Tarantula | null = null
-      const maleRes = maleKey
-        ? await fetch(`${API_URL}/api/v1/inverts/${maleKey}`, { headers }).catch(() => null)
-        : null
-      if (maleRes && maleRes.ok) {
-        parent = await maleRes.json()
-      } else if (femaleKey) {
-        const femRes = await fetch(
-          `${API_URL}/api/v1/inverts/${femaleKey}`,
-          { headers },
-        ).catch(() => null)
-        if (femRes && femRes.ok) parent = await femRes.json()
-      }
+      // Mother first (a sac logged on a female has no pairing), then the
+      // pairing's parents. Never guess a taxon: refuse instead.
+      const parent = await resolveOffspringParent(sac, async (path) => {
+        const r = await fetch(`${API_URL}/api/v1${path}`, { headers }).catch(() => null)
+        return r && r.ok ? r.json().catch(() => null) : null
+      })
+      if (!parent) throw new Error(NO_PARENT_MESSAGE)
 
       setAddParent({
-        scientific_name: parent?.scientific_name ?? null,
-        species_id: parent?.species_id ?? null,
-        // Only fall back to tarantula when the parent couldn't be read at
-        // all. Guessing a taxon is how the wrong-species rows got created.
-        taxon: parent?.taxon || 'tarantula',
+        scientific_name: parent.scientific_name,
+        species_id: parent.species_id,
+        taxon: parent.taxon,
         hatch_date: sac.hatch_date,
         laid_date: sac.laid_date,
       })
@@ -401,6 +370,11 @@ export default function OffspringDetailPage() {
    */
   async function handleCreateAndLink() {
     if (!offspring || !token || addCreating) return
+    // No parent read = no taxon: refuse rather than file it as a tarantula.
+    if (!addParent) {
+      setAddError(addParentError || NO_PARENT_MESSAGE)
+      return
+    }
     if (!addName.trim()) {
       setAddError('Give your new animal a name first.')
       return
@@ -430,7 +404,7 @@ export default function OffspringDetailPage() {
         name: addName.trim(),
         // The generic create takes the taxon in the body — this is the line
         // that keeps a mantis nymph from being filed as a tarantula.
-        taxon: addParent?.taxon || 'tarantula',
+        taxon: addParent.taxon,
         sex: addSex,
         source: 'bred',
         date_acquired: dateAcquired,
@@ -876,8 +850,7 @@ export default function OffspringDetailPage() {
                   </p>
                 ) : addParentError ? (
                   <p className="text-amber-700 dark:text-amber-300">
-                    {addParentError} You can still create the record — it
-                    just won&rsquo;t auto-fill the species.
+                    {addParentError}
                   </p>
                 ) : (
                   <>
@@ -963,7 +936,7 @@ export default function OffspringDetailPage() {
               </button>
               <button
                 onClick={handleCreateAndLink}
-                disabled={addCreating || !addName.trim()}
+                disabled={addCreating || !addName.trim() || !addParent}
                 className="px-4 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {addCreating ? 'Creating…' : 'Create & link'}

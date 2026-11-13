@@ -9,7 +9,9 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
-import { foodTypeToSave, foodVocabularyFor, isInvertTaxon, splitStoredFood, type InvertTaxon } from '@/lib/inverts'
+import { countsPrey, foodTypeToSave, foodVocabularyFor, isInvertTaxon, splitStoredFood, type InvertTaxon } from '@/lib/inverts'
+
+import { clampQuantity, PREY_QUANTITY_MAX, PREY_QUANTITY_MIN, quantityForSave, quantityFromQuery, stepQuantity } from '@/lib/everydayLoggingUi'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const inputCls = 'w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary focus:outline-none focus:ring-2 focus:ring-electric-blue-500'
@@ -27,6 +29,7 @@ interface StoredFeeding {
   food_size?: string | null
   accepted?: boolean | null
   notes?: string | null
+  quantity?: number | null
 }
 
 export default function AddInvertFeedingPage() {
@@ -51,9 +54,16 @@ export default function AddInvertFeedingPage() {
   const [foodSize, setFoodSize] = useState('')
   const [accepted, setAccepted] = useState(true)
   const [notes, setNotes] = useState('')
+  /** How many prey items (1-20); only for taxa that count prey. */
+  const [quantity, setQuantity] = useState(1)
+  /** False when an edit never loaded its stored log and the link carried no
+   *  quantity — then the stored count is unknown and a save must not send one
+   *  (sending the 1 default would overwrite it). */
+  const [quantityKnown, setQuantityKnown] = useState(true)
   const [saving, setSaving] = useState(false)
   const isEdit = !!logId
   const vocab = foodVocabularyFor(taxon)
+  const showQuantity = !!taxon && countsPrey(taxon)
 
   useEffect(() => {
     if (isLoading) return
@@ -80,15 +90,18 @@ export default function AddInvertFeedingPage() {
       // Edit: the query string carries what the detail page had; the log
       // itself is authoritative (and is the only source of food_size, which the
       // detail page's edit link doesn't pass).
+      const queryQuantity = quantityFromQuery(sp?.get('quantity'))
       let stored: StoredFeeding = {
         fed_at: sp?.get('fed_at'),
         food_type: sp?.get('food_type'),
         accepted: sp?.get('accepted') != null ? sp?.get('accepted') === 'true' : null,
         notes: sp?.get('notes'),
+        quantity: queryQuantity,
       }
+      let loaded = false
       try {
         const res = await fetch(`${API_URL}/api/v1/feedings/${lid}`, { headers: { Authorization: `Bearer ${token}` } })
-        if (res.ok) stored = await res.json()
+        if (res.ok) { stored = await res.json(); loaded = true }
       } catch { /* fall back to the query string */ }
       if (stored.fed_at) setDate(localDay(new Date(stored.fed_at)))
       const split = splitStoredFood(stored.food_type, foods)
@@ -97,6 +110,8 @@ export default function AddInvertFeedingPage() {
       setFoodSize(stored.food_size ?? '')
       if (stored.accepted != null) setAccepted(!!stored.accepted)
       if (stored.notes != null) setNotes(stored.notes)
+      setQuantity(clampQuantity(stored.quantity))
+      setQuantityKnown(loaded || queryQuantity != null)
     })()
   }, [id, token, isAuthenticated, isLoading, router])
 
@@ -110,6 +125,8 @@ export default function AddInvertFeedingPage() {
         accepted,
         notes: notes.trim() || null,
       }
+      const qty = quantityForSave(showQuantity, quantityKnown, quantity)
+      if (qty !== undefined) payload.quantity = qty
       // null, not '' — an unrecorded size reads as absent, and an edit must be
       // able to clear one. Taxa without a size picker leave a stored size alone.
       if (vocab.preySize) payload.food_size = foodSize || null
@@ -171,6 +188,32 @@ export default function AddInvertFeedingPage() {
                 {FOOD_SIZES.map((s) => (
                   <button key={s} type="button" onClick={() => setFoodSize(foodSize === s ? '' : s)} aria-pressed={foodSize === s} className={chipCls(foodSize === s)}>{s}</button>
                 ))}
+              </div>
+            </div>
+          )}
+          {showQuantity && (
+            <div>
+              <label className={labelCls} id="prey-quantity-label">How many</label>
+              <div className="flex items-center gap-3" role="group" aria-labelledby="prey-quantity-label">
+                <button
+                  type="button"
+                  onClick={() => { const next = stepQuantity(quantity, -1); setQuantity(next.quantity); setQuantityKnown(next.known) }}
+                  disabled={quantity <= PREY_QUANTITY_MIN}
+                  aria-label="One fewer"
+                  className="h-10 w-10 rounded-full border border-theme bg-surface text-theme-primary text-lg font-semibold disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span className="min-w-[2rem] text-center text-lg font-semibold text-theme-primary" aria-live="polite">{quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => { const next = stepQuantity(quantity, 1); setQuantity(next.quantity); setQuantityKnown(next.known) }}
+                  disabled={quantity >= PREY_QUANTITY_MAX}
+                  aria-label="One more"
+                  className="h-10 w-10 rounded-full border border-theme bg-surface text-theme-primary text-lg font-semibold disabled:opacity-40"
+                >
+                  +
+                </button>
               </div>
             </div>
           )}

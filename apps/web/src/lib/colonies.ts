@@ -149,6 +149,8 @@ export interface ColonyResponse {
   species_display_name: string | null
   species_scientific_name: string | null
   species_missing: boolean
+  /** Set when this group was started by hatching an egg sac. */
+  from_egg_sac?: { id: string; laid_date: string; mother: { id: string; name: string } | null } | null
 }
 
 export interface ColonyCreate {

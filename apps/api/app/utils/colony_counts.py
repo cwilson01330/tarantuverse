@@ -37,11 +37,13 @@ DECREASING_EVENTS = frozenset({"death", "removed", "cannibalism", "split"})
 INCREASING_EVENTS = frozenset({"birth", "added", "merge"})
 
 # Notes written on the events that record a colony's starting headcount
-# (create and import). The 30-day change on the collection card leaves these
-# out: a colony added last week didn't grow by its whole population.
+# (create, import and an egg-sac hatch). The 30-day change on the collection
+# card leaves these out: a colony added last week didn't grow by its whole
+# population, and a group that just hatched didn't "grow" by its brood.
 STARTING_COUNT_NOTE = "Starting count"
 STARTING_COUNT_IMPORTED_NOTE = "Starting count (imported)"
-STARTING_COUNT_NOTES = (STARTING_COUNT_NOTE, STARTING_COUNT_IMPORTED_NOTE)
+HATCH_NOTE = "Hatched from egg sac"
+STARTING_COUNT_NOTES = (STARTING_COUNT_NOTE, STARTING_COUNT_IMPORTED_NOTE, HATCH_NOTE)
 
 
 def canonical_stage(name: Optional[str]) -> Optional[str]:

@@ -20,6 +20,10 @@ import { PostMoltPauseLine, usePostMoltPause } from '../../src/components/PostMo
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 import { useUnitField } from '../../src/hooks/useUnitField';
 import { maybeRequestReview } from '../../src/lib/reviewPrompt';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MoltPhotoPrompt } from '../../src/components/MoltPhotoPrompt';
+import { MOLT_PHOTO_PROMPT_KEY, offerMoltPhoto } from '../../src/lib/everyday-logging';
+import { readMoltPhotoDismissed, rememberMoltPhotoChoice } from '../../src/lib/everyday-logging-ui';
 
 /** successful / stuck / lost_limb / fatal — the backend vocabulary. Finer
  *  gradations would be guesses about a process the keeper mostly didn't watch. */
@@ -78,6 +82,8 @@ export default function AddInvertMoltScreen() {
    *  the feature off for animals that are still growing. */
   const [isUltimate, setIsUltimate] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Photo prompt after a new, non-fatal molt; `next` runs the rest of the flow. */
+  const [photoPrompt, setPhotoPrompt] = useState<{ next: () => void } | null>(null);
   const pause = usePostMoltPause();
   const loadPause = pause.load;
 
@@ -169,6 +175,7 @@ export default function AddInvertMoltScreen() {
       // fatal branch above stays first so a death never offers a card.
       if (!isEdit && created && outcome !== 'fatal' && can(role, 'keeper')) {
         const molt = created;
+        const closed = !!(animal?.died_at || animal?.transferred_out_at);
         // Same post-save navigation as the fatal offer: back to the detail
         // screen we came from, else open it in this screen's place.
         // Declining the card ends the flow — a success moment, so the store
@@ -177,10 +184,17 @@ export default function AddInvertMoltScreen() {
           if (from === 'detail') router.back(); else router.replace(`/invert/${id}` as any);
           maybeRequestReview('molt_logged');
         };
-        Alert.alert('Molt saved', 'Make a card of it?', [
+        const askCard = () => Alert.alert('Molt saved', 'Make a card of it?', [
           { text: 'Not now', style: 'cancel', onPress: leave },
           { text: 'Make a card', onPress: () => router.replace(`/share/${id}?kind=molt&moltId=${molt.id}` as any) },
         ], { cancelable: true, onDismiss: leave });
+        // The photo offer comes first; storage errors mean keep asking.
+        const dismissed = await readMoltPhotoDismissed(AsyncStorage, MOLT_PHOTO_PROMPT_KEY);
+        if (offerMoltPhoto(taxon, closed, dismissed)) {
+          setPhotoPrompt({ next: askCard });
+          return;
+        }
+        askCard();
         return;
       }
       router.back();
@@ -193,6 +207,26 @@ export default function AddInvertMoltScreen() {
   return (
     <View style={styles.flex}>
       <AppHeader title={isEdit ? 'Edit molt' : 'Log molt'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
+      <MoltPhotoPrompt
+        visible={!!photoPrompt}
+        onTake={(dontAsk) => {
+          setPhotoPrompt(null);
+          void rememberMoltPhotoChoice(dontAsk, AsyncStorage, MOLT_PHOTO_PROMPT_KEY);
+          router.replace(`/invert/add-photo?id=${id}&mode=camera` as any);
+        }}
+        onChoose={(dontAsk) => {
+          setPhotoPrompt(null);
+          void rememberMoltPhotoChoice(dontAsk, AsyncStorage, MOLT_PHOTO_PROMPT_KEY);
+          router.replace(`/invert/add-photo?id=${id}&mode=gallery` as any);
+        }}
+        onClose={(dontAsk) => {
+          const next = photoPrompt?.next;
+          setPhotoPrompt(null);
+          void rememberMoltPhotoChoice(dontAsk, AsyncStorage, MOLT_PHOTO_PROMPT_KEY);
+          // Let the sheet finish closing before the next alert.
+          if (next) setTimeout(next, 350);
+        }}
+      />
       <KeyboardAvoidingView style={styles.flex} behavior={'padding'}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <MoltNote taxon={taxon} style={{ marginBottom: 16 }} />

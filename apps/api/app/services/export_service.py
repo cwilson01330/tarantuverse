@@ -184,6 +184,7 @@ EGG_SAC_FIELDS = [
     "incubation_temp_min", "incubation_temp_max",
     "incubation_humidity_min", "incubation_humidity_max",
     "spiderling_count", "viable_count", "notes", "photo_url", "created_at",
+    "mother_invert_id", "outcome",
 ]
 
 OFFSPRING_FIELDS = [
@@ -203,7 +204,7 @@ COLONY_FIELDS = [
     "target_humidity_min", "target_humidity_max", "water_dish",
     "notes", "sitter_note", "photo_url", "visibility", "is_active", "transferred_out_at",
     "ended_at", "end_reason", "end_notes", "location",
-    "created_at", "updated_at",
+    "created_at", "updated_at", "egg_sac_id",
 ]
 
 COLONY_EVENT_FIELDS = [

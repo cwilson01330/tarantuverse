@@ -31,6 +31,10 @@ import { getImageUrl } from '../utils/image-url';
 import { taxonMdiIcon } from '../lib/inverts';
 import { feedingStatusText } from '../lib/first-feeding';
 import { pauseLabel } from '../lib/post-molt';
+import { TYPE } from '../theme/tokens';
+
+/** Fully rounded pill (not a themed card radius). */
+const PILL_RADIUS = 999;
 
 export interface AnimalCardFeeding {
   /** null / undefined = never fed (or no ACCEPTED feeding). Not the same as 0. */
@@ -55,6 +59,10 @@ export interface AnimalCardProps {
   sex?: string | null;
   taxon: string;
   feeding?: AnimalCardFeeding;
+  /** "L5" style stage chip (jumping spiders etc.). Shown in the footer row, not on the photo. */
+  stageChip?: string | null;
+  /** "Mature · 3 mo". Shown in the footer row. */
+  matureBadge?: string | null;
   /** Renders the premolt pill. Only pass true when a prediction is active. */
   premolt?: boolean;
   /** Marks this as something other than a single animal — currently "Colony".
@@ -151,6 +159,8 @@ export function AnimalCard({
   taxon,
   feeding,
   premolt,
+  stageChip,
+  matureBadge,
   kindLabel,
   countLabel,
   onPress,
@@ -183,6 +193,8 @@ export function AnimalCard({
         scientificName ?? undefined,
         a11ySex,
         status?.text,
+        stageChip,
+        matureBadge,
       ]
         .filter(Boolean)
         .join(', ')}
@@ -275,19 +287,33 @@ export function AnimalCard({
           </Text>
         )}
 
-        {!!status && (
+        {(!!status || !!stageChip || !!matureBadge) && (
           <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: status.color }]} />
-            <Text
-              style={[
-                styles.statusText,
-                { color: status.color },
-                (status as any).strong && { fontWeight: '700' },
-              ]}
-              numberOfLines={1}
-            >
-              {status.text}
-            </Text>
+            {!!status && (
+              <>
+                <View style={[styles.dot, { backgroundColor: status.color }]} />
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: status.color },
+                    (status as any).strong && { fontWeight: '700' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {status.text}
+                </Text>
+              </>
+            )}
+            {!!stageChip && (
+              <View style={styles.footChip}>
+                <Text style={styles.footChipText} numberOfLines={1}>{stageChip}</Text>
+              </View>
+            )}
+            {!!matureBadge && (
+              <View style={styles.footChip}>
+                <Text style={styles.footChipText} numberOfLines={1}>{matureBadge}</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -415,6 +441,7 @@ const makeStyles = (colors: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      flexWrap: 'wrap',
       marginTop: 9,
       paddingTop: 9,
       borderTopWidth: 1,
@@ -422,6 +449,11 @@ const makeStyles = (colors: any) =>
     },
     dot: { width: 7, height: 7, borderRadius: 3.5 },
     statusText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+    footChip: {
+      paddingHorizontal: 7, paddingVertical: 2, borderRadius: PILL_RADIUS,
+      backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border,
+    },
+    footChipText: { ...TYPE.caption, fontWeight: '600', color: colors.textSecondary },
     kindChip: {
       position: 'absolute', top: 8, right: 8,
       paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,

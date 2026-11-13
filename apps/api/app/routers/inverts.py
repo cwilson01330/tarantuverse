@@ -37,11 +37,13 @@ from app.models.molt_log import MoltLog
 from app.models.scorpion_colony import ScorpionColony
 from app.models.tarantula import Sex, Source  # shared DB enums (UPPERCASE)
 from app.schemas.invert import (
+    AnimalRef,
     ChangeTaxonRequest,
     InvertCreate,
     InvertFeedingStats,
     InvertFeedingStatusItem,
     InvertGrowthAnalytics,
+    InvertParentage,
     InvertResponse,
     InvertUpdate,
 )
@@ -204,6 +206,7 @@ def create_invert_row(
     user: User,
     payload: InvertCreate,
     enforce_limit: bool = True,
+    commit: bool = True,
 ) -> Invert:
     """Create one invert for `user`. Shared by the create endpoint and the
     bulk importer so both go through the same validation, enum coercion,
@@ -211,6 +214,9 @@ def create_invert_row(
 
     enforce_limit=False lets the importer gate capacity itself (it catches the
     402 once, rather than per row) — callers that pass False must handle the cap.
+
+    commit=False (split-out) flushes, mirrors and bumps times_kept but leaves
+    the commit to the caller, so a batch of animals lands in ONE transaction.
     """
     if enforce_limit:
         enforce_collection_limit(db, user)
@@ -241,8 +247,9 @@ def create_invert_row(
 
     mirror_invert_create_to_legacy(db, new_invert)
 
-    db.commit()
-    db.refresh(new_invert)
+    if commit:
+        db.commit()
+        db.refresh(new_invert)
 
     if new_invert.species_id:
         species = db.query(InvertSpecies).filter(
@@ -250,7 +257,10 @@ def create_invert_row(
         ).first()
         if species:
             species.times_kept = (species.times_kept or 0) + 1
-            db.commit()
+            if commit:
+                db.commit()
+            else:
+                db.flush()
 
     return new_invert
 
@@ -542,9 +552,45 @@ async def get_invert(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Fetch a single invert the current user owns."""
+    """Fetch a single invert the current user owns.
+
+    The detail (only) carries `parentage` when the animal was split out of a
+    sac-born group: an offspring row links it to the sac. Never on lists or
+    public routes."""
     invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Invert not found")
-    return invert
+    resp = InvertResponse.model_validate(invert)
+    resp.parentage = _parentage(db, invert)
+    return resp
+
+
+def _parentage(db: Session, invert: Invert) -> Optional[InvertParentage]:
+    """{egg_sac_id, mother, colony} from the newest offspring row naming this
+    animal (same owner), or None. A handful of indexed lookups, detail only."""
+    from app.models.colony import Colony
+    from app.models.egg_sac import EggSac
+    from app.models.offspring import Offspring
+
+    off = (
+        db.query(Offspring)
+        .filter(Offspring.invert_id == invert.id, Offspring.user_id == invert.user_id)
+        .order_by(Offspring.created_at.desc())
+        .first()
+    )
+    if off is None:
+        return None
+    sac = db.query(EggSac).filter(EggSac.id == off.egg_sac_id).first()
+    if sac is None:
+        return None
+    mother = None
+    if sac.mother_invert_id is not None:
+        row = db.query(Invert.id, Invert.name).filter(Invert.id == sac.mother_invert_id).first()
+        if row is not None:
+            mother = AnimalRef(id=row[0], name=row[1])
+    group = None
+    row = db.query(Colony.id, Colony.name).filter(Colony.egg_sac_id == sac.id).first()
+    if row is not None:
+        group = AnimalRef(id=row[0], name=row[1])
+    return InvertParentage(egg_sac_id=sac.id, mother=mother, colony=group)
 
 
 @router.put("/{invert_id}", response_model=InvertResponse)

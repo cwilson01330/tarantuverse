@@ -44,7 +44,7 @@ def _lapsed_subscription(db: Session, user_id) -> bool:
     )
 
 
-def _cap_message(*, current_count: int, cap: int, lapsed: bool) -> str:
+def _cap_message(*, current_count: int, cap: int, lapsed: bool, adding: int = 1) -> str:
     """Say what is actually true of this keeper.
 
     Three distinct situations that the single old sentence flattened:
@@ -53,7 +53,18 @@ def _cap_message(*, current_count: int, cap: int, lapsed: bool) -> str:
                                         someone holding 60, and reads as an
                                         instruction to start deleting
       - lapsed subscriber             → the fix is billing, not their collection
+    A batch (adding > 1) refused while the keeper is still UNDER the cap says
+    how many still fit instead -- "you've reached the limit" would be false.
     """
+    if adding > 1 and current_count < cap:
+        room = cap - current_count
+        noun = "animal" if room == 1 else "animals"
+        if lapsed:
+            return (
+                f"Your subscription has ended, so you're back on the free plan's "
+                f"{cap}-animal limit. You can add {room} more {noun} on the free plan."
+            )
+        return f"You can add {room} more {noun} on the free plan."
     if lapsed:
         over = current_count > cap
         return (
@@ -119,12 +130,15 @@ def active_inverts_query(db: Session, user_id):
     )
 
 
-def enforce_collection_limit(db: Session, user: User) -> None:
-    """Raise HTTP 402 if the user is at or above their animal cap.
+def enforce_collection_limit(db: Session, user: User, adding: int = 1) -> None:
+    """Raise HTTP 402 if adding `adding` entries would take the user past
+    their animal cap (the default, 1, = "at or above the cap").
 
     Counts the user's rows in `inverts` (the cross-taxon source of
-    truth). Call this BEFORE inserting the new animal so the count
-    reflects only existing records.
+    truth). Call this BEFORE inserting the new animal(s) so the count
+    reflects only existing records. A batch (split-out) passes its size so
+    the whole batch is checked up front and nothing is written when it
+    doesn't fit; the 402 says how many still would (`can_add`).
     """
     limits = user.get_subscription_limits()
     max_animals = limits.get("max_animals", FREE_TIER_MAX_ANIMALS)
@@ -140,16 +154,19 @@ def enforce_collection_limit(db: Session, user: User) -> None:
         + active_colonies_query(db, user.id).count()
     )
 
-    if current_count >= max_animals:
+    if current_count + adding > max_animals:
         lapsed = _lapsed_subscription(db, user.id)
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
                 "message": _cap_message(
-                    current_count=current_count, cap=max_animals, lapsed=lapsed
+                    current_count=current_count, cap=max_animals, lapsed=lapsed,
+                    adding=adding,
                 ),
                 "current_count": current_count,
                 "limit": max_animals,
+                # How many more still fit (0 at or over the cap).
+                "can_add": max(0, max_animals - current_count),
                 "is_premium": limits.get("is_premium", False),
                 # Lets the client offer "Renew" rather than "Upgrade", and
                 # avoids a lapsed subscriber being sold a plan they already

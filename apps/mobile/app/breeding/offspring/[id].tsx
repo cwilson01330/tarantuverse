@@ -40,6 +40,7 @@ import { AppHeader } from '../../../src/components/AppHeader';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { apiClient } from '../../../src/services/api';
+import { NO_PARENT_MESSAGE, resolveOffspringParent } from '../../../src/lib/egg-sacs';
 import { parseLocalDate } from '../../../src/utils/date';
 
 // ─── Inline types ─────────────────────────────────────────────────────
@@ -61,18 +62,12 @@ interface Offspring {
 
 interface EggSac {
   id: string;
-  pairing_id: string;
+  // A sac logged on a female has no pairing (jumpers etc.); one of the two
+  // is always set.
+  pairing_id: string | null;
+  mother_invert_id: string | null;
   laid_date: string;
   hatch_date: string | null;
-}
-
-interface Pairing {
-  id: string;
-  // Legacy FKs — NULL for every taxon except tarantula.
-  male_id: string | null;
-  female_id: string | null;
-  male_invert_id: string | null;
-  female_invert_id: string | null;
 }
 
 interface Tarantula {
@@ -231,10 +226,10 @@ function OffspringDetailScreen() {
 
   /**
    * Lazy-fetch parent prefill (species + dates) on first modal open.
-   * Both parents should share a species after the cross-species fix —
-   * we read the male as the canonical source, with female fallback if
-   * the male fetch fails. Failure leaves the modal usable with empty
-   * prefills + a soft inline warning.
+   * The sac's mother first (sacs logged on a female have no pairing),
+   * then the pairing's male, then its female. If none can be read the
+   * modal says so and "Create & link" stays disabled: without a parent
+   * there is no taxon, and guessing one filed bred jumpers as tarantulas.
    */
   async function openAddToCollection() {
     setAddOpen(true);
@@ -247,38 +242,23 @@ function OffspringDetailScreen() {
         `/egg-sacs/${offspring.egg_sac_id}`,
       );
       const sac = sacRes.data;
-      const pRes = await apiClient.get<Pairing>(`/pairings/${sac.pairing_id}`);
-      const pairing = pRes.data;
-
-      // Resolve via `/inverts/` and prefer the `*_invert_id` columns. The
-      // legacy `male_id`/`female_id` are NULL for every non-tarantula, so the
-      // old code fetched `/tarantulas/undefined` and the prefill came back
-      // empty for exactly the keepers who needed it most.
-      const maleKey = pairing.male_invert_id || pairing.male_id;
-      const femaleKey = pairing.female_invert_id || pairing.female_id;
-
-      let parent: Tarantula | null = null;
-      try {
-        if (!maleKey) throw new Error('no male link');
-        const maleRes = await apiClient.get<Tarantula>(`/inverts/${maleKey}`);
-        parent = maleRes.data;
-      } catch {
+      // Mother first (a sac logged on a female has no pairing), then the
+      // pairing's parents. Never guess a taxon: refuse instead.
+      const parent = await resolveOffspringParent(sac, async (path) => {
         try {
-          if (!femaleKey) throw new Error('no female link');
-          const femRes = await apiClient.get<Tarantula>(`/inverts/${femaleKey}`);
-          parent = femRes.data;
+          const r = await apiClient.get(path);
+          return r.data;
         } catch {
-          parent = null;
+          return null;
         }
-      }
+      });
+      if (!parent) throw new Error(NO_PARENT_MESSAGE);
 
       setAddParent({
-        scientific_name: parent?.scientific_name ?? null,
-        species_id: parent?.species_id ?? null,
-        // The offspring of a mantis is a mantis. Only fall back to tarantula
-        // when the parent couldn't be read at all — guessing a taxon is how
-        // wrong-species rows got created.
-        taxon: parent?.taxon || 'tarantula',
+        scientific_name: parent.scientific_name,
+        species_id: parent.species_id,
+        // The offspring of a mantis is a mantis.
+        taxon: parent.taxon,
         hatch_date: sac.hatch_date,
         laid_date: sac.laid_date,
       });
@@ -300,6 +280,11 @@ function OffspringDetailScreen() {
    */
   async function handleCreateAndLink() {
     if (!offspring || addCreating) return;
+    // No parent read = no taxon: refuse rather than file it as a tarantula.
+    if (!addParent) {
+      setAddError(addParentError || NO_PARENT_MESSAGE);
+      return;
+    }
     if (!addName.trim()) {
       setAddError('Give your new animal a name first.');
       return;
@@ -320,7 +305,7 @@ function OffspringDetailScreen() {
         name: addName.trim(),
         // The generic create takes the taxon in the body — this is the line
         // that keeps a mantis nymph from being filed as a tarantula.
-        taxon: addParent?.taxon || 'tarantula',
+        taxon: addParent.taxon,
         sex: addSex,
         source: 'bred',
         date_acquired: dateAcquired,
@@ -939,8 +924,7 @@ function AddToCollectionModal({
                         lineHeight: 17,
                       }}
                     >
-                      {parentError} You can still create the record — it
-                      just won&rsquo;t auto-fill the species.
+                      {parentError}
                     </Text>
                   ) : (
                     <>
@@ -1069,12 +1053,12 @@ function AddToCollectionModal({
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={onSubmit}
-                  disabled={creating || !name.trim()}
+                  disabled={creating || !name.trim() || !parent}
                   style={[
                     styles.modalFooterPrimary,
                     {
                       borderRadius: layout.radius.sm,
-                      opacity: creating || !name.trim() ? 0.5 : 1,
+                      opacity: creating || !name.trim() || !parent ? 0.5 : 1,
                     },
                   ]}
                 >

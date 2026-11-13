@@ -49,7 +49,7 @@ from app.utils.hero_photo import sync_hero_photo
 from app.services.storage import storage_service
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.config import settings
-from app.utils.access import policy
+from app.utils.access import policy, resolve_role
 from app.utils.legacy_logs import tarantula_logs
 from app.routers.animals import refuse_if_closed
 from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_legacy
@@ -849,8 +849,15 @@ async def get_public_tarantula_profile(
         tarantula_logs(Photo, t_uuid)
     ).order_by(Photo.created_at.desc()).limit(10).all()
 
-    # Lineage — parents via Pairing / Offspring
-    lineage = _get_lineage(tarantula_id, db)
+    # Lineage — parents via Pairing / Offspring. Only for someone with access
+    # to this collection (owner or co-keeper): split-out slings get offspring
+    # rows automatically, so a public page would otherwise name a keeper's
+    # breeding animals with no keeper action (spec 2026-11-13 §8). Everyone
+    # else gets the same empty shape as an animal with no tracked parents.
+    can_see_lineage = is_owner or (
+        resolve_role(db, current_user, owner, "tarantuverse") is not None
+    )
+    lineage = _get_lineage(tarantula_id, db) if can_see_lineage else {}
 
     # Provenance — the immutable transfer snapshot on the unified Invert mirror
     # (Invert.id == Tarantula.id). Public-safe: the snapshot never holds

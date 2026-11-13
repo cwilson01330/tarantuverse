@@ -9,11 +9,12 @@ Events with a `count_delta` mutate the colony's `stage_counts` bucket on write
 (same pattern as FeederCareLog -> count). JSONB is reassigned (not mutated in
 place) so SQLAlchemy flushes the change.
 """
+import re
 from typing import List, Optional
 from uuid import UUID
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -32,6 +33,8 @@ from app.schemas.colony import (
     ColonyEventCreate,
     ColonyEventUpdate,
     ColonyEventResponse,
+    ColonySplitOut,
+    ColonySplitOutResponse,
 )
 from app.utils.dependencies import get_current_user
 from app.services.colony_history_service import colony_population_history
@@ -39,6 +42,7 @@ from app.utils.limits import enforce_collection_limit
 from app.utils.locations import canonical_location
 from app.utils.access import access_helper, load_colony, policy, require_can_change, scope_collection
 from app.utils.photo_cleanup import collect_for_colony, delete_files
+from app.utils.rate_limit import limiter, user_or_ip
 from app.utils.colony_counts import (
     STARTING_COUNT_NOTE,
     STARTING_COUNT_NOTES,
@@ -72,7 +76,26 @@ def _total_count(colony: Colony) -> int:
         return 0
 
 
-def _build_response(colony: Colony, db: Session) -> dict:
+def _egg_sac_origin(db: Session, colony: Colony) -> Optional[dict]:
+    """{id, laid_date, mother: {id,name}|None} for a sac-born group, else None.
+    Only called for a colony that has an egg_sac_id (detail paths, not lists)."""
+    if colony.egg_sac_id is None:
+        return None
+    from app.models.egg_sac import EggSac
+    from app.models.invert import Invert
+
+    sac = db.query(EggSac).filter(EggSac.id == colony.egg_sac_id).first()
+    if sac is None:
+        return None
+    mother = None
+    if sac.mother_invert_id is not None:
+        row = db.query(Invert.id, Invert.name).filter(Invert.id == sac.mother_invert_id).first()
+        if row is not None:
+            mother = {"id": row[0], "name": row[1]}
+    return {"id": sac.id, "laid_date": sac.laid_date, "mother": mother}
+
+
+def _build_response(colony: Colony, db: Session, with_origin: bool = True) -> dict:
     sp: Optional[InvertSpecies] = None
     species_missing = False
     if colony.species_id:
@@ -86,6 +109,8 @@ def _build_response(colony: Colony, db: Session) -> dict:
     data["species_display_name"] = display
     data["species_scientific_name"] = scientific
     data["species_missing"] = species_missing
+    # The list skips it (ColonyListItem has no banner; no per-row query).
+    data["from_egg_sac"] = _egg_sac_origin(db, colony) if with_origin else None
     return data
 
 
@@ -160,6 +185,7 @@ def _starting_count_events(
     owner_id,
     logged_by_user_id=None,
     note: str = STARTING_COUNT_NOTE,
+    occurred_on: Optional[date] = None,
 ) -> List[ColonyEvent]:
     """One 'added' event per non-zero bucket, recording the headcount a colony
     started with, so its population history is complete from day one (audit-2
@@ -167,7 +193,7 @@ def _starting_count_events(
 
     The events DESCRIBE counts `stage_counts` already holds; they are not
     applied through _apply_delta, or the colony would start with double."""
-    today = date.today()
+    today = occurred_on or date.today()
     events = []
     for stage, n in (colony.stage_counts or {}).items():
         if not isinstance(n, int) or isinstance(n, bool) or n <= 0:
@@ -309,7 +335,7 @@ async def list_colonies(
     now = datetime.now(timezone.utc)
     items = []
     for c in colonies:
-        data = _build_response(c, db)
+        data = _build_response(c, db, with_origin=False)
         fed_at = last_fed.get(c.id)
         data["last_feeding_date"] = fed_at
         data["change_30d"] = change_30d.get(c.id)
@@ -331,6 +357,8 @@ def create_colony_row(
     enforce_limit: bool = True,
     logged_by_user_id=None,
     starting_note: str = STARTING_COUNT_NOTE,
+    egg_sac_id=None,
+    started_on: Optional[date] = None,
 ) -> Colony:
     """Create one colony for `owner`. Shared by the create endpoint and the bulk
     importer so both go through the same cap check, enclosure/species
@@ -340,6 +368,11 @@ def create_colony_row(
     A colony counts as 1 animal toward the free-tier cap. enforce_limit=False
     lets a caller gate capacity itself; the importer leaves it on and stops at
     the first 402.
+
+    egg_sac_id (hatch) is set before the commit, so the caller's own changes
+    on the session (the sac's outcome) land in the same transaction; the
+    UNIQUE index on it refuses a second group for one sac. started_on dates
+    the starting-count events (default today).
     """
     if enforce_limit:
         enforce_collection_limit(db, owner)
@@ -354,11 +387,11 @@ def create_colony_row(
     colony_data["stage_counts"] = canonical_stage_counts(colony_data.get("stage_counts"))
     # Id set up front so the starting-count events can point at it without a
     # flush; the unit of work still inserts the colony first.
-    colony = Colony(id=_uuid.uuid4(), user_id=owner.id, **colony_data)
+    colony = Colony(id=_uuid.uuid4(), user_id=owner.id, egg_sac_id=egg_sac_id, **colony_data)
     db.add(colony)
 
     # The population history starts with the headcount the keeper entered.
-    for ev in _starting_count_events(colony, owner.id, logged_by_user_id, starting_note):
+    for ev in _starting_count_events(colony, owner.id, logged_by_user_id, starting_note, started_on):
         db.add(ev)
 
     # Bump the species "times_kept" counter (parity with invert create).
@@ -444,6 +477,163 @@ async def update_colony(
     db.commit()
     db.refresh(colony)
     return ColonyResponse(**_build_response(colony, db))
+
+
+# ---------- split-out ----------
+
+SPLIT_DESTINATION = "Split out into individual enclosures"
+_NAME_MAX = 100
+
+
+def _split_base(name: str) -> str:
+    """The name split-out animals are numbered after ("Sally slings" ->
+    "Sally slings #4"), cut so the numbered name still fits the column."""
+    return (name or "").strip()[: _NAME_MAX - 4].rstrip() or "Group"
+
+
+def _next_split_number(db: Session, owner_id, base: str) -> int:
+    """One past the highest "{base} #n" among ALL the owner's animals (died,
+    transferred and renamed-away ones included, so a number is never reused
+    while it still names one of them)."""
+    from app.models.invert import Invert
+
+    pattern = re.compile(rf"^{re.escape(base)} #(\d+)$")
+    names = (
+        db.query(Invert.name)
+        .filter(Invert.user_id == owner_id, Invert.name.startswith(f"{base} #", autoescape=True))
+        .all()
+    )
+    highest = 0
+    for (name,) in names:
+        m = pattern.match(name or "")
+        if m:
+            highest = max(highest, int(m.group(1)))
+    return highest + 1
+
+
+@router.post(
+    "/{colony_id}/split-out",
+    response_model=ColonySplitOutResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit("60/hour", key_func=user_or_ip)
+@policy("keeper")
+async def split_out(
+    request: Request,
+    colony_id: UUID,
+    payload: ColonySplitOut,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Move `count` animals out of a brood group into their own enclosures.
+
+    Creates numbered individual animals (the group's taxon, species and
+    location; sex unknown; bred; acquired on split_on), takes them off the
+    group's counts largest bucket first (one `split` event per bucket touched)
+    and, for a sac-born group, links each one to the sac (offspring rows,
+    status kept). Every refusal -- wrong taxon, closed group, more than the
+    group holds, more than the free cap allows -- happens before anything is
+    written, and everything is ONE commit. Free (not Premium-gated).
+    """
+    from app.models.offspring import Offspring, OffspringStatus
+    from app.routers.inverts import create_invert_row
+    from app.schemas.invert import InvertCreate
+    from app.utils.broods import BROOD_TAXA
+
+    colony, access = load_colony(db, current_user, colony_id, "keeper")
+    # Lock the group row so two taps / two phones can't both pass the total
+    # and cap checks below (lost count update, duplicate "#n", cap bypass).
+    # populate_existing: a request that waited on the lock must see the counts
+    # the first one committed, not the copy it loaded before.
+    colony = (
+        db.query(Colony).filter(Colony.id == colony.id)
+        .with_for_update().populate_existing().one()
+    )
+    owner = access.owner
+    if colony.taxon not in BROOD_TAXA:
+        raise HTTPException(status_code=400, detail="Split-out isn't available for this group")
+    if colony.ended_at is not None or colony.is_active is False or colony.transferred_out_at is not None:
+        raise HTTPException(status_code=409, detail="This group is closed. Reopen it first.")
+    count = payload.count
+    total = _total_count(colony)
+    if count > total:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This group only has {total} to split out.",
+        )
+    # The whole batch against the cap, before any write.
+    enforce_collection_limit(db, owner, adding=count)
+
+    base = _split_base(colony.name)
+    first = _next_split_number(db, owner.id, base)
+    created = []
+    try:
+        for n in range(first, first + count):
+            inv = create_invert_row(
+                db,
+                owner,
+                InvertCreate(
+                    taxon=colony.taxon,
+                    name=f"{base} #{n}",
+                    species_id=colony.species_id,
+                    location=colony.location,
+                    sex="unknown",
+                    life_stage=payload.life_stage,
+                    date_acquired=payload.split_on,
+                    source="bred",
+                ),
+                enforce_limit=False,
+                commit=False,
+            )
+            created.append(inv)
+
+        # Largest bucket first, then the next largest; one event per bucket.
+        counts = canonical_stage_counts(colony.stage_counts) or {}
+        order = sorted(
+            (k for k, v in counts.items() if isinstance(v, int) and v > 0),
+            key=lambda k: -int(counts[k]),
+        )
+        remaining = count
+        for bucket in order:
+            if remaining <= 0:
+                break
+            take = min(remaining, int(counts[bucket]))
+            db.add(ColonyEvent(
+                colony_id=colony.id,
+                user_id=owner.id,
+                logged_by_user_id=access.logged_by_user_id,
+                event_type="split",
+                stage=bucket,
+                count_delta=-take,
+                occurred_at=payload.split_on,
+                destination=SPLIT_DESTINATION,
+            ))
+            _apply_delta(colony, bucket, -take)
+            remaining -= take
+
+        if colony.egg_sac_id is not None:
+            db.flush()  # legacy tarantula mirrors exist before the FK points at them
+            for inv in created:
+                db.add(Offspring(
+                    egg_sac_id=colony.egg_sac_id,
+                    user_id=owner.id,
+                    invert_id=inv.id,
+                    # Same rule as offspring._resolve_kept_link: the legacy
+                    # column only for tarantulas (shared PK).
+                    tarantula_id=inv.id if inv.taxon == "tarantula" else None,
+                    status=OffspringStatus.KEPT,
+                    status_date=payload.split_on,
+                ))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    db.refresh(colony)
+    return ColonySplitOutResponse(
+        created=[{"id": inv.id, "name": inv.name} for inv in created],
+        colony_total=_total_count(colony),
+    )
 
 
 # ---------- end / reopen ----------

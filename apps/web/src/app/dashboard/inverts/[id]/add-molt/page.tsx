@@ -11,6 +11,9 @@ import MoltNote from '@/components/MoltNote'
 import PostMoltPauseLine, { usePostMoltPause } from '@/components/PostMoltPauseLine'
 import { INVERT_TAXA, isInvertTaxon, growthLengthLabel, finalMoltCopy } from '@/lib/inverts'
 import { useUnitField } from '@/hooks/useUnitField'
+import MoltPhotoPrompt from '@/components/MoltPhotoPrompt'
+import { MOLT_PHOTO_PROMPT_KEY, offerMoltPhoto } from '@/lib/everydayLogging'
+import { isPromptableMolt, readMoltPhotoDismissed, writeMoltPhotoDismissed } from '@/lib/everydayLoggingUi'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const inputCls = 'w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary focus:outline-none focus:ring-2 focus:ring-electric-blue-500'
@@ -63,6 +66,9 @@ export default function AddInvertMoltPage() {
   const pause = usePostMoltPause()
   const loadPause = pause.load
   const [saving, setSaving] = useState(false)
+  // Closed (died / transferred) animals take no new photos, so no prompt.
+  const [isClosed, setIsClosed] = useState(false)
+  const [showPhotoPrompt, setShowPhotoPrompt] = useState(false)
   const isEdit = !!logId
 
   useEffect(() => {
@@ -101,6 +107,7 @@ export default function AddInvertMoltPage() {
         const data = await res.json()
         const t: string | undefined = data?.taxon
         setTaxon(t ?? null)
+        setIsClosed(!!(data?.died_at || data?.transferred_out_at))
         setPrefix(isInvertTaxon(t) ? INVERT_TAXA[t].prefix : null)
       } catch { /* leave null */ }
     })()
@@ -138,12 +145,32 @@ export default function AddInvertMoltPage() {
         },
       )
       if (!res.ok) throw new Error()
+      // Offer a photo only after a NEW, non-fatal molt (never an edit).
+      if (taxon && isPromptableMolt(isEdit, outcome)) {
+        const dismissed = readMoltPhotoDismissed(
+          typeof window !== 'undefined' ? window.localStorage : null,
+          MOLT_PHOTO_PROMPT_KEY,
+        )
+        if (offerMoltPhoto(taxon, isClosed, dismissed)) {
+          setShowPhotoPrompt(true)
+          return
+        }
+      }
       router.push(`/dashboard/inverts/${id}`)
     } catch {
       alert('Could not save molt. Please try again.')
     } finally {
       setSaving(false)
     }
+  }
+
+  // Tick box = stored whichever button was pressed, including "Choose photo".
+  const finishPrompt = (dontAsk: boolean, destination: string) => {
+    if (dontAsk) {
+      writeMoltPhotoDismissed(typeof window !== 'undefined' ? window.localStorage : null, MOLT_PHOTO_PROMPT_KEY)
+    }
+    setShowPhotoPrompt(false)
+    router.push(destination)
   }
 
   return (
@@ -244,6 +271,12 @@ export default function AddInvertMoltPage() {
           <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update molt' : 'Save molt'}</button>
         </div>
       </div>
+      {showPhotoPrompt && (
+        <MoltPhotoPrompt
+          onChoose={(d) => finishPrompt(d, `/dashboard/inverts/${id}/add-photo`)}
+          onClose={(d) => finishPrompt(d, `/dashboard/inverts/${id}`)}
+        />
+      )}
     </DashboardLayout>
   )
 }

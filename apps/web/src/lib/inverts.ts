@@ -108,11 +108,11 @@ export function animalDisplayName(animal: {
 // features", which is the exact drift that produced two mobile detail screens.
 // ---------------------------------------------------------------------------
 
-export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding'
+export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding' | 'eggSacs'
 
 export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
-  tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
-  scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-021 Phase D
+  tarantula: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
+  scorpion: ['feedingStats', 'growth', 'breeding', 'eggSacs'], // breeding pilot — ADR-021 Phase D
   // Centipede breeding enabled 2026-10-06 (consistency audit C): the female
   // broods a clutch of eggs (no egg sac) — see 'Clutch' / 'plings' in
   // BREEDING_VOCABULARY below. 'plings' still wants a keeper's second opinion.
@@ -125,7 +125,7 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   vinegaroon: ['feedingStats', 'growth'],
   // Jumping spiders lay an egg sac like a tarantula, so the pairing → sac →
   // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
-  true_spider: ['feedingStats', 'growth', 'breeding'],
+  true_spider: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Growth opt-in (2026-10-07): shown only once a molt carries a
   // measurement (showGrowthChart). Mirrors the mobile registry.
   millipede: ['growth'],
@@ -133,7 +133,7 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   // the ootheca → nymphs vocabulary below is correct and now actually read by
   // the hubs, so a mantis breeder is no longer offered a spider's "egg sac".
   // Demand is real — the first premium subscriber keeps 15 mantids.
-  mantis: ['feedingStats', 'growth', 'breeding'],
+  mantis: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Omnivore grazer, and kept as a colony far more often than individually —
   // colonies have their own screen (ADR-010). Not an oversight.
   roach: [],
@@ -229,7 +229,7 @@ export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = {
   centipede: { clutch: { noun: 'Clutch', plural: 'clutches', offspring: 'plings' }, liveBirth: null },
   millipede: { clutch: { noun: 'Clutch', plural: 'clutches', offspring: 'young' }, liveBirth: null },
   // Viviparous — no egg stage exists.
-  scorpion: { clutch: null, liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'instars' } },
+  scorpion: { clutch: null, liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'scorplings' } },
   // No egg stage the keeper sees: eggs are brooded internally in a marsupium
   // and released as live young. "Mancae" is the correct hobby term.
   isopod: { clutch: null, liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'mancae' } },
@@ -573,4 +573,45 @@ export function foodTypeToSave(chip: string, other: string): string | null {
   if (!chip) return null
   if (chip === 'Other') return other.trim() || 'Other'
   return chip
+}
+
+// ---------------------------------------------------------------------------
+// Broods (jumping-spiders plan). KEEP IN LOCKSTEP with
+// apps/mobile/src/lib/taxon-modules.ts.
+
+/** Taxa whose keepers count the prey they offer (small prey, offered in numbers). */
+const COUNTS_PREY_TAXA = new Set<string>(['true_spider', 'mantis'])
+
+export function countsPrey(taxon: string): boolean {
+  return COUNTS_PREY_TAXA.has(taxon)
+}
+
+/** Name of the group a hatched sac/brood becomes. */
+export function broodBucket(taxon: string): string {
+  switch (taxon) {
+    case 'true_spider':
+    case 'tarantula':
+      return 'slings'
+    case 'mantis':
+      return 'nymphs'
+    case 'scorpion':
+      return 'scorplings'
+    default:
+      return 'young'
+  }
+}
+
+export function isLiveBirth(taxon: string): boolean {
+  return breedingVocabulary(taxon).liveBirth != null
+}
+
+export function hatchButtonLabel(taxon: string): string {
+  switch (taxon) {
+    case 'mantis':
+      return 'Hatched: start a nymph group'
+    case 'scorpion':
+      return 'Start a scorpling group'
+    default:
+      return 'Hatched: start a sling group'
+  }
 }

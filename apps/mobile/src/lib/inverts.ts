@@ -385,7 +385,7 @@ export interface InvertSpecies {
   times_kept: number;
 }
 
-export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; /** Set only when a sitter logged it via a sitter link. */ sitter_name?: string | null; /** Set when a co-keeper logged it (null = the owner). */ logged_by_user_id?: string | null; logged_by_name?: string | null; }
+export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; /** Prey items offered (1 when not counted). */ quantity?: number; /** Set only when a sitter logged it via a sitter link. */ sitter_name?: string | null; /** Set when a co-keeper logged it (null = the owner). */ logged_by_user_id?: string | null; logged_by_name?: string | null; }
 /** successful | stuck | lost_limb | fatal — the backend vocabulary.
  *  Deliberately small: finer gradations would be guesses about a process the
  *  keeper mostly didn't watch. `fatal` records a death IN the molt and does
@@ -704,7 +704,7 @@ export async function getInvertFeedingStats(id: string): Promise<InvertFeedingSt
   return res.data;
 }
 
-export async function createInvertFeeding(_taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; food_size?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
+export async function createInvertFeeding(_taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; food_size?: string | null; accepted?: boolean; notes?: string | null; quantity?: number }): Promise<InvertFeedingLog> {
   const { data } = await apiClient.post<InvertFeedingLog>(`/inverts/${id}/feedings`, payload);
   return data;
 }
@@ -808,7 +808,7 @@ export async function uploadInvertPhoto(_taxon: InvertTaxon, id: string, form: F
 // rich edit/delete + set-hero UX tarantulas have works for every taxon.
 // ---------------------------------------------------------------------------
 
-export async function updateInvertFeeding(feedingId: string, payload: { fed_at?: string; food_type?: string | null; food_size?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
+export async function updateInvertFeeding(feedingId: string, payload: { fed_at?: string; food_type?: string | null; food_size?: string | null; accepted?: boolean; notes?: string | null; quantity?: number }): Promise<InvertFeedingLog> {
   const { data } = await apiClient.put<InvertFeedingLog>(`/feedings/${feedingId}`, payload);
   return data;
 }

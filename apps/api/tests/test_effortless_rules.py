@@ -556,7 +556,9 @@ def test_queries_stay_batched(client, db_session, keeper, h):
 
     def spy(conn, cursor, statement, params, context, executemany):
         s = statement.lower().lstrip()
-        if s.startswith("select") and "molt_logs" in s:
+        # The card's matured_at query (is_ultimate, jumpers T2) is its own
+        # batched query, pinned in test_egg_sac_hatch_split; count the pause one.
+        if s.startswith("select") and "molt_logs" in s and "is_ultimate" not in s:
             molt_selects.append(statement)
         if s.startswith("select") and "feeding_logs" in s:
             feeding_selects.append(statement)
@@ -581,7 +583,9 @@ def test_switches_off_skip_the_extra_queries(client, db_session, keeper, h):
 
     def spy(conn, cursor, statement, params, context, executemany):
         s = statement.lower().lstrip()
-        if s.startswith("select") and "molt_logs" in s:
+        # Only the pause query is switch-gated; the card's matured_at query
+        # (is_ultimate) always runs once per page (jumpers T2).
+        if s.startswith("select") and "molt_logs" in s and "is_ultimate" not in s:
             molt_selects.append(statement)
 
     engine = db_session.get_bind()

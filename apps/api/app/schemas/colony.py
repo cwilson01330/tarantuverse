@@ -6,7 +6,7 @@ Population-level tracking. `stage_counts` is always a bucket map
 layer. Taxon is validated against the shared invert taxon vocab.
 """
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-from typing import Optional, Dict, List
+from typing import Literal, Optional, Dict, List
 from datetime import date, datetime
 import uuid
 
@@ -164,6 +164,18 @@ class ColonyUpdate(BaseModel):
         return _validate_stage_counts(v)
 
 
+class ColonyAnimalRef(BaseModel):
+    id: uuid.UUID
+    name: Optional[str] = None
+
+
+class ColonyEggSacOrigin(BaseModel):
+    """The sac a hatched group came from (detail banner; never public)."""
+    id: uuid.UUID
+    laid_date: date
+    mother: Optional[ColonyAnimalRef] = None
+
+
 class ColonyResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -215,7 +227,31 @@ class ColonyResponse(BaseModel):
     species_scientific_name: Optional[str] = None
     species_missing: bool = False
 
+    # Set for a group hatched from an egg sac (colonies.egg_sac_id).
+    egg_sac_id: Optional[uuid.UUID] = None
+    from_egg_sac: Optional[ColonyEggSacOrigin] = None
+
     model_config = ConfigDict(from_attributes=True)
+
+
+class ColonySplitOut(BaseModel):
+    """POST /colonies/{id}/split-out: move `count` animals into their own
+    enclosures as individual animals."""
+    count: int = Field(..., ge=1, le=50)
+    split_on: date
+    life_stage: Literal["sling", "juvenile", "adult"] = "sling"
+
+    @field_validator("split_on")
+    @classmethod
+    def _not_in_future(cls, v: date) -> date:
+        if v > latest_local_today():
+            raise ValueError("split_on cannot be in the future")
+        return v
+
+
+class ColonySplitOutResponse(BaseModel):
+    created: List[ColonyAnimalRef]
+    colony_total: int
 
 
 class ColonyListItem(BaseModel):
