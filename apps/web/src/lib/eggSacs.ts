@@ -214,3 +214,52 @@ export async function resolveOffspringParent(
 /** Shown instead of the add form when no parent could be read. */
 export const NO_PARENT_MESSAGE =
   "We couldn't find this offspring's mother or pairing, so we can't tell what kind of animal it is. Add it from the Collection page instead."
+
+/** Shown when the sac saved but its photo did not upload (no rollback). */
+export const SAC_PHOTO_FAILED_MESSAGE =
+  "Saved, but the photo didn't upload. You can add it from the sac page."
+
+export const SAC_PHOTO_MAX_BYTES = 15 * 1024 * 1024
+
+/** Button wording for the sac photo: Add, or Replace once one is set. */
+export function sacPhotoActionLabel(photoUrl: string | null | undefined): string {
+  return photoUrl ? 'Replace photo' : 'Add photo'
+}
+
+/** A sentence when a chosen file can't be a sac photo; null when it can. The
+ *  server still decides from the bytes; this only saves a pointless upload. */
+export function sacPhotoFileError(file: { type: string; size: number }): string | null {
+  if (!file.type.startsWith('image/')) return 'Choose an image file.'
+  if (file.size > SAC_PHOTO_MAX_BYTES) return 'That photo is over 15 MB. Choose a smaller one.'
+  return null
+}
+
+async function sacPhotoRequest(
+  apiUrl: string,
+  token: string,
+  sacId: string,
+  init: { method: 'POST' | 'DELETE'; body?: FormData },
+): Promise<Response> {
+  const res = await fetch(`${apiUrl}/api/v1/egg-sacs/${sacId}/photo`, {
+    method: init.method,
+    headers: { Authorization: `Bearer ${token}` },
+    body: init.body,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    throw new Error(typeof body?.detail === 'string' ? body.detail : '')
+  }
+  return res
+}
+
+/** Set (or replace) the sac's one photo. Throws Error(detail or ''). */
+export async function uploadEggSacPhoto(apiUrl: string, token: string, sacId: string, file: File): Promise<EggSac> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await sacPhotoRequest(apiUrl, token, sacId, { method: 'POST', body: form })
+  return res.json()
+}
+
+export async function removeEggSacPhoto(apiUrl: string, token: string, sacId: string): Promise<void> {
+  await sacPhotoRequest(apiUrl, token, sacId, { method: 'DELETE' })
+}

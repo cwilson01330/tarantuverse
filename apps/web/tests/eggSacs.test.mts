@@ -15,6 +15,11 @@ import {
   splitToastText,
   buildSacEditPayload,
   resolveOffspringParent,
+  sacPhotoActionLabel,
+  sacPhotoFileError,
+  removeEggSacPhoto,
+  uploadEggSacPhoto,
+  SAC_PHOTO_FAILED_MESSAGE,
 } from '../src/lib/eggSacs.ts'
 
 test('parseWholeNumber', () => {
@@ -125,4 +130,38 @@ test('resolveOffspringParent: falls back to the pairing male, then female', asyn
     taxon: 'mantis', scientific_name: null, species_id: null,
   })
   assert.equal(await resolveOffspringParent({ mother_invert_id: null, pairing_id: 'nope' }, fakeGet({}).get), null)
+})
+
+test('sac photo wording and file check', () => {
+  assert.equal(sacPhotoActionLabel(null), 'Add photo')
+  assert.equal(sacPhotoActionLabel('https://x/y.jpg'), 'Replace photo')
+  assert.equal(SAC_PHOTO_FAILED_MESSAGE, "Saved, but the photo didn't upload. You can add it from the sac page.")
+  assert.equal(sacPhotoFileError({ type: 'image/png', size: 1000 }), null)
+  assert.equal(sacPhotoFileError({ type: 'application/pdf', size: 1000 }), 'Choose an image file.')
+  assert.match(sacPhotoFileError({ type: 'image/jpeg', size: 16 * 1024 * 1024 }) ?? '', /15 MB/)
+})
+
+test('sac photo requests hit the right route and surface the API detail', async () => {
+  const calls: { url: string; method: string }[] = []
+  const realFetch = globalThis.fetch
+  let ok = true
+  globalThis.fetch = (async (url: string, init: any) => {
+    calls.push({ url, method: init.method })
+    return ok
+      ? new Response(JSON.stringify({ id: 's1', photo_url: 'https://p/x.jpg' }), { status: 200 })
+      : new Response(JSON.stringify({ detail: 'nope' }), { status: 400 })
+  }) as any
+  try {
+    const sac = await uploadEggSacPhoto('http://api', 't', 's1', new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }))
+    assert.equal(sac.photo_url, 'https://p/x.jpg')
+    await removeEggSacPhoto('http://api', 't', 's1')
+    assert.deepEqual(calls, [
+      { url: 'http://api/api/v1/egg-sacs/s1/photo', method: 'POST' },
+      { url: 'http://api/api/v1/egg-sacs/s1/photo', method: 'DELETE' },
+    ])
+    ok = false
+    await assert.rejects(removeEggSacPhoto('http://api', 't', 's1'), /nope/)
+  } finally {
+    globalThis.fetch = realFetch
+  }
 })

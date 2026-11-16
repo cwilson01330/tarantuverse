@@ -6,6 +6,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
@@ -25,8 +27,9 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import { getInvert, invertDisplayName, type Invert } from '../../src/lib/inverts';
 import { clutchSingularLabel, isLiveBirth, offspringNoun } from '../../src/lib/taxon-modules';
-import { buildSacPayload } from '../../src/lib/egg-sacs';
-import { createInvertEggSac } from '../../src/lib/egg-sacs-api';
+import { buildSacPayload, SAC_PHOTO_FAILED_MESSAGE } from '../../src/lib/egg-sacs';
+import { createInvertEggSac, uploadEggSacPhoto } from '../../src/lib/egg-sacs-api';
+import { chooseSacPhoto } from '../../src/lib/sac-photo-picker';
 import { toISODateLocal } from '../../src/utils/date';
 import { getErrorMessage } from '../../src/utils/errors';
 
@@ -41,6 +44,7 @@ function AddEggSacScreen() {
   const [expected, setExpected] = useState<Date | null>(null);
   const [count, setCount] = useState('');
   const [notes, setNotes] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -77,7 +81,16 @@ function AddEggSacScreen() {
     setSaving(true);
     setError('');
     try {
-      await createInvertEggSac(id, built.payload);
+      const sac = await createInvertEggSac(id, built.payload);
+      if (photoUri) {
+        try {
+          await uploadEggSacPhoto(sac.id, photoUri);
+        } catch {
+          // The sac is saved; no rollback. Say so, then leave.
+          Alert.alert('Saved', SAC_PHOTO_FAILED_MESSAGE, [{ text: 'OK', onPress: () => router.back() }]);
+          return;
+        }
+      }
       router.back();
     } catch (e: any) {
       setError(getErrorMessage(e, `Couldn't save this ${noun.toLowerCase()}. Nothing has changed. Try again.`));
@@ -154,6 +167,34 @@ function AddEggSacScreen() {
             accessibilityLabel="Notes"
           />
 
+          <View style={styles.optionalHeader}>
+            <Text style={[TYPE.caption, styles.label, { color: colors.textTertiary }]}>PHOTO</Text>
+            <Text style={[TYPE.caption, { color: colors.textTertiary }]}>Optional</Text>
+          </View>
+          {photoUri && (
+            <Image
+              source={{ uri: photoUri }}
+              style={[styles.preview, { borderRadius: layout.radius.sm, backgroundColor: colors.surface }]}
+              accessibilityLabel="Chosen photo"
+            />
+          )}
+          <View style={styles.photoRow}>
+            <TouchableOpacity
+              onPress={async () => { const u = await chooseSacPhoto(); if (u) setPhotoUri(u); }}
+              disabled={saving}
+              accessibilityRole="button"
+              style={[styles.photoBtn, { borderColor: colors.border, borderRadius: layout.radius.sm }]}
+            >
+              <MaterialCommunityIcons name="camera-outline" size={18} color={colors.textSecondary} />
+              <Text style={[TYPE.label, { color: colors.textPrimary }]}>{photoUri ? 'Change photo' : 'Add photo'}</Text>
+            </TouchableOpacity>
+            {photoUri && (
+              <TouchableOpacity onPress={() => setPhotoUri(null)} disabled={saving} accessibilityRole="button">
+                <Text style={[TYPE.label, { color: colors.accent }]}>Remove photo</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {error !== '' && (
             <Text style={[TYPE.caption, { color: colors.error }]} accessibilityLiveRegion="polite">
               {error}
@@ -185,6 +226,9 @@ const styles = StyleSheet.create({
   optionalHeader: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.sm },
   input: { borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: 10 },
   textarea: { minHeight: 88 },
+  preview: { width: '100%', aspectRatio: 4 / 3 },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  photoBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, borderWidth: 1, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs },
   confirm: { marginTop: SPACING.xs, paddingVertical: 15, alignItems: 'center' },
 });
 

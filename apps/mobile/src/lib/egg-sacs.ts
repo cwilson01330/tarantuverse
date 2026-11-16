@@ -200,3 +200,20 @@ export async function resolveOffspringParent(
 /** Shown instead of the add form when no parent could be read. */
 export const NO_PARENT_MESSAGE =
   "We couldn't find this offspring's mother or pairing, so we can't tell what kind of animal it is. Add it from the Collection page instead.";
+
+/** Shown when the sac saved but its photo did not upload (no rollback). */
+export const SAC_PHOTO_FAILED_MESSAGE =
+  "Saved, but the photo didn't upload. You can add it from the sac page.";
+
+/** Button wording for the sac photo: Add, or Replace once one is set. */
+export function sacPhotoActionLabel(photoUrl: string | null | undefined): string {
+  return photoUrl ? 'Replace photo' : 'Add photo';
+}
+
+/** The multipart `file` part for a picked image uri (type from the extension). */
+export function sacPhotoFilePart(uri: string): { uri: string; name: string; type: string } {
+  const name = uri.split('/').pop() || 'photo.jpg';
+  const ext = /\.(\w+)$/.exec(name)?.[1]?.toLowerCase();
+  const type = ext === 'jpg' || !ext ? 'image/jpeg' : `image/${ext}`;
+  return { uri, name, type };
+}

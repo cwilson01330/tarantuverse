@@ -231,6 +231,8 @@ export default function InvertDetailPage() {
   const [growth, setGrowth] = useState<any | null>(null)
   // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
   const [moltsToAdult, setMoltsToAdult] = useState<number | null>(null)
+  // Linked species' family, from the same read (jumping-spider male sentence).
+  const [speciesFamily, setSpeciesFamily] = useState<string | null>(null)
   const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null)
   // Tarantulas only: the richer card (streak, longest gap, prey mix) from
   // /tarantulas/{id}/feeding-stats. The verdict above it still comes from
@@ -288,11 +290,16 @@ export default function InvertDetailPage() {
   const speciesIdForStages = invert && tracksInstars(invert.taxon) ? invert.species_id ?? null : null
   useEffect(() => {
     setMoltsToAdult(null)
+    setSpeciesFamily(null)
     if (!speciesIdForStages) return
     let cancelled = false
     fetch(`${API_URL}/api/v1/invert-species/${speciesIdForStages}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((sp) => { if (!cancelled) setMoltsToAdult(sp?.typical_instars_to_maturity ?? null) })
+      .then((sp) => {
+        if (cancelled) return
+        setMoltsToAdult(sp?.typical_instars_to_maturity ?? null)
+        setSpeciesFamily(sp?.family ?? null)
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [speciesIdForStages])
@@ -939,9 +946,9 @@ export default function InvertDetailPage() {
             )}
 
             {/* Mature males: one sourced sentence about lifespan after the final
-                molt (tarantulas only; the helper decides). Never a countdown. */}
+                molt (tarantulas, and jumping-spider males via the species family; the helper decides). Never a countdown. */}
             {maturedAt && (() => {
-              const note = matureMaleNote(invert.taxon, invert.sex ?? null)
+              const note = matureMaleNote(invert.taxon, invert.sex ?? null, speciesFamily)
               if (!note) return null
               return (
                 <p className="mb-6 -mt-3 text-xs text-theme-secondary">

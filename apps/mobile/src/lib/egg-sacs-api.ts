@@ -1,7 +1,7 @@
 // Network calls for the egg sac -> group -> split-out flow. Kept apart from
 // egg-sacs.ts so the pure logic there stays importable by jest.
 import { apiClient } from '../services/api';
-import type { EggSac, SplitLifeStage, SplitResult } from './egg-sacs';
+import { sacPhotoFilePart, type EggSac, type SplitLifeStage, type SplitResult } from './egg-sacs';
 
 export async function listInvertEggSacs(invertId: string): Promise<EggSac[]> {
   const { data } = await apiClient.get<EggSac[]>(`/inverts/${invertId}/egg-sacs`);
@@ -32,4 +32,18 @@ export async function splitOutOfColony(
 ): Promise<SplitResult> {
   const { data } = await apiClient.post<SplitResult>(`/colonies/${colonyId}/split-out`, payload);
   return data;
+}
+
+/** Set (or replace) the sac's one photo from a picked image uri. */
+export async function uploadEggSacPhoto(sacId: string, imageUri: string): Promise<EggSac> {
+  const form = new FormData();
+  form.append('file', sacPhotoFilePart(imageUri) as any);
+  const { data } = await apiClient.post<EggSac>(`/egg-sacs/${sacId}/photo`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function removeEggSacPhoto(sacId: string): Promise<void> {
+  await apiClient.delete(`/egg-sacs/${sacId}/photo`);
 }

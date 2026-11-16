@@ -35,16 +35,32 @@ export function matureBadge(maturedAt: string | null, now: Date): string | null 
 const MATURE_MALE_SOURCE =
   'https://www.thebiodude.com/blogs/helpful-husbandry-faqs/how-to-sex-male-vs-female-tarantulas'
 
-/** Tarantula males only: no reliable source exists for other taxa. */
+// Jackson, R. R. (1978), "Life history of Phidippus johnsoni (Araneae,
+// Salticidae)", Journal of Arachnology 6:1-29: lab adult males lived 94 +/- 47.7 days.
+const JUMPER_MALE_SOURCE =
+  'https://www.americanarachnology.org/journal-joa/joa-all-articles/article/download/JoA_v6_p1.pdf'
+
+/** One sourced sentence for mature males: tarantulas, and true spiders whose
+ *  linked species is a Salticidae (jumping spider). Anything else gets nothing. */
 export function matureMaleNote(
   taxon: string,
   sex: string | null,
+  family?: string | null,
 ): { text: string; sourceUrl: string } | null {
-  if (taxon !== 'tarantula' || (sex ?? '').toLowerCase() !== 'male') return null
-  return {
-    text: 'Mature males typically live a few months to a couple of years after their final molt.',
-    sourceUrl: MATURE_MALE_SOURCE,
+  if ((sex ?? '').toLowerCase() !== 'male') return null
+  if (taxon === 'tarantula') {
+    return {
+      text: 'Mature males typically live a few months to a couple of years after their final molt.',
+      sourceUrl: MATURE_MALE_SOURCE,
+    }
   }
+  if (taxon === 'true_spider' && (family ?? '').trim().toLowerCase() === 'salticidae') {
+    return {
+      text: 'In a lab study of a Phidippus jumping spider, males lived about 3 months on average after their final molt.',
+      sourceUrl: JUMPER_MALE_SOURCE,
+    }
+  }
+  return null
 }
 
 /** "L5" / "Instar 5" for instar taxa once a count is set; nothing otherwise. */

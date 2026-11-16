@@ -19,6 +19,8 @@
  *
  *   - Edit (keepers): date laid / born, expected hatch (egg layers),
  *     count (live birth), notes -- PUT /egg-sacs/{id}, partial.
+ *   - Photo (one per sac): everyone sees it (click opens it full size in a
+ *     new tab); keepers Add / Replace / Remove it.
  *
  * Taxon-dependent words (Laid/Born, egg sac/ootheca/brood) render only once
  * the mother's taxon is known, so a scorpion brood never flashes "Laid".
@@ -35,7 +37,14 @@ import UpgradeModal from '@/components/UpgradeModal'
 import { can, useCollectionRole } from '@/lib/coKeepers'
 import { clutchSingularLabel, hatchButtonLabel, isLiveBirth, offspringNoun } from '@/lib/inverts'
 import { sacStatus, sacStatusLabel } from '@/lib/broods'
-import { buildSacEditPayload, type EggSac } from '@/lib/eggSacs'
+import {
+  buildSacEditPayload,
+  removeEggSacPhoto,
+  sacPhotoActionLabel,
+  sacPhotoFileError,
+  uploadEggSacPhoto,
+  type EggSac,
+} from '@/lib/eggSacs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const editInputCls =
@@ -112,6 +121,10 @@ export default function EggSacDetailPage() {
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
+  // Photo. Keepers only change it.
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -155,6 +168,36 @@ export default function EggSacDetailPage() {
       if (r.ok) setSac(await r.json())
     } catch {
       /* the next load will try again */
+    }
+  }
+
+  async function handlePhotoFile(file: File | null) {
+    if (!file || !sac || !token || photoBusy) return
+    const problem = sacPhotoFileError(file)
+    if (problem) { setPhotoError(problem); return }
+    setPhotoBusy(true)
+    setPhotoError('')
+    try {
+      setSac(await uploadEggSacPhoto(API_URL, token, sac.id, file))
+    } catch (e) {
+      setPhotoError(e instanceof Error && e.message ? e.message : 'Couldn’t upload that photo. Nothing has changed. Try again.')
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+
+  async function handlePhotoRemove() {
+    if (!sac || !token || photoBusy) return
+    if (!window.confirm(`Remove photo?\n\nThe photo is deleted from this ${noun.toLowerCase()}. This can't be undone.`)) return
+    setPhotoBusy(true)
+    setPhotoError('')
+    try {
+      await removeEggSacPhoto(API_URL, token, sac.id)
+      setSac({ ...sac, photo_url: null })
+    } catch (e) {
+      setPhotoError(e instanceof Error && e.message ? e.message : 'Couldn’t remove that photo. Nothing has changed. Try again.')
+    } finally {
+      setPhotoBusy(false)
     }
   }
 
@@ -456,6 +499,52 @@ export default function EggSacDetailPage() {
               <KV label="Viable" value={String(sac.viable_count)} />
             )}
           </div>
+
+          {sac.photo_url ? (
+            <a
+              href={sac.photo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`View ${noun.toLowerCase()} photo full size`}
+              className="mt-4 block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={sac.photo_url}
+                alt={`${noun} photo`}
+                className="w-full max-h-80 object-cover rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900"
+              />
+            </a>
+          ) : null}
+          {canKeep && !taxonPending && (
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <label
+                className={`px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${photoBusy ? 'opacity-60 pointer-events-none' : ''}`}
+              >
+                {photoBusy ? 'Uploading…' : sacPhotoActionLabel(sac.photo_url)}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={photoBusy}
+                  onChange={(e) => { void handlePhotoFile(e.target.files?.[0] ?? null); e.target.value = '' }}
+                />
+              </label>
+              {sac.photo_url ? (
+                <button
+                  type="button"
+                  onClick={handlePhotoRemove}
+                  disabled={photoBusy}
+                  className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-60"
+                >
+                  Remove photo
+                </button>
+              ) : null}
+            </div>
+          )}
+          {photoError !== '' && (
+            <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">{photoError}</p>
+          )}
 
           {sac.notes && !editOpen && (
             <p className="mt-4 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">

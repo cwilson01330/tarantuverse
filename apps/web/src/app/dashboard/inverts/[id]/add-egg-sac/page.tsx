@@ -4,15 +4,16 @@
  * Log an egg sac (ootheca, brood) for a female. No pairing needed: jumpers
  * and many other keepers never record one. Only the date is required; the
  * sac can be hatched or marked "didn't hatch" later from its detail page.
- * Web counterpart of mobile app/invert/add-egg-sac.tsx. No photo field: no
- * upload route returns a URL for a sac photo.
+ * Web counterpart of mobile app/invert/add-egg-sac.tsx. The optional photo is
+ * uploaded after the sac is saved (POST /egg-sacs/{id}/photo); if that fails
+ * the sac stays and the keeper is told where to add it.
  */
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import { clutchSingularLabel, isLiveBirth, offspringNoun } from '@/lib/inverts'
-import { buildSacPayload } from '@/lib/eggSacs'
+import { buildSacPayload, sacPhotoFileError, SAC_PHOTO_FAILED_MESSAGE, uploadEggSacPhoto } from '@/lib/eggSacs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const inputCls = 'w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary focus:outline-none focus:ring-2 focus:ring-electric-blue-500'
@@ -35,6 +36,8 @@ export default function AddEggSacPage() {
   const [expected, setExpected] = useState('')
   const [count, setCount] = useState('')
   const [notes, setNotes] = useState('')
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -49,6 +52,21 @@ export default function AddEggSacPage() {
       })
       .catch(() => setLoadError("Couldn't load this animal."))
   }, [id, token, isAuthenticated, isLoading, router])
+
+  useEffect(() => {
+    if (!photo) { setPhotoPreview(null); return }
+    const url = URL.createObjectURL(photo)
+    setPhotoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photo])
+
+  const onPhotoChosen = (file: File | null) => {
+    if (!file) return
+    const problem = sacPhotoFileError(file)
+    if (problem) { setError(problem); return }
+    setError('')
+    setPhoto(file)
+  }
 
   const taxon = animal?.taxon ?? 'true_spider'
   const live = isLiveBirth(taxon)
@@ -78,6 +96,15 @@ export default function AddEggSacPage() {
       if (!res.ok) {
         const body = await res.json().catch(() => null)
         throw new Error(typeof body?.detail === 'string' ? body.detail : '')
+      }
+      const sac = await res.json().catch(() => null)
+      if (photo && sac?.id) {
+        try {
+          await uploadEggSacPhoto(API_URL, token, sac.id, photo)
+        } catch {
+          // The sac is saved; no rollback. Say so, then leave.
+          window.alert(SAC_PHOTO_FAILED_MESSAGE)
+        }
       }
       router.push(`/dashboard/inverts/${id}`)
     } catch (e) {
@@ -131,6 +158,27 @@ export default function AddEggSacPage() {
           <div>
             <label htmlFor="sac-notes" className={labelCls}>Notes (optional)</label>
             <textarea id="sac-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} />
+          </div>
+
+          <div>
+            <label htmlFor="sac-photo" className={labelCls}>Photo (optional)</label>
+            {photoPreview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoPreview} alt="Chosen photo" className="mb-2 w-full max-h-64 object-cover rounded-lg border border-theme" />
+            )}
+            <input
+              id="sac-photo"
+              type="file"
+              accept="image/*"
+              disabled={saving}
+              onChange={(e) => { onPhotoChosen(e.target.files?.[0] ?? null); e.target.value = '' }}
+              className="block w-full text-sm text-theme-secondary file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-theme file:bg-surface file:text-theme-primary"
+            />
+            {photo && (
+              <button type="button" onClick={() => setPhoto(null)} disabled={saving} className="mt-1 text-xs font-semibold text-primary-600 hover:underline">
+                Remove photo
+              </button>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>}

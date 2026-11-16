@@ -457,8 +457,12 @@ async def delete_pairing(
     if not pairing:
         raise HTTPException(status_code=404, detail="Pairing not found")
 
+    from app.utils.photo_cleanup import collect_for_egg_sacs, delete_files
+
+    _photo_files = collect_for_egg_sacs(db, pairing_id=pairing.id)  # its sacs cascade away
     db.delete(pairing)
     db.commit()
+    await delete_files(db, _photo_files)
 
     return None
 

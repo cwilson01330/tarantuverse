@@ -733,8 +733,10 @@ async def delete_invert(
     from app.services.inverts_dualwrite import mirror_invert_delete_to_legacy
     from app.utils.animal_delete import clear_dependent_references
 
-    clear_dependent_references(db, invert_id)
+    # Collect BEFORE clearing: clearing deletes the animal's pairings and the
+    # DB cascade takes their egg sacs (and so the sacs' photo URLs) with them.
     _photo_files = collect_for_animal(db, invert_id)
+    clear_dependent_references(db, invert_id)
 
     # Remove the legacy twin too. GET /tarantulas/ reads the legacy table until
     # the C1 read cutover, so deleting only the invert row leaves the animal

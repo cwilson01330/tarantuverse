@@ -45,6 +45,22 @@ describe('matureMaleNote', () => {
     expect(matureMaleNote('tarantula', null)).toBeNull();
     expect(matureMaleNote('true_spider', 'male')).toBeNull();
   });
+
+  it('jumping spider males (Salticidae) get the Jackson 1978 sentence', () => {
+    const n = matureMaleNote('true_spider', 'male', ' salticidae ');
+    expect(n?.text).toBe('In a lab study of a Phidippus jumping spider, males lived about 3 months on average after their final molt.');
+    expect(n?.sourceUrl).toBe('https://www.americanarachnology.org/journal-joa/joa-all-articles/article/download/JoA_v6_p1.pdf');
+    expect(matureMaleNote('true_spider', 'Male', 'Salticidae')).not.toBeNull();
+  });
+
+  it('other families, no family, females and other taxa get nothing', () => {
+    expect(matureMaleNote('true_spider', 'male', 'Lycosidae')).toBeNull();
+    expect(matureMaleNote('true_spider', 'male', null)).toBeNull();
+    expect(matureMaleNote('true_spider', 'male', undefined)).toBeNull();
+    expect(matureMaleNote('true_spider', 'female', 'Salticidae')).toBeNull();
+    expect(matureMaleNote('true_spider', null, 'Salticidae')).toBeNull();
+    expect(matureMaleNote('mantis', 'male', 'Salticidae')).toBeNull();
+  });
 });
 
 describe('stageChip', () => {

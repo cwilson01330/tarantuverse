@@ -33,6 +33,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -54,8 +55,11 @@ import { useAuth } from '../../../src/contexts/AuthContext';
 import { can, useCollectionRole } from '../../../src/lib/co-keepers';
 import { sacStatus, sacStatusLabel, splitCapText } from '../../../src/lib/broods';
 import { clutchSingularLabel, hatchButtonLabel, isLiveBirth, offspringNoun } from '../../../src/lib/taxon-modules';
-import { buildSacEditPayload, type CapDetail, type EggSac } from '../../../src/lib/egg-sacs';
-import { failEggSac } from '../../../src/lib/egg-sacs-api';
+import { buildSacEditPayload, sacPhotoActionLabel, type CapDetail, type EggSac } from '../../../src/lib/egg-sacs';
+import { failEggSac, removeEggSacPhoto, uploadEggSacPhoto } from '../../../src/lib/egg-sacs-api';
+import { chooseSacPhoto } from '../../../src/lib/sac-photo-picker';
+import PhotoViewer from '../../../src/components/PhotoViewer';
+import { getImageUrl } from '../../../src/utils/image-url';
 import { getInvert } from '../../../src/lib/inverts';
 import { getErrorMessage } from '../../../src/utils/errors';
 
@@ -170,6 +174,47 @@ function EggSacDetailScreen() {
       setEditError(getErrorMessage(err, "Couldn't save that. Nothing has changed. Try again."));
     }
     setEditSaving(false);
+  };
+
+  // Photo (one per sac). Everyone sees it; keepers add / replace / remove.
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const [photoOpen, setPhotoOpen] = useState(false);
+
+  const changePhoto = async () => {
+    if (!sac || photoBusy) return;
+    const uri = await chooseSacPhoto();
+    if (!uri) return;
+    setPhotoBusy(true);
+    setPhotoError('');
+    try {
+      setSac(await uploadEggSacPhoto(sac.id, uri));
+    } catch (err: any) {
+      setPhotoError(getErrorMessage(err, "Couldn't upload that photo. Nothing has changed. Try again."));
+    }
+    setPhotoBusy(false);
+  };
+
+  const removePhoto = () => {
+    if (!sac || photoBusy) return;
+    Alert.alert('Remove photo?', `The photo is deleted from this ${noun.toLowerCase()}. This can't be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setPhotoBusy(true);
+          setPhotoError('');
+          try {
+            await removeEggSacPhoto(sac.id);
+            setSac({ ...sac, photo_url: null });
+          } catch (err: any) {
+            setPhotoError(getErrorMessage(err, "Couldn't remove that photo. Nothing has changed. Try again."));
+          }
+          setPhotoBusy(false);
+        },
+      },
+    ]);
   };
 
   const reloadSac = useCallback(async () => {
@@ -474,6 +519,47 @@ function EggSacDetailScreen() {
                 )}
               </View>
 
+              {sac.photo_url ? (
+                <TouchableOpacity
+                  onPress={() => setPhotoOpen(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${noun.toLowerCase()} photo larger`}
+                >
+                  <Image
+                    source={{ uri: getImageUrl(sac.photo_url) }}
+                    style={[styles.sacPhoto, { borderRadius: layout.radius.sm, backgroundColor: colors.background }]}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ) : null}
+              {canKeep && !taxonPending && (
+                <View style={styles.photoActions}>
+                  <TouchableOpacity
+                    onPress={changePhoto}
+                    disabled={photoBusy}
+                    accessibilityRole="button"
+                    style={[styles.editBtn, { borderColor: colors.border, borderRadius: layout.radius.sm }, photoBusy && { opacity: 0.6 }]}
+                  >
+                    {photoBusy ? (
+                      <ActivityIndicator size="small" color={colors.textTertiary} />
+                    ) : (
+                      <MaterialCommunityIcons name="camera-outline" size={16} color={colors.textSecondary} />
+                    )}
+                    <Text style={[TYPE.label, { color: colors.textPrimary }]}>{sacPhotoActionLabel(sac.photo_url)}</Text>
+                  </TouchableOpacity>
+                  {sac.photo_url ? (
+                    <TouchableOpacity onPress={removePhoto} disabled={photoBusy} accessibilityRole="button">
+                      <Text style={[TYPE.label, { color: colors.accent }]}>Remove photo</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+              {photoError !== '' && (
+                <Text style={[TYPE.caption, { color: colors.error }]} accessibilityLiveRegion="polite">
+                  {photoError}
+                </Text>
+              )}
+
               {sac.notes && !editOpen && (
                 <Text style={[styles.notes, { color: colors.textSecondary }]}>
                   {sac.notes}
@@ -724,6 +810,15 @@ function EggSacDetailScreen() {
         )}
       </ScrollView>
 
+      {sac?.photo_url ? (
+        <PhotoViewer
+          visible={photoOpen}
+          photos={[{ id: sac.id, url: sac.photo_url, created_at: sac.created_at }]}
+          initialIndex={0}
+          onClose={() => setPhotoOpen(false)}
+        />
+      ) : null}
+
       {sac && sac.mother_invert_id ? (
         <HatchSheet
           visible={hatchOpen}
@@ -839,6 +934,8 @@ const styles = StyleSheet.create({
   kvValue: { fontSize: 13, fontWeight: '600' },
 
   notes: { fontSize: 13, lineHeight: 18, marginTop: 4 },
+  sacPhoto: { width: '100%', aspectRatio: 4 / 3 },
+  photoActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
 
   sectionLabel: {
     fontSize: 11,

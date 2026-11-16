@@ -1,7 +1,9 @@
 """
 Egg sac routes for breeding module
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import logging
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
@@ -26,6 +28,11 @@ from sqlalchemy.exc import IntegrityError
 from app.utils.closed_animals import refuse_if_closed_invert
 from app.utils.rate_limit import limiter, user_or_ip
 from app.utils.storage_urls import is_our_photo_url, photo_bases
+from app.services.storage import storage_service
+from app.utils.file_validation import validate_image_bytes
+from app.utils.photo_cleanup import collect_for_egg_sacs, delete_files
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -336,9 +343,80 @@ async def delete_egg_sac(
     """Delete an egg sac"""
     egg_sac, _access = load_egg_sac(db, current_user, egg_sac_id, "keeper")
 
+    _photo_files = collect_for_egg_sacs(db, egg_sac_id=egg_sac.id)
     db.delete(egg_sac)
     db.commit()
+    # Files don't cascade with the row (R2): remove it now the delete is committed.
+    await delete_files(db, _photo_files)
 
+    return None
+
+
+MAX_SAC_PHOTO_BYTES = 15 * 1024 * 1024
+
+
+@router.post("/egg-sacs/{egg_sac_id}/photo", response_model=EggSacResponse)
+@limiter.limit("20/hour", key_func=user_or_ip)
+@policy("keeper")
+async def upload_egg_sac_photo(
+    request: Request,
+    egg_sac_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Set the sac's photo (one per sac: a new upload replaces the old one).
+
+    Free, and not counted by the per-animal photo cap — a sac isn't an animal.
+    Open on a died/transferred mother (it is history). Goes through the same
+    sanitising upload as animal photos (EXIF/GPS stripped, type from bytes).
+    """
+    egg_sac, _access = load_egg_sac(db, current_user, egg_sac_id, "keeper")
+
+    file_data = await file.read()
+    try:
+        detected_mime = validate_image_bytes(file_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if len(file_data) > MAX_SAC_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
+
+    try:
+        photo_url, thumbnail_url = await storage_service.upload_photo(
+            file_data=file_data,
+            filename=file.filename or "upload.jpg",
+            content_type=detected_mime,  # verified from the bytes, not the client
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="That file isn't a readable image. Try another photo.")
+    except Exception:
+        logger.exception("Egg sac photo upload failed for %s", egg_sac_id)
+        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
+
+    old_url = egg_sac.photo_url
+    egg_sac.photo_url = photo_url
+    db.commit()
+    db.refresh(egg_sac)
+    # After the commit: the replaced file, and the thumbnail the helper always
+    # makes (a sac keeps only the main image).
+    await delete_files(db, [(old_url, None), (None, thumbnail_url)])
+    return _serialize(db, [egg_sac])[0]
+
+
+@router.delete("/egg-sacs/{egg_sac_id}/photo", status_code=status.HTTP_204_NO_CONTENT)
+@policy("keeper")
+async def delete_egg_sac_photo(
+    egg_sac_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Remove the sac's photo."""
+    egg_sac, _access = load_egg_sac(db, current_user, egg_sac_id, "keeper")
+    old_url = egg_sac.photo_url
+    if old_url:
+        egg_sac.photo_url = None
+        db.commit()
+        await delete_files(db, [(old_url, None)])
     return None
 
 

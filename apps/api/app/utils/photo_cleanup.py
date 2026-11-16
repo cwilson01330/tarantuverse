@@ -57,6 +57,8 @@ def _pairs(rows) -> list[FilePair]:
 def collect_for_animal(db: Session, animal_id) -> list[FilePair]:
     """Photos for one individual animal. TV animals share one id across the
     inverts row and its legacy tarantula/scorpion twin, so match all three."""
+    from app.models.egg_sac import EggSac
+
     aid = str(animal_id)
     rows = db.query(Photo.url, Photo.thumbnail_url).filter(or_(
         Photo.invert_id == aid,
@@ -64,7 +66,41 @@ def collect_for_animal(db: Session, animal_id) -> list[FilePair]:
         Photo.scorpion_id == aid,
         Photo.animal_id == aid,
     )).all()
-    return _pairs(rows)
+    pairs = _pairs(rows)
+    # Egg sacs go with their mother (ON DELETE CASCADE); so do their photos.
+    # A sac under a pairing also goes when EITHER parent is deleted (the pairing
+    # is removed, the sac cascades from it), so match the animal's pairings too.
+    from app.models.pairing import Pairing
+
+    pairing_ids = db.query(Pairing.id).filter(or_(
+        Pairing.male_id == aid,
+        Pairing.female_id == aid,
+        Pairing.male_invert_id == aid,
+        Pairing.female_invert_id == aid,
+    ))
+    pairs += _sac_pairs(db.query(EggSac.photo_url).filter(or_(
+        EggSac.mother_invert_id == aid,
+        EggSac.pairing_id.in_(pairing_ids),
+    )).all())
+    return pairs
+
+
+def _sac_pairs(rows) -> list[FilePair]:
+    return [(u, None) for (u,) in rows if u]
+
+
+def collect_for_egg_sacs(db: Session, *, egg_sac_id=None, pairing_id=None) -> list[FilePair]:
+    """The photo of one egg sac, or of every sac under one pairing."""
+    from app.models.egg_sac import EggSac
+
+    q = db.query(EggSac.photo_url)
+    if egg_sac_id is not None:
+        q = q.filter(EggSac.id == egg_sac_id)
+    elif pairing_id is not None:
+        q = q.filter(EggSac.pairing_id == pairing_id)
+    else:
+        return []
+    return _sac_pairs(q.all())
 
 
 def collect_for_colony(db: Session, colony_id) -> list[FilePair]:
@@ -76,6 +112,7 @@ def collect_for_user(db: Session, user_id) -> list[FilePair]:
     """Every photo of every animal/colony the user owns, plus their avatar."""
     from app.models.animal import Animal
     from app.models.colony import Colony
+    from app.models.egg_sac import EggSac
     from app.models.invert import Invert
     from app.models.scorpion import Scorpion
     from app.models.tarantula import Tarantula
@@ -90,6 +127,7 @@ def collect_for_user(db: Session, user_id) -> list[FilePair]:
         Photo.colony_id.in_(db.query(Colony.id).filter(Colony.user_id == uid)),
     )
     pairs = _pairs(db.query(Photo.url, Photo.thumbnail_url).filter(owned).all())
+    pairs += _sac_pairs(db.query(EggSac.photo_url).filter(EggSac.user_id == uid).all())
     avatar = db.query(User.avatar_url).filter(User.id == uid).scalar()
     if avatar:
         pairs.append((avatar, None))
@@ -120,6 +158,7 @@ def _legacy_bases() -> str:
 async def delete_files(db: Session, pairs: Iterable[FilePair], storage=None) -> int:
     """Delete the files for `pairs` that nothing references any more.
     Call AFTER the commit. Returns how many files were deleted."""
+    from app.models.egg_sac import EggSac
     from app.models.user import User
 
     if storage is None:
@@ -144,6 +183,7 @@ async def delete_files(db: Session, pairs: Iterable[FilePair], storage=None) -> 
             still_used = (
                 db.query(Photo.id).filter(or_(Photo.url.in_(refs), Photo.thumbnail_url.in_(refs))).first()
                 or db.query(User.id).filter(User.avatar_url.in_(refs)).first()
+                or db.query(EggSac.id).filter(EggSac.photo_url.in_(refs)).first()
             )
             if still_used:
                 continue

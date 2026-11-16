@@ -10,6 +10,9 @@ import {
   splitToastText,
   buildSacEditPayload,
   resolveOffspringParent,
+  sacPhotoActionLabel,
+  sacPhotoFilePart,
+  SAC_PHOTO_FAILED_MESSAGE,
 } from '../egg-sacs';
 
 describe('parseWholeNumber', () => {
@@ -140,5 +143,18 @@ describe('resolveOffspringParent', () => {
       scientific_name: null,
       species_id: null,
     });
+  });
+});
+
+describe('sac photo helpers', () => {
+  it('labels and the failure sentence', () => {
+    expect(sacPhotoActionLabel(null)).toBe('Add photo');
+    expect(sacPhotoActionLabel('https://x/y.jpg')).toBe('Replace photo');
+    expect(SAC_PHOTO_FAILED_MESSAGE).toBe("Saved, but the photo didn't upload. You can add it from the sac page.");
+  });
+  it('builds the file part from the uri', () => {
+    expect(sacPhotoFilePart('file:///tmp/a/IMG_1.PNG')).toEqual({ uri: 'file:///tmp/a/IMG_1.PNG', name: 'IMG_1.PNG', type: 'image/png' });
+    expect(sacPhotoFilePart('file:///tmp/a/b.jpg').type).toBe('image/jpeg');
+    expect(sacPhotoFilePart('file:///tmp/a/noext').type).toBe('image/jpeg');
   });
 });

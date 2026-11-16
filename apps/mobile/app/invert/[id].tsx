@@ -86,6 +86,8 @@ function InvertDetailScreen() {
   const [growth, setGrowth] = useState<InvertGrowthAnalytics | null>(null);
   // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
   const [moltsToAdult, setMoltsToAdult] = useState<number | null>(null);
+  // Linked species' family, from the same species read (jumping-spider male sentence).
+  const [speciesFamily, setSpeciesFamily] = useState<string | null>(null);
   const [pairings, setPairings] = useState<InvertPairing[]>([]);
   // Egg sacs (null = not loaded / not applicable). Loaded with the focus
   // reload only; the sac screen refreshes its own list.
@@ -213,10 +215,11 @@ function InvertDetailScreen() {
       // Optional hint only, so a failure here isn't reported as missing data.
       if (tracksInstars(i.taxon) && i.species_id) {
         getInvertSpecies(i.species_id)
-          .then((sp) => setMoltsToAdult(sp.typical_instars_to_maturity ?? null))
-          .catch(() => setMoltsToAdult(null));
+          .then((sp) => { setMoltsToAdult(sp.typical_instars_to_maturity ?? null); setSpeciesFamily(sp.family ?? null); })
+          .catch(() => { setMoltsToAdult(null); setSpeciesFamily(null); });
       } else {
         setMoltsToAdult(null);
+        setSpeciesFamily(null);
       }
       setPartialFailure(failed);
       setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
@@ -1341,9 +1344,9 @@ function InvertDetailScreen() {
       )}
 
       {/* Mature males: one sourced sentence about lifespan after the final
-          molt (tarantulas only; the helper decides). Never a countdown. */}
+          molt (tarantulas, and jumping-spider males via the species family; the helper decides). Never a countdown. */}
       {maturedAtFromMolts(molts) && (() => {
-        const note = matureMaleNote(invert.taxon, invert.sex);
+        const note = matureMaleNote(invert.taxon, invert.sex, speciesFamily);
         if (!note) return null;
         return (
           <View style={{ marginHorizontal: SPACING.lg, marginVertical: SPACING.xs }}>
