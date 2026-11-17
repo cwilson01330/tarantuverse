@@ -725,6 +725,10 @@ async def export_preview(
         .count()
     )
 
+    # Premolt episodes — same owner rule as export_service (user_id = owner).
+    from app.models.premolt_episode import PremoltEpisode
+    premolt_episode_count = db.query(PremoltEpisode).filter(PremoltEpisode.user_id == current_user.id).count()
+
     counts = {
             # Every TV animal of every taxon (tarantulas included). This key
             # used to be "animals", which the Herpetoverse count below then
@@ -757,6 +761,7 @@ async def export_preview(
             "feeder_care_logs": feeder_care_log_count,
             "expenses": expense_count,
             "expense_shares": expense_share_count,
+            "premolt_episodes": premolt_episode_count,
     }
     return {
         "username": current_user.username,

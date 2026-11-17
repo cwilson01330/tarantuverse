@@ -98,13 +98,79 @@ def resume_if_accepted(animal: Any, accepted: bool, db: Any = None) -> bool:
     return True
 
 
-def _clear_twin(db: Any, animal: Any) -> None:
+def end_premolt_pause(animal: Any, db: Any = None) -> bool:
+    """Clear a feeding pause whose reason is "premolt". Returns True if it did.
+
+    Premolt v2 (2026-11-17 final review): a molt ends premolt by definition,
+    so the molt routes call this (through `end_premolt_pause_for_molt`) when
+    the new molt is the animal's newest. Without it a "Yes, pause feeding"
+    pause outlived the molt and silenced due-to-eat reminders until the
+    keeper happened to log a meal. Any other reason (rehoused, breeding
+    season, ...) is the keeper's call and is left alone. Pass `db` to clear the
+    consolidation twin too, as `resume_if_accepted` does.
+    """
+    if not _is_premolt_reason(getattr(animal, "feeding_paused_reason", None)):
+        return False
+    animal.feeding_paused_reason = None
+    animal.feeding_paused_until = None
+    if db is not None:
+        _clear_twin(db, animal, only_premolt=True)
+    return True
+
+
+def end_premolt_pause_for_molt(db: Any, molt: Any) -> bool:
+    """After adding `molt` (flushed), end the animal's premolt pause if this
+    molt is its newest (on or after every other molt — the same test that
+    moves the instar count, `utils/instar.is_newest`). A back-dated molt older
+    than the newest says nothing about now and changes nothing.
+
+    Colony and enclosure molts have no per-animal pause and are skipped.
+    Reads the animal on the unified `inverts` row first, else the legacy
+    tarantula / scorpion row; either way the twin is cleared too.
+    """
+    from sqlalchemy import or_
+
+    from app.models.invert import Invert
+    from app.models.molt_log import MoltLog
+    from app.models.scorpion import Scorpion
+    from app.models.tarantula import Tarantula
+    from app.utils.instar import is_newest
+    from app.utils.legacy_logs import tarantula_logs
+
+    animal_id = molt.invert_id or molt.tarantula_id or getattr(molt, "scorpion_id", None)
+    if animal_id is None:
+        return False
+    others = [
+        r[0]
+        for r in db.query(MoltLog.molted_at)
+        .filter(
+            # Either parent column (utils/legacy_logs), plus a scorpion's.
+            or_(tarantula_logs(MoltLog, animal_id), MoltLog.scorpion_id == animal_id),
+            MoltLog.id != molt.id,
+        )
+        .all()
+    ]
+    if not is_newest(molt.molted_at, others):
+        return False
+    for model in (Invert, Tarantula, Scorpion):
+        row = db.query(model).filter(model.id == animal_id).first()
+        if row is not None:
+            return end_premolt_pause(row, db)
+    return False
+
+
+def _is_premolt_reason(reason: Optional[str]) -> bool:
+    return (reason or "").strip().lower() == "premolt"
+
+
+def _clear_twin(db: Any, animal: Any, only_premolt: bool = False) -> None:
     """Clear the pause on the consolidation twin, matched on the shared PK.
 
     Invert and its legacy per-taxon row deliberately share a primary key, which
     is what makes this a lookup rather than a join. Best-effort: a missing twin
     is the normal case for invert-native taxa (centipedes and everything added
     after the per-taxon tables stopped being written), not an error.
+    `only_premolt` leaves a twin paused for another reason alone.
     """
     from app.models.invert import Invert
     from app.models.scorpion import Scorpion
@@ -119,6 +185,7 @@ def _clear_twin(db: Any, animal: Any) -> None:
 
     for model in twins:
         row = db.query(model).filter(model.id == animal.id).first()
-        if row is not None and getattr(row, "feeding_paused_reason", None):
+        reason = getattr(row, "feeding_paused_reason", None) if row is not None else None
+        if reason and (not only_premolt or _is_premolt_reason(reason)):
             row.feeding_paused_reason = None
             row.feeding_paused_until = None

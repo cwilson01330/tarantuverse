@@ -112,20 +112,20 @@ export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding' |
 
 export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   tarantula: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
-  scorpion: ['feedingStats', 'growth', 'breeding', 'eggSacs'], // breeding pilot — ADR-021 Phase D
+  scorpion: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'], // breeding pilot — ADR-021 Phase D
   // Centipede breeding enabled 2026-10-06 (consistency audit C): the female
   // broods a clutch of eggs (no egg sac) — see 'Clutch' / 'plings' in
   // BREEDING_VOCABULARY below. 'plings' still wants a keeper's second opinion.
-  centipede: ['feedingStats', 'growth', 'breeding'],
+  centipede: ['premolt', 'feedingStats', 'growth', 'breeding'],
   // Growth enabled 2026-10-06 (consistency audit C): both molt through visible
   // instars and keepers measure them; /inverts/{id}/growth is taxon-agnostic
   // and growthLengthLabel() labels whip spiders 'Leg span', vinegaroons
   // 'Body length'. Breeding left off: no keeper demand on record.
-  whip_spider: ['feedingStats', 'growth'],
-  vinegaroon: ['feedingStats', 'growth'],
+  whip_spider: ['premolt', 'feedingStats', 'growth'],
+  vinegaroon: ['premolt', 'feedingStats', 'growth'],
   // Jumping spiders lay an egg sac like a tarantula, so the pairing → sac →
   // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
-  true_spider: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
+  true_spider: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Growth opt-in (2026-10-07): shown only once a molt carries a
   // measurement (showGrowthChart). Mirrors the mobile registry.
   millipede: ['growth'],
@@ -133,7 +133,7 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   // the ootheca → nymphs vocabulary below is correct and now actually read by
   // the hubs, so a mantis breeder is no longer offered a spider's "egg sac".
   // Demand is real — the first premium subscriber keeps 15 mantids.
-  mantis: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
+  mantis: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Omnivore grazer, and kept as a colony far more often than individually —
   // colonies have their own screen (ADR-010). Not an oversight.
   roach: [],
@@ -144,7 +144,7 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   isopod: [],
   // Catch-all keepers file real predators under; cards appear only with
   // data (2026-10-07, every taxon first-class). Mirrors mobile.
-  other: ['feedingStats', 'growth'],
+  other: ['premolt', 'feedingStats', 'growth'],
 }
 
 export function taxonHasModule(taxon: string, module: FeatureModule): boolean {
@@ -170,7 +170,7 @@ export function showGrowthChart(
 
 /** "today" / "yesterday" / "12 days ago" for the most recent molt, by calendar
  *  day in the viewer's timezone. A fact, not a prediction, so every taxon
- *  that logs molts gets it (premolt prediction stays tarantula-only). */
+ *  that logs molts gets it (premolt is a separate, rule-based module). */
 export function lastMoltAgo(molts: { molted_at: string }[]): string | null {
   if (!molts.length) return null
   const latest = molts.reduce((a, b) => (new Date(b.molted_at) > new Date(a.molted_at) ? b : a))

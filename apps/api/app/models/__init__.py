@@ -89,6 +89,8 @@ from app.models.animal_event import AnimalEvent
 from app.models.card_link import CardLink
 # Expense tracking (exp_20261022). FK targets: users, inverts, colonies, animals.
 from app.models.expense import Expense, ExpenseShare
+# Premolt v2 episodes (pmv_20261117). FK targets: users, inverts.
+from app.models.premolt_episode import PremoltEpisode
 
 __all__ = [
     "User",

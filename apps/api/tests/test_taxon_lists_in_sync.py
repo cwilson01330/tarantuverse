@@ -366,6 +366,11 @@ def _py_subsets():
     from app.utils import broods
     out.append(("BROOD_TAXA", "apps/api/app/utils/broods.py", set(broods.BROOD_TAXA),
                 "taxa whose females lay sacs/oothecae or bear broods the keeper groups"))
+    from app.services import premolt_service
+    out.append(("PREMOLT_TAXA", "apps/api/app/services/premolt_service.py", set(premolt_service.PREMOLT_TAXA),
+                "taxa that take prey on a cadence (predator default), so a fasting/refusal premolt signal means something; grazers never get the card"))
+    out.append(("ADULTS_KEEP_MOLTING", "apps/api/app/services/premolt_service.py", set(premolt_service.ADULTS_KEEP_MOLTING),
+                "taxa whose adults keep molting, so an adult is not 'matured'; every other taxon stops being flagged at adult"))
     try:
         from app.services import share_card
         out.append(("_LEG_SPAN_TAXA", "apps/api/app/services/share_card.py", set(share_card._LEG_SPAN_TAXA),
@@ -641,4 +646,15 @@ def test_egg_sac_module_taxa_equal_python_brood_taxa():
         got = {t for t, mods in reg.items() if "eggSacs" in mods}
         assert got == set(broods.BROOD_TAXA), (
             f"{label} TAXON_MODULES 'eggSacs' taxa {sorted(got)} != BROOD_TAXA {sorted(broods.BROOD_TAXA)}"
+        )
+
+
+def test_premolt_module_taxa_equal_python_premolt_taxa():
+    from app.services import premolt_service
+    web = ts_module_lists(WEB_MODULES, r"export const TAXON_MODULES: Record<InvertTaxon, FeatureModule\[\]> = \{")
+    mob = ts_module_lists(MOB_MODULES, r"export const TAXON_MODULES: Record<string, FeatureModule\[\]> = \{")
+    for label, reg in (("web", web), ("mobile", mob)):
+        got = {t for t, mods in reg.items() if "premolt" in mods}
+        assert got == set(premolt_service.PREMOLT_TAXA), (
+            f"{label} TAXON_MODULES 'premolt' taxa {sorted(got)} != PREMOLT_TAXA {sorted(premolt_service.PREMOLT_TAXA)}"
         )

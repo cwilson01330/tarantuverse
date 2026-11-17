@@ -3,25 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-
-interface PremoltPrediction {
-  tarantula_id: string
-  tarantula_name: string
-  is_premolt_likely: boolean
-  confidence: 'high' | 'medium' | 'low' | 'none'
-  days_since_last_molt: number | null
-  average_molt_interval: number | null
-  molt_interval_progress: number | null
-  recent_refusal_streak: number
-  refusal_rate_last_30_days: number | null
-  estimated_molt_window_days: number | null
-  data_quality: 'good' | 'fair' | 'insufficient'
-  last_molt_date: string | null
-  last_feeding_date: string | null
-}
+import { alertCount, type PremoltPrediction } from '@/lib/premoltView'
 
 interface DashboardResponse {
   total_tarantulas: number
+  total_animals?: number
   premolt_likely_count: number
   predictions: PremoltPrediction[]
 }
@@ -73,15 +59,15 @@ export default function PremoltAlertsCard() {
     return null
   }
 
-  const likelyPredictions = data.predictions.filter(p => p.is_premolt_likely)
+  const likelyPredictions = data.predictions.filter(p => alertCount([p]) === 1)
 
   // If no sufficient data
-  if (data.total_tarantulas > 0 && likelyPredictions.length === 0 &&
+  if ((data.total_animals ?? data.total_tarantulas) > 0 && likelyPredictions.length === 0 &&
       data.predictions.some(p => p.data_quality === 'insufficient')) {
     return (
       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl shadow-lg border border-blue-200 dark:border-blue-800 p-6 mb-8">
         <div className="flex items-start gap-4">
-          <div className="text-3xl">💡</div>
+          
           <div>
             <h2 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2">Improve Premolt Predictions</h2>
             <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
@@ -104,10 +90,10 @@ export default function PremoltAlertsCard() {
     return (
       <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl shadow-lg border border-green-200 dark:border-green-800 p-6 mb-8">
         <div className="flex items-center gap-4">
-          <div className="text-3xl">✅</div>
+          
           <div>
             <h2 className="text-lg font-bold text-green-900 dark:text-green-100">All Clear</h2>
-            <p className="text-sm text-green-800 dark:text-green-200">No tarantulas showing premolt signs</p>
+            <p className="text-sm text-green-800 dark:text-green-200">No animals showing premolt signs</p>
           </div>
         </div>
       </div>
@@ -118,11 +104,11 @@ export default function PremoltAlertsCard() {
   return (
     <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl shadow-lg border border-amber-200 dark:border-amber-800 p-6 mb-8">
       <div className="flex items-start gap-4 mb-4">
-        <div className="text-3xl">🕷️</div>
+        
         <div className="flex-1">
           <h2 className="text-lg font-bold text-amber-900 dark:text-amber-100">Premolt Alerts</h2>
           <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-            {likelyPredictions.length} tarantula{likelyPredictions.length !== 1 ? 's' : ''} may be in premolt
+            {likelyPredictions.length} {likelyPredictions.length === 1 ? 'animal' : 'animals'} may be in premolt
           </p>
         </div>
       </div>
@@ -131,8 +117,8 @@ export default function PremoltAlertsCard() {
       <div className="space-y-2">
         {likelyPredictions.map(prediction => (
           <button
-            key={prediction.tarantula_id}
-            onClick={() => router.push(`/dashboard/inverts/${prediction.tarantula_id}`)}
+            key={prediction.invert_id ?? prediction.tarantula_id}
+            onClick={() => router.push(`/dashboard/inverts/${prediction.invert_id ?? prediction.tarantula_id}`)}
             className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-gray-800 hover:shadow-md transition border border-amber-100 dark:border-amber-900 text-left group"
           >
             <div className="flex-1">
@@ -140,8 +126,12 @@ export default function PremoltAlertsCard() {
                 {prediction.tarantula_name}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {prediction.recent_refusal_streak > 0 ? `${prediction.recent_refusal_streak} feeding refusals` : 'Multiple indicators'}
-                {prediction.days_since_last_molt !== null && ` · ${prediction.days_since_last_molt} days since molt`}
+                {prediction.reason
+                  ? prediction.reason
+                  : <>
+                      {prediction.recent_refusal_streak > 0 ? `${prediction.recent_refusal_streak} feeding refusals` : 'Multiple indicators'}
+                      {prediction.days_since_last_molt != null && ` · ${prediction.days_since_last_molt} days since molt`}
+                    </>}
               </p>
             </div>
             <div className={`px-3 py-1 rounded-full text-xs font-semibold text-white whitespace-nowrap ${

@@ -26,6 +26,7 @@ import {
 } from '@/lib/colonies'
 import { INVERT_TAXA, isInvertTaxon, taxonHasModule } from '@/lib/inverts'
 import { listDeceasedInverts, tenureLabel } from '@/lib/animal-lifecycle'
+import type { PremoltPrediction } from '@/lib/premoltView'
 
 interface Tarantula {
   id: string
@@ -134,17 +135,11 @@ interface DeceasedAnimal {
  * calibrated against recorded molt outcomes. `confidence` describes how much
  * data supports the call, not predictive accuracy.
  */
-interface PremoltPrediction {
-  tarantula_id: string
-  is_premolt_likely: boolean
-  confidence: string
-  data_quality: string
-}
 
 // --- Multi-taxon (ADR-006) -------------------------------------------------
 // The collection list shows every taxon. Feeding status shows for every taxon
-// with a feeding cadence (registry `feedingStats` module); premolt stays
-// tarantula-only. Every card opens the shared /dashboard/inverts/[id] page.
+// with a feeding cadence (registry `feedingStats` module); premolt is
+// shown for every predator taxon (the server decides via `show_alert`). Every card opens the shared /dashboard/inverts/[id] page.
 type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider' | 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'roach' | 'isopod' | 'other'
 
 interface Animal {
@@ -424,7 +419,7 @@ export default function TarantulasPage() {
       if (response.ok) {
         const data = await response.json()
         for (const p of (data?.predictions ?? []) as PremoltPrediction[]) {
-          predictionMap.set(p.tarantula_id, p)
+          predictionMap.set(p.invert_id ?? p.tarantula_id, p)
         }
       }
     } catch {
@@ -464,19 +459,24 @@ export default function TarantulasPage() {
     )
   }
 
+  // The server decides (show_alert: likely, not snoozed, not paused); an older
+  // API without it falls back to likely + enough data.
+  const showsPremoltBadge = (p: PremoltPrediction | undefined) =>
+    !!p && (p.show_alert === undefined
+      ? p.is_premolt_likely && p.data_quality !== 'insufficient'
+      : p.show_alert)
+
   const getPremoltBadge = (tarantulaId: string) => {
     const prediction = premoltPredictions.get(tarantulaId)
     if (!prediction) return null
 
     // Both required: the service says premolt is likely, AND it had enough
     // history to say so. 'insufficient' data quality means the signal is noise.
-    if (!prediction.is_premolt_likely || prediction.data_quality === 'insufficient') {
-      return null
-    }
+    if (!showsPremoltBadge(prediction)) return null
 
     return (
       <span className="px-3 py-1 rounded-full bg-yellow-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
-        🦋 Premolt
+        Premolt
       </span>
     )
   }
@@ -641,7 +641,7 @@ export default function TarantulasPage() {
                               const isT = animal.taxon === 'tarantula'
                               const feedingStatus = statusFor(animal)
                               const line = feedingStatus ? feedingLine(feedingStatus) : null
-                              const premoltPrediction = isT ? premoltPredictions.get(animal.id) : undefined
+                              const premoltPrediction = premoltPredictions.get(animal.id)
                               const cfg = TAXON_CONFIG[animal.taxon]
                               const title = animalTitle(animal)
                               return (
@@ -698,12 +698,9 @@ export default function TarantulasPage() {
                                     )}
                                   </td>
                                   <td className="px-4 py-3 hidden lg:table-cell align-middle">
-                                    {isT
-                                      && premoltPrediction
-                                      && premoltPrediction.is_premolt_likely
-                                      && premoltPrediction.data_quality !== 'insufficient' ? (
+                                    {showsPremoltBadge(premoltPrediction) ? (
                                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">
-                                        🦋 Premolt
+                                        Premolt
                                       </span>
                                     ) : (
                                       <span className="text-theme-tertiary text-sm">—</span>
@@ -744,9 +741,9 @@ export default function TarantulasPage() {
                               {/* Status badges */}
                               <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
                                 <div className="flex justify-between items-start">
-                                  {/* Premolt badge (left) — tarantula only */}
+                                  {/* Premolt badge (left) — any taxon with an alert */}
                                   <div>
-                                    {animal.taxon === 'tarantula' ? getPremoltBadge(animal.id) : null}
+                                    {getPremoltBadge(animal.id)}
                                   </div>
 
                                   {/* Right badge: feeding status for every taxon

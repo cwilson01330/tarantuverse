@@ -937,11 +937,16 @@ export default function InvertDetailPage() {
               <p role="alert" className="-mt-4 mb-6 text-sm text-red-600 dark:text-red-400">{pauseError}</p>
             )}
 
-            {/* Premolt prediction — tarantula only (registry-gated). The card
+            {/* Premolt prediction — every taxon with the premolt module (registry-gated). The card
                 fetches its own data from the canonical premolt endpoint. */}
             {taxonHasModule(invert.taxon, 'premolt') && !invert.died_at && (
               <div className="mb-6">
-                <PremoltPredictionSection key={premoltKey} tarantulaId={invert.id} />
+                <PremoltPredictionSection
+                  key={premoltKey}
+                  invertId={invert.id}
+                  canAnswer={canKeep && !invert.transferred_out_at}
+                  onAnswered={() => refreshSlices(['invert', 'stats'])}
+                />
               </div>
             )}
 

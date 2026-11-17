@@ -1,61 +1,74 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { apiClient } from '../services/api';
-
-interface PremoltPrediction {
-  tarantula_id: string;
-  tarantula_name: string;
-  is_premolt_likely: boolean;
-  confidence: 'high' | 'medium' | 'low' | 'none';
-  days_since_last_molt: number | null;
-  average_molt_interval: number | null;
-  molt_interval_progress: number | null;
-  recent_refusal_streak: number;
-  refusal_rate_last_30_days: number | null;
-  estimated_molt_window_days: number | null;
-  data_quality: 'good' | 'fair' | 'insufficient';
-  last_molt_date: string | null;
-  last_feeding_date: string | null;
-  /** Maturity (ult_20260911). Elapsed only — the API deliberately returns no
-   *  time-remaining figure, because species.lifespan_male is populated on 3 of
-   *  197 rows and a countdown would be invented for almost every animal. */
-  has_matured?: boolean;
-  matured_at?: string | null;
-  days_since_matured?: number | null;
-}
+import {
+  PREMOLT_COPY,
+  answerPremolt,
+  premoltAnswerable,
+  premoltCardState,
+  type PremoltAnswer,
+  type PremoltPrediction,
+} from '../lib/premolt-view';
+import { ON_PRIMARY } from '../utils/status-colors';
+import { TYPE } from '../theme/tokens';
+import { showReminderToast } from './ReminderToast';
 
 interface Props {
-  tarantulaId: string;
+  invertId: string;
+  /** Keepers of an open (not died / transferred) animal can answer. */
+  canAnswer: boolean;
+  /** Called after an answer was saved, so the parent can refresh what it shows. */
+  onAnswered?: () => void;
 }
 
-export default function PremoltPredictionCard({ tarantulaId }: Props) {
+export default function PremoltPredictionCard({ invertId, canAnswer, onAnswered }: Props) {
   const { colors } = useTheme();
   const [prediction, setPrediction] = useState<PremoltPrediction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState<PremoltAnswer | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     const fetchPrediction = async () => {
       try {
-        const response = await apiClient.get(
-          `/premolt/tarantulas/${tarantulaId}/prediction`
-        );
+        const response = await apiClient.get(`/premolt/inverts/${invertId}`);
         if (!cancelled) setPrediction(response.data);
-      } catch (error) {
-        console.error('Failed to fetch premolt prediction:', error);
+      } catch (err) {
+        console.error('Failed to fetch premolt prediction:', err);
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     fetchPrediction();
     return () => { cancelled = true; };
-  }, [tarantulaId]);
+  }, [invertId]);
+
+  const answer = async (choice: PremoltAnswer) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPosting(choice);
+    setError(null);
+    try {
+      const fresh = await answerPremolt(invertId, choice);
+      setPrediction(fresh);
+      if (choice === 'not_yet') showReminderToast(PREMOLT_COPY.snoozedToast);
+      onAnswered?.();
+    } catch (e: any) {
+      setError(e?.message || 'Could not save your answer. Please try again.');
+    } finally {
+      inFlight.current = false;
+      setPosting(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -70,20 +83,15 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     );
   }
 
-  if (!prediction) {
+  const state = premoltCardState(prediction);
+  if (!prediction || state === 'hidden') {
     return null;
   }
 
   // Matured (ult_20260911). Checked BEFORE data quality, because maturity is
-  // a fact about the animal while data quality is a fact about the logs — a
-  // matured male with thin records is still matured, and "need more data to
-  // predict molts" would be the wrong thing to say about an animal that has
-  // none left.
-  //
-  // Deliberately states elapsed time only. No countdown, no "expect X months":
-  // the API doesn't return one and shouldn't, and inventing one here for an
-  // animal a keeper may be about to sell or loan would be worse than silence.
-  if (prediction.has_matured) {
+  // a fact about the animal while data quality is a fact about the logs.
+  // Deliberately states elapsed time only. No countdown, no "expect X months".
+  if (state === 'matured') {
     const since = prediction.days_since_matured;
     const elapsed =
       since == null
@@ -103,7 +111,14 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
         <Text style={[styles.title, { color: colors.textPrimary }]}>Matured</Text>
         <View style={[styles.insufficientBox, { backgroundColor: 'transparent' }]}>
           <Text style={[styles.insufficientText, { color: colors.textSecondary }]}>
-            {elapsed
+            {/* has_matured = a final molt was logged. Otherwise the server
+                decided from the life stage (adults of taxa that stop molting,
+                adult male tarantulas) — don't claim a molt nobody recorded. */}
+            {!prediction.has_matured
+              ? prediction.taxon === 'tarantula'
+                ? "Mature males don't molt again, so premolt predictions stop here."
+                : "Adults of this kind don't molt again, so premolt predictions stop here."
+              : elapsed
               ? `Ultimate molt recorded ${elapsed}. No further molts expected, so premolt predictions stop here.`
               : 'Ultimate molt recorded. No further molts expected, so premolt predictions stop here.'}
           </Text>
@@ -112,8 +127,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     );
   }
 
-  // Insufficient data state
-  if (prediction.data_quality === 'insufficient') {
+  if (state === 'insufficient') {
     return (
       <View
         style={[
@@ -121,7 +135,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           { backgroundColor: colors.primary + '20', borderColor: colors.primary },
         ]}
       >
-        <Text style={[styles.title, { color: colors.primary }]}>💡 Premolt Prediction</Text>
+        <Text style={[styles.title, { color: colors.primary }]}>Premolt</Text>
         <View style={[styles.insufficientBox, { backgroundColor: colors.primary + '10' }]}>
           <Text style={[styles.insufficientText, { color: colors.textPrimary }]}>
             Need more data — log feedings and molts to enable predictions
@@ -131,74 +145,76 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     );
   }
 
-  const getBgColor = () => {
-    if (!prediction.is_premolt_likely) return '#dcfce7';
-    if (prediction.confidence === 'high') return '#fee2e2';
-    if (prediction.confidence === 'medium') return '#fef3c7';
-    return '#f3f4f6';
-  };
-
-  const getBorderColor = () => {
-    if (!prediction.is_premolt_likely) return '#bbf7d0';
-    if (prediction.confidence === 'high') return '#fecaca';
-    if (prediction.confidence === 'medium') return '#fcd34d';
-    return '#e5e7eb';
-  };
-
-  const getTextColor = () => {
-    if (!prediction.is_premolt_likely) return '#15803d';
-    if (prediction.confidence === 'high') return '#991b1b';
-    if (prediction.confidence === 'medium') return '#b45309';
-    return '#374151';
-  };
-
-  const getStatusBgColor = () => {
-    if (!prediction.is_premolt_likely) return '#dcfce7';
-    if (prediction.confidence === 'high') return '#fee2e2';
-    if (prediction.confidence === 'medium') return '#fef3c7';
-    return '#f3f4f6';
-  };
-
-  const getProgressBarColor = () => {
-    if (!prediction.is_premolt_likely) return '#22c55e';
-    if (prediction.confidence === 'high') return '#ef4444';
-    if (prediction.confidence === 'medium') return '#f59e0b';
-    return '#6b7280';
-  };
-
-  const getBadgeBgColor = () => {
-    if (prediction.confidence === 'high') return '#ef4444';
-    if (prediction.confidence === 'medium') return '#f59e0b';
-    if (prediction.confidence === 'low') return '#9ca3af';
-    return '#22c55e';
-  };
+  const isAlert = state === 'alert';
+  const isClear = state === 'clear';
+  const tint = isAlert ? colors.warning : isClear ? colors.success : colors.border;
+  const statusText =
+    state === 'paused'
+      ? PREMOLT_COPY.paused
+      : state === 'snoozed'
+      ? PREMOLT_COPY.snoozedToast
+      : isAlert
+      ? PREMOLT_COPY.headline
+      : PREMOLT_COPY.clear;
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: getBgColor(), borderColor: getBorderColor() },
+        {
+          backgroundColor: isAlert || isClear ? tint + '20' : colors.surface,
+          borderColor: tint,
+        },
       ]}
     >
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: getTextColor() }]}>🔮 Premolt Prediction</Text>
-        {prediction.confidence !== 'none' && (
-          <View style={[styles.badge, { backgroundColor: getBadgeBgColor() }]}>
-            <Text style={styles.badgeText}>{prediction.confidence}</Text>
-          </View>
-        )}
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Premolt</Text>
       </View>
 
-      {/* Status Message */}
-      <View style={[styles.statusBox, { backgroundColor: getStatusBgColor() }]}>
-        <Text style={{ fontSize: 18 }}>
-          {prediction.is_premolt_likely ? '🦋' : '✅'}
-        </Text>
-        <Text style={[styles.statusText, { color: getTextColor() }]}>
-          {prediction.is_premolt_likely ? 'Likely in premolt' : 'No premolt signs'}
-        </Text>
+      <View style={[styles.statusBox, { backgroundColor: isAlert || isClear ? tint + '20' : colors.surfaceElevated }]}>
+        <Text style={[styles.statusText, { color: colors.textPrimary }]}>{statusText}</Text>
       </View>
+
+      {isAlert && !!prediction.reason && (
+        <Text style={[styles.reasonText, { color: colors.textPrimary }]}>{prediction.reason}</Text>
+      )}
+
+      {canAnswer && premoltAnswerable(prediction) && (
+        <View style={styles.answerRow}>
+          <TouchableOpacity
+            style={[styles.answerButton, { backgroundColor: colors.primary, opacity: posting ? 0.6 : 1 }]}
+            onPress={() => answer('yes')}
+            disabled={!!posting}
+            accessibilityRole="button"
+            accessibilityLabel={PREMOLT_COPY.yes}
+          >
+            {posting === 'yes' ? (
+              <ActivityIndicator color={ON_PRIMARY} />
+            ) : (
+              <Text style={[styles.answerText, { color: ON_PRIMARY }]}>{PREMOLT_COPY.yes}</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.answerButton, { borderColor: colors.border, borderWidth: 1, opacity: posting ? 0.6 : 1 }]}
+            onPress={() => answer('not_yet')}
+            disabled={!!posting}
+            accessibilityRole="button"
+            accessibilityLabel={PREMOLT_COPY.notYet}
+          >
+            {posting === 'not_yet' ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={[styles.answerText, { color: colors.textPrimary }]}>{PREMOLT_COPY.notYet}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {error && (
+        <Text style={[styles.errorText, { color: colors.error }]} accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
 
       {/* Metrics */}
       <View style={styles.metricsContainer}>
@@ -207,13 +223,13 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
               Feeding refusals
             </Text>
-            <Text style={[styles.metricValue, { color: '#dc2626' }]}>
+            <Text style={[styles.metricValue, { color: colors.error }]}>
               {prediction.recent_refusal_streak}
             </Text>
           </View>
         )}
 
-        {prediction.days_since_last_molt !== null && (
+        {prediction.days_since_last_molt != null && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
               Days since molt
@@ -224,7 +240,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           </View>
         )}
 
-        {prediction.molt_interval_progress !== null && prediction.average_molt_interval && (
+        {prediction.molt_interval_progress != null && !!prediction.average_molt_interval && (
           <View style={[styles.progressContainer, { backgroundColor: colors.surface }]}>
             <View style={styles.progressHeader}>
               <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
@@ -240,7 +256,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
                   styles.progressFill,
                   {
                     width: `${Math.min(prediction.molt_interval_progress, 100)}%`,
-                    backgroundColor: getProgressBarColor(),
+                    backgroundColor: isAlert ? colors.warning : colors.success,
                   },
                 ]}
               />
@@ -251,7 +267,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           </View>
         )}
 
-        {prediction.refusal_rate_last_30_days !== null && (
+        {prediction.refusal_rate_last_30_days != null && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
               Refusal rate (30d)
@@ -262,7 +278,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           </View>
         )}
 
-        {prediction.estimated_molt_window_days !== null && (
+        {prediction.estimated_molt_window_days != null && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
               Estimated window
@@ -281,7 +297,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
             { color: colors.textTertiary, borderTopColor: colors.border },
           ]}
         >
-          💡 Log more feedings and molts to improve prediction accuracy
+          Log more feedings and molts to improve prediction accuracy
         </Text>
       )}
     </View>
@@ -313,15 +329,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+  reasonText: {
+    ...TYPE.body,
+    marginBottom: 12,
   },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
+  answerRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  answerButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  answerText: {
+    ...TYPE.bodyStrong,
+  },
+  errorText: {
+    ...TYPE.label,
+    marginBottom: 12,
   },
   statusBox: {
     padding: 12,

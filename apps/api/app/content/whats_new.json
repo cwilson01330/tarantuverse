@@ -1,6 +1,14 @@
 {
   "tarantuverse": [
     {
+      "id": "2026-11-30-premolt-v2",
+      "published_on": "2026-11-30",
+      "title": "Premolt alerts for more of your animals",
+      "body": "Premolt alerts now cover jumping spiders, mantids, scorpions and more. They may flag an animal that has gone much longer than usual without eating, and you can pause feeding in one tap.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    },
+    {
       "id": "2026-11-23-egg-sacs-to-sling-groups",
       "published_on": "2026-11-23",
       "title": "From egg sac to individual animals",

@@ -27,6 +27,7 @@ from app.services.activity_service import create_activity
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.utils.legacy_logs import tarantula_logs
 from app.utils.instar import adjust_instar_for_molt
+from app.utils.feeding_pause import end_premolt_pause_for_molt
 from app.utils.closed_animals import refuse_if_closed_invert, refuse_if_closed_legacy
 
 router = APIRouter()
@@ -84,6 +85,7 @@ async def create_molt_log(
     db.add(new_molt)
     db.flush()
     adjust_instar_for_molt(db, new_molt, +1)
+    end_premolt_pause_for_molt(db, new_molt)  # a molt ends premolt
     db.commit()
     db.refresh(new_molt)
     
@@ -164,6 +166,7 @@ async def create_scorpion_molt_log(
     db.add(new_molt)
     db.flush()
     adjust_instar_for_molt(db, new_molt, +1)
+    end_premolt_pause_for_molt(db, new_molt)  # a molt ends premolt
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -229,6 +232,7 @@ async def create_centipede_molt_log(
     db.add(new_molt)
     db.flush()
     adjust_instar_for_molt(db, new_molt, +1)
+    end_premolt_pause_for_molt(db, new_molt)  # a molt ends premolt
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -289,6 +293,7 @@ async def create_whip_spider_molt_log(
     db.add(new_molt)
     db.flush()
     adjust_instar_for_molt(db, new_molt, +1)
+    end_premolt_pause_for_molt(db, new_molt)  # a molt ends premolt
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -334,6 +339,7 @@ async def create_invert_molt_log(
     db.add(new_molt)
     db.flush()
     adjust_instar_for_molt(db, new_molt, +1)
+    end_premolt_pause_for_molt(db, new_molt)  # a molt ends premolt
     db.commit()
     db.refresh(new_molt)
     return new_molt

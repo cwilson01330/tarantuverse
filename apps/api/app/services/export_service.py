@@ -53,6 +53,9 @@ from app.models.feeder_care_log import FeederCareLog
 # Expense tracking (2026-10-22). The keeper's own money records: exported to
 # them and nowhere else (privacy: tests/test_expense_privacy.py).
 from app.models.expense import Expense, ExpenseShare
+# Premolt episodes (premolt v2, 2026-11-17): when the app flagged an animal as
+# maybe in premolt, how it ended, and the keeper's answer. Owner-only data.
+from app.models.premolt_episode import PremoltEpisode
 from app.utils.units import EXPORT_UNITS
 
 
@@ -322,6 +325,14 @@ EXPENSE_SHARE_FIELDS = [
     "id", "expense_id", "invert_id", "colony_id", "animal_id", "amount", "position",
 ]
 
+# Premolt episodes. `signals` is a JSON object (the prediction's numbers when
+# the episode opened): nested in JSON, JSON text in the CSVs.
+PREMOLT_EPISODE_FIELDS = [
+    "id", "invert_id", "user_id", "opened_on", "closed_on", "close_reason",
+    "branch", "signals", "rule_version", "keeper_answer", "answer_source",
+    "answered_at", "answered_by", "created_at",
+]
+
 
 # ---------------------------------------------------------------------------
 # Query helpers
@@ -568,6 +579,25 @@ def _expense_rows(expenses: List[Expense], shares: List[ExpenseShare]) -> List[D
     return rows
 
 
+def _get_premolt_episodes(db: Session, user_id: UUID) -> List[PremoltEpisode]:
+    """The keeper's own premolt episodes (`user_id` is always the collection
+    owner, so a co-keeper's export never carries the owner's)."""
+    return (
+        db.query(PremoltEpisode)
+        .filter(PremoltEpisode.user_id == user_id)
+        .order_by(PremoltEpisode.opened_on, PremoltEpisode.created_at)
+        .all()
+    )
+
+
+def _premolt_episode_csv_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """`signals` as JSON text, not a Python dict repr."""
+    return [
+        {**r, "signals": json.dumps(r["signals"], sort_keys=True) if r.get("signals") is not None else None}
+        for r in rows
+    ]
+
+
 def _feeder_colony_dict(colony: FeederColony) -> Dict[str, Any]:
     row = _row_to_dict(colony, [f for f in FEEDER_COLONY_FIELDS if f != "species_scientific_name"])
     species = colony.feeder_species
@@ -650,6 +680,10 @@ class ExportService:
             # --- Expense tracking (2026-10-22): nested shares + the flat list ---
             "expenses": expenses,
             "expense_shares": [_row_to_dict(sh, EXPENSE_SHARE_FIELDS) for sh in expense_shares],
+            # --- Premolt episodes (premolt v2) ---
+            "premolt_episodes": [
+                _row_to_dict(ep, PREMOLT_EPISODE_FIELDS) for ep in _get_premolt_episodes(db, user.id)
+            ],
         }
 
     # ---- JSON export ----------------------------------------------------
@@ -711,6 +745,9 @@ class ExportService:
             # Expense tracking: every expense (both apps) with its shares nested.
             # .get(): callers that build `data` by hand may predate expenses.
             "expenses": data.get("expenses") or [],
+            # Premolt episodes: when an animal was flagged as maybe in
+            # premolt, how it ended, and your answer. .get() as above.
+            "premolt_episodes": data.get("premolt_episodes") or [],
             "counts": {
                 "inverts": len(data["inverts"]),
                 "tarantulas": len(data["tarantulas"]),
@@ -740,6 +777,7 @@ class ExportService:
                 "care_logs": len(data["care_logs"]),
                 "expenses": len(data.get("expenses") or []),
                 "expense_shares": len(data.get("expense_shares") or []),
+                "premolt_episodes": len(data.get("premolt_episodes") or []),
             },
         }
 
@@ -806,6 +844,11 @@ class ExportService:
             # on each row). Written even when empty, like pairings.csv.
             zf.writestr("expenses.csv", ExportService._to_csv_bytes(data.get("expenses") or [], EXPENSE_FIELDS))
             zf.writestr("expense_shares.csv", ExportService._to_csv_bytes(data.get("expense_shares") or [], EXPENSE_SHARE_FIELDS))
+
+            # Premolt episodes, written even when empty like expenses.csv.
+            zf.writestr("premolt_episodes.csv", ExportService._to_csv_bytes(
+                _premolt_episode_csv_rows(data.get("premolt_episodes") or []), PREMOLT_EPISODE_FIELDS,
+            ))
 
             # Colony mode CSVs — only when the keeper has colonies.
             if data["colonies"]:
@@ -1058,6 +1101,14 @@ async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None, 
                 zf.writestr("expenses.json", json.dumps(expenses, indent=2, default=str))
                 zf.writestr("expenses.csv", ExportService._to_csv_bytes(expenses, EXPENSE_FIELDS))
                 zf.writestr("expense_shares.csv", ExportService._to_csv_bytes(data.get("expense_shares") or [], EXPENSE_SHARE_FIELDS))
+
+            # Premolt episodes — only when the keeper has any.
+            premolt_episodes = data.get("premolt_episodes") or []
+            if premolt_episodes:
+                zf.writestr("premolt_episodes.json", json.dumps(premolt_episodes, indent=2, default=str))
+                zf.writestr("premolt_episodes.csv", ExportService._to_csv_bytes(
+                    _premolt_episode_csv_rows(premolt_episodes), PREMOLT_EPISODE_FIELDS,
+                ))
             breeding = {
                 "pairings": data["pairings"],
                 "egg_sacs": data["egg_sacs"],
@@ -1113,6 +1164,7 @@ Files included:
   feeder_care_logs.csv  – Feeder colony care / restock records (if any)
   expenses.csv          – Expenses you recorded, both apps (amounts in your own currency)
   expense_shares.csv    – How each expense was divided (expense_id links to expenses.csv)
+  premolt_episodes.csv  – Each time an animal was flagged as maybe in premolt, how it ended, and your answer
   profile.json          – Your profile information
 
 Units: every number is in the units it is stored in, whatever your
@@ -1150,6 +1202,8 @@ Structure:
   expenses.json               – Expenses (both apps), each with its shares (if any)
   expenses.csv                – Expenses in spreadsheet format (if any)
   expense_shares.csv          – How each expense was divided (if any)
+  premolt_episodes.json       – Premolt alerts: how each ended, and your answer (if any)
+  premolt_episodes.csv        – The same in spreadsheet format (if any)
   all_animals.csv             – Every animal, every taxon, in one sheet
   all_feeding_logs.csv        – Feeding logs in spreadsheet format
   all_molt_logs.csv           – Molt logs in spreadsheet format

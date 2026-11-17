@@ -132,6 +132,8 @@ class Invert(Base):
     feeding_paused_until = Column(Date)
     # "Tomorrow" button on a feeding reminder: no reminder until this local date.
     reminder_snoozed_until = Column(Date, nullable=True)
+    # "Not yet" on the premolt card: no premolt alert until this local date.
+    premolt_snoozed_until = Column(Date, nullable=True)
 
     # ADR-017 — the keeper's own cadence, in days. NULL means "derive it from
     # the care sheet / life stage" (the default for everyone). When set it

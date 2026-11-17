@@ -1,49 +1,45 @@
 'use client'
 
 import { useAuth } from '@/hooks/useAuth'
-import { useEffect, useState } from 'react'
-
-interface PremoltPrediction {
-  tarantula_id: string
-  tarantula_name: string
-  is_premolt_likely: boolean
-  confidence: 'high' | 'medium' | 'low' | 'none'
-  days_since_last_molt: number | null
-  average_molt_interval: number | null
-  molt_interval_progress: number | null
-  recent_refusal_streak: number
-  refusal_rate_last_30_days: number | null
-  estimated_molt_window_days: number | null
-  data_quality: 'good' | 'fair' | 'insufficient'
-  last_molt_date: string | null
-  last_feeding_date: string | null
-  /** Maturity (ult_20260911). Elapsed only — the API deliberately returns no
-   *  time-remaining figure, because species.lifespan_male is populated on 3 of
-   *  197 rows and a countdown would be invented for almost every animal. */
-  has_matured?: boolean
-  matured_at?: string | null
-  days_since_matured?: number | null
-}
+import { useEffect, useRef, useState } from 'react'
+import {
+  PREMOLT_COPY,
+  answerPremolt,
+  premoltAnswerable,
+  premoltCardState,
+  type PremoltAnswer,
+  type PremoltPrediction,
+} from '@/lib/premoltView'
 
 interface Props {
-  tarantulaId: string
+  invertId: string
+  /** Keeper-or-owner on an open animal: shows the Yes / Not yet buttons. */
+  canAnswer?: boolean
+  /** Called after a "Yes" or "Not yet" is saved, so the page can refresh pause state. */
+  onAnswered?: () => void | Promise<void>
 }
 
-export default function PremoltPredictionSection({ tarantulaId }: Props) {
+export default function PremoltPredictionSection({ invertId, canAnswer = false, onAnswered }: Props) {
   const { token } = useAuth()
   const [prediction, setPrediction] = useState<PremoltPrediction | null>(null)
   const [loading, setLoading] = useState(true)
+  // Which answer is being saved; both buttons are disabled meanwhile, but only
+  // the pressed one says "Saving...".
+  const [pending, setPending] = useState<PremoltAnswer | null>(null)
+  const inFlight = useRef(false)
+  const [answerError, setAnswerError] = useState<string | null>(null)
+  const [hiddenNote, setHiddenNote] = useState<string | null>(null)
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
     fetchPrediction()
-  }, [tarantulaId, token])
+  }, [invertId, token])
 
   const fetchPrediction = async () => {
     if (!token) return
     try {
-      const response = await fetch(`${API_URL}/api/v1/premolt/tarantulas/${tarantulaId}/prediction`, {
+      const response = await fetch(`${API_URL}/api/v1/premolt/inverts/${invertId}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
       if (response.ok) {
@@ -54,6 +50,24 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
       console.error('Failed to fetch premolt prediction:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const answer = async (choice: PremoltAnswer) => {
+    if (!token || inFlight.current) return
+    inFlight.current = true
+    setPending(choice)
+    setAnswerError(null)
+    try {
+      const fresh = await answerPremolt(token, invertId, choice)
+      setPrediction(fresh)
+      if (choice === 'not_yet') setHiddenNote(PREMOLT_COPY.snoozedToast)
+      await onAnswered?.()
+    } catch (e) {
+      setAnswerError(e instanceof Error ? e.message : 'Could not save your answer. Please try again.')
+    } finally {
+      inFlight.current = false
+      setPending(null)
     }
   }
 
@@ -73,6 +87,9 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
     return null
   }
 
+  const state = premoltCardState(prediction)
+  if (state === 'hidden') return null
+
   // Matured (ult_20260911). Checked BEFORE data quality, because maturity is a
   // fact about the animal while data quality is a fact about the logs — a
   // matured male with thin records is still matured, and "log more feedings to
@@ -81,7 +98,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
   // Elapsed only. No countdown, no "expect X months": the API returns no such
   // figure and shouldn't, and inventing one for an animal a keeper may be
   // about to sell or loan would be worse than saying nothing.
-  if (prediction.has_matured) {
+  if (state === 'matured') {
     const since = prediction.days_since_matured
     const elapsed =
       since == null
@@ -95,7 +112,14 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
       <div className="bg-gray-50 dark:bg-gray-900/20 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Matured</h2>
         <p className="text-gray-700 dark:text-gray-300">
-          {elapsed
+          {/* has_matured = a final molt was logged. Otherwise the server
+              decided from the life stage (adults of taxa that stop molting,
+              adult male tarantulas) — don't claim a molt nobody recorded. */}
+          {!prediction.has_matured
+            ? prediction.taxon === 'tarantula'
+              ? "Mature males don't molt again, so premolt predictions stop here."
+              : "Adults of this kind don't molt again, so premolt predictions stop here."
+            : elapsed
             ? `Ultimate molt recorded ${elapsed}. No further molts expected, so premolt predictions stop here.`
             : 'Ultimate molt recorded. No further molts expected, so premolt predictions stop here.'}
         </p>
@@ -104,11 +128,11 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
   }
 
   // Insufficient data state
-  if (prediction.data_quality === 'insufficient') {
+  if (state === 'insufficient') {
     return (
       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl shadow-sm border border-blue-200 dark:border-blue-800 p-6">
         <h2 className="text-2xl font-bold text-blue-900 dark:text-blue-100 mb-4 flex items-center gap-2">
-          💡 Premolt Prediction
+          Premolt Prediction
         </h2>
         <p className="text-blue-800 dark:text-blue-200">
           Need more data — log feedings and molts to enable predictions
@@ -117,60 +141,86 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
     )
   }
 
-  const getBgColor = () => {
-    if (!prediction.is_premolt_likely) return 'bg-green-50 dark:bg-green-900/20'
-    if (prediction.confidence === 'high') return 'bg-red-50 dark:bg-red-900/20'
-    if (prediction.confidence === 'medium') return 'bg-amber-50 dark:bg-amber-900/20'
-    return 'bg-gray-50 dark:bg-gray-900/20'
-  }
+  const alert = state === 'alert'
+  const paused = state === 'paused'
+  const snoozed = state === 'snoozed'
+  const attention = alert || paused
 
-  const getBorderColor = () => {
-    if (!prediction.is_premolt_likely) return 'border-green-200 dark:border-green-800'
-    if (prediction.confidence === 'high') return 'border-red-200 dark:border-red-800'
-    if (prediction.confidence === 'medium') return 'border-amber-200 dark:border-amber-800'
-    return 'border-gray-200 dark:border-gray-700'
-  }
-
-  const getStatusColor = () => {
-    if (!prediction.is_premolt_likely) return 'text-green-900 dark:text-green-100'
-    if (prediction.confidence === 'high') return 'text-red-900 dark:text-red-100'
-    if (prediction.confidence === 'medium') return 'text-amber-900 dark:text-amber-100'
-    return 'text-gray-900 dark:text-gray-100'
-  }
-
-  const getIndicatorColor = () => {
-    if (!prediction.is_premolt_likely) return 'bg-green-100 dark:bg-green-900/30'
-    if (prediction.confidence === 'high') return 'bg-red-100 dark:bg-red-900/30'
-    if (prediction.confidence === 'medium') return 'bg-amber-100 dark:bg-amber-900/30'
-    return 'bg-gray-100 dark:bg-gray-900/30'
-  }
-
-  const getConfidenceBadgeColor = () => {
-    if (prediction.confidence === 'high') return 'bg-red-500'
-    if (prediction.confidence === 'medium') return 'bg-amber-500'
-    if (prediction.confidence === 'low') return 'bg-gray-400'
-    return 'bg-green-500'
-  }
+  const box = attention
+    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+    : snoozed
+    ? 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700'
+    : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+  const titleColor = attention
+    ? 'text-amber-900 dark:text-amber-100'
+    : snoozed
+    ? 'text-gray-900 dark:text-gray-100'
+    : 'text-green-900 dark:text-green-100'
+  const indicator = attention
+    ? 'bg-amber-100 dark:bg-amber-900/30'
+    : snoozed
+    ? 'bg-gray-100 dark:bg-gray-900/30'
+    : 'bg-green-100 dark:bg-green-900/30'
+  const statusLine = alert
+    ? PREMOLT_COPY.headline
+    : paused
+    ? PREMOLT_COPY.paused
+    : snoozed
+    ? PREMOLT_COPY.snoozedToast
+    : PREMOLT_COPY.clear
+  const likely = !!prediction.is_premolt_likely
 
   return (
-    <div className={`rounded-2xl shadow-sm border p-6 ${getBgColor()} ${getBorderColor()}`}>
+    <div className={`rounded-2xl shadow-sm border p-6 ${box}`}>
       <div className="flex items-start justify-between mb-4">
-        <h2 className={`text-2xl font-bold flex items-center gap-2 ${getStatusColor()}`}>
-          🔮 Premolt Prediction
+        <h2 className={`text-2xl font-bold flex items-center gap-2 ${titleColor}`}>
+          Premolt
         </h2>
-        {prediction.confidence !== 'none' && (
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getConfidenceBadgeColor()}`}>
+        {alert && prediction.confidence !== 'none' && (
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${
+            prediction.confidence === 'high' ? 'bg-red-600' : prediction.confidence === 'medium' ? 'bg-amber-600' : 'bg-gray-600'
+          }`}>
             {prediction.confidence}
           </span>
         )}
       </div>
 
       {/* Status Message */}
-      <div className={`mb-4 p-3 rounded-xl ${getIndicatorColor()}`}>
-        <p className="font-semibold text-gray-900 dark:text-white">
-          {prediction.is_premolt_likely ? '🦋 Likely in premolt' : '✅ No premolt signs'}
-        </p>
+      <div className={`mb-4 p-3 rounded-xl ${indicator}`}>
+        <p className="font-semibold text-gray-900 dark:text-white">{statusLine}</p>
+        {alert && prediction.reason && (
+          <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">{prediction.reason}</p>
+        )}
       </div>
+
+      {canAnswer && premoltAnswerable(prediction) && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => answer('yes')}
+            disabled={pending !== null}
+            className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-60 transition"
+          >
+            {pending === 'yes' ? 'Saving...' : PREMOLT_COPY.yes}
+          </button>
+          <button
+            type="button"
+            onClick={() => answer('not_yet')}
+            disabled={pending !== null}
+            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-60 transition"
+          >
+            {pending === 'not_yet' ? 'Saving...' : PREMOLT_COPY.notYet}
+          </button>
+        </div>
+      )}
+      {answerError && (
+        <p role="alert" className="mb-4 text-sm text-red-600 dark:text-red-400">{answerError}</p>
+      )}
+      {/* Announces the hide to screen readers; the status line above already
+          shows "Hidden for 2 weeks", so it isn't shown twice. */}
+      {hiddenNote && snoozed && (
+        <p role="status" className="sr-only">{hiddenNote}</p>
+      )}
 
       {/* Key Metrics */}
       <div className="space-y-3">
@@ -183,7 +233,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
         )}
 
         {/* Days Since Last Molt */}
-        {prediction.days_since_last_molt !== null && (
+        {prediction.days_since_last_molt != null && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Days since last molt</span>
             <span className="text-lg font-bold text-gray-900 dark:text-white">{prediction.days_since_last_molt}</span>
@@ -191,7 +241,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
         )}
 
         {/* Molt Interval Progress */}
-        {prediction.molt_interval_progress !== null && prediction.average_molt_interval && (
+        {prediction.molt_interval_progress != null && prediction.average_molt_interval && (
           <div className="p-3 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Molt interval progress</span>
@@ -202,7 +252,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
             <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-2">
               <div
                 className={`h-2 rounded-full transition-all ${
-                  prediction.is_premolt_likely ? 'bg-red-500' :
+                  likely ? 'bg-red-500' :
                   prediction.confidence === 'medium' ? 'bg-amber-500' :
                   'bg-green-500'
                 }`}
@@ -216,7 +266,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
         )}
 
         {/* Refusal Rate */}
-        {prediction.refusal_rate_last_30_days !== null && (
+        {prediction.refusal_rate_last_30_days != null && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Refusal rate (30d)</span>
             <span className="text-lg font-bold text-gray-900 dark:text-white">
@@ -226,7 +276,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
         )}
 
         {/* Estimated Molt Window */}
-        {prediction.estimated_molt_window_days !== null && (
+        {prediction.estimated_molt_window_days != null && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estimated molt window</span>
             <span className="text-lg font-bold text-gray-900 dark:text-white">
@@ -239,7 +289,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
       {/* Data Quality Note */}
       {prediction.data_quality === 'fair' && (
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-4 pt-4 border-t border-gray-300 dark:border-gray-700">
-          💡 Log more feedings and molts to improve prediction accuracy
+          Log more feedings and molts to improve prediction accuracy
         </p>
       )}
     </div>

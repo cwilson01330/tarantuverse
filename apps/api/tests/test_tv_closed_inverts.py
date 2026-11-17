@@ -40,6 +40,7 @@ from app.routers import feedings as fr
 from app.routers import inverts as iv
 from app.routers import molts as ml
 from app.routers import photos as ph
+from app.routers import premolt as pm
 from app.routers import qr
 from app.routers import substrate_changes as sc
 from app.routers import transfers as tr
@@ -487,6 +488,7 @@ REFUSING = [
     ph.upload_whip_spider_photo, ph.upload_invert_photo,
     qr.create_upload_session, qr.create_invert_upload_session, qr.create_scorpion_upload_session,
     qr.create_centipede_upload_session, qr.upload_photo_via_token,
+    pm.answer_invert_premolt,
 ]
 OPEN = [
     fr.update_feeding_log, fr.delete_feeding_log, ml.update_molt_log, ml.delete_molt_log,

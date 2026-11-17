@@ -312,7 +312,11 @@ def _premolt_likely(db: Session, inv: Invert) -> bool:
     savepoint = db.begin_nested()
     try:
         from app.services.premolt_service import predict_premolt
-        likely = bool(predict_premolt(db, inv.id).get("is_premolt_likely"))
+        p = predict_premolt(db, inv.id)
+        # The original three branches only: the sitter card's "Don't feed —
+        # showing signs of premolt" predates premolt v2's fasting branch, and
+        # a sitter shouldn't withhold food on "hasn't eaten in a while" alone.
+        likely = bool(p.get("is_premolt_likely")) and p.get("branch") != "fasting"
         savepoint.commit()
         return likely
     except Exception:

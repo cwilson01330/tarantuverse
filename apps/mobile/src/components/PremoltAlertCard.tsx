@@ -11,25 +11,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
 import { apiClient } from '../services/api';
-
-interface PremoltPrediction {
-  tarantula_id: string;
-  tarantula_name: string;
-  is_premolt_likely: boolean;
-  confidence: 'high' | 'medium' | 'low' | 'none';
-  days_since_last_molt: number | null;
-  average_molt_interval: number | null;
-  molt_interval_progress: number | null;
-  recent_refusal_streak: number;
-  refusal_rate_last_30_days: number | null;
-  estimated_molt_window_days: number | null;
-  data_quality: 'good' | 'fair' | 'insufficient';
-  last_molt_date: string | null;
-  last_feeding_date: string | null;
-}
+import { alertCount, type PremoltPrediction } from '../lib/premolt-view';
+import { ON_PRIMARY } from '../utils/status-colors';
 
 interface DashboardResponse {
   total_tarantulas: number;
+  total_animals?: number;
   premolt_likely_count: number;
   predictions: PremoltPrediction[];
 }
@@ -80,9 +67,6 @@ export default function PremoltAlertCard() {
       gap: 12,
       flex: 1,
     },
-    emoji: {
-      fontSize: 24,
-    },
     titleText: {
       fontSize: 14,
       fontWeight: '700',
@@ -120,7 +104,7 @@ export default function PremoltAlertCard() {
       marginLeft: 8,
     },
     badgeText: {
-      color: '#fff',
+      color: ON_PRIMARY,
       fontSize: 10,
       fontWeight: '600',
     },
@@ -144,31 +128,32 @@ export default function PremoltAlertCard() {
     );
   }
 
-  if (!data || data.total_tarantulas === 0) {
+  if (!data || (data.total_animals ?? data.total_tarantulas) === 0) {
     return null;
   }
 
-  const likelyPredictions = data.predictions.filter(p => p.is_premolt_likely);
+  const likelyPredictions = data.predictions.filter(
+    (p) => alertCount([p]) === 1,
+  );
 
   // All clear state
-  if (likelyPredictions.length === 0) {
+  if (alertCount(data.predictions) === 0) {
     return (
       <View
         style={[
           styles.container,
           {
-            backgroundColor: '#dcfce7',
-            borderColor: '#bbf7d0',
+            backgroundColor: colors.success + '20',
+            borderColor: colors.success,
           },
         ]}
       >
         <View style={styles.header}>
           <View style={styles.titleContainer}>
-            <Text style={styles.emoji}>✅</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.titleText, { color: '#15803d' }]}>All Clear</Text>
-              <Text style={[styles.alertText, { color: '#166534' }]}>
-                No tarantulas showing premolt signs
+              <Text style={[styles.titleText, { color: colors.textPrimary }]}>All clear</Text>
+              <Text style={[styles.alertText, { color: colors.textSecondary }]}>
+                No animals showing premolt signs
               </Text>
             </View>
           </View>
@@ -178,10 +163,10 @@ export default function PremoltAlertCard() {
   }
 
   // Alert state with premolt tarantulas
-  const bgColor = '#fef3c7';
-  const borderColor = '#fcd34d';
-  const textColor = '#b45309';
-  const lightTextColor = '#a16207';
+  const bgColor = colors.warning + '20';
+  const borderColor = colors.warning;
+  const textColor = colors.textPrimary;
+  const lightTextColor = colors.textSecondary;
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor, borderColor }]}>
@@ -191,11 +176,10 @@ export default function PremoltAlertCard() {
         activeOpacity={0.7}
       >
         <View style={styles.titleContainer}>
-          <Text style={styles.emoji}>🕷️</Text>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.titleText, { color: textColor }]}>Premolt Alerts</Text>
+            <Text style={[styles.titleText, { color: textColor }]}>Premolt alerts</Text>
             <Text style={[styles.alertText, { color: lightTextColor }]}>
-              {likelyPredictions.length} tarantula{likelyPredictions.length !== 1 ? 's' : ''} may be in premolt
+              {likelyPredictions.length} animal{likelyPredictions.length !== 1 ? 's' : ''} may be in premolt
             </Text>
           </View>
         </View>
@@ -211,18 +195,18 @@ export default function PremoltAlertCard() {
       {expanded && (
         <FlatList
           data={likelyPredictions}
-          keyExtractor={item => item.tarantula_id}
+          keyExtractor={item => item.invert_id ?? item.tarantula_id}
           scrollEnabled={false}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[
                 styles.listItem,
                 {
-                  backgroundColor: '#ffffff',
-                  borderColor: '#fde047',
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
                 },
               ]}
-              onPress={() => router.push(`/tarantula/${item.tarantula_id}`)}
+              onPress={() => router.push(`/invert/${item.invert_id ?? item.tarantula_id}`)}
               activeOpacity={0.7}
             >
               <View style={styles.itemContent}>
@@ -230,10 +214,11 @@ export default function PremoltAlertCard() {
                   {item.tarantula_name}
                 </Text>
                 <Text style={[styles.itemDetails, { color: colors.textSecondary }]}>
-                  {item.recent_refusal_streak > 0
-                    ? `${item.recent_refusal_streak} feeding refusals`
-                    : 'Multiple indicators'}
-                  {item.days_since_last_molt !== null && ` · ${item.days_since_last_molt} days`}
+                  {item.reason
+                    ? item.reason
+                    : `${item.recent_refusal_streak > 0
+                        ? `${item.recent_refusal_streak} feeding refusals`
+                        : 'Multiple indicators'}${item.days_since_last_molt !== null ? ` · ${item.days_since_last_molt} days` : ''}`}
                 </Text>
               </View>
               <View
@@ -242,10 +227,10 @@ export default function PremoltAlertCard() {
                   {
                     backgroundColor:
                       item.confidence === 'high'
-                        ? '#ef4444'
+                        ? colors.error
                         : item.confidence === 'medium'
-                        ? '#f97316'
-                        : '#6b7280',
+                        ? colors.warning
+                        : colors.textTertiary,
                   },
                 ]}
               >

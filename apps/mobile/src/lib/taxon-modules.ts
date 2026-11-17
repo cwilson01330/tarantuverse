@@ -10,8 +10,11 @@
  *
  * Enabled per taxon below — the old claim that "only tarantula has modules
  * enabled" outlived the table it describes:
- *   - premolt:      tuned for tarantula feeding-refusal + molt-interval signal;
- *                   not validated for other taxa (see ADR-008).
+ *   - premolt:      premolt v2 (2026-11): enabled for every predator taxon.
+ *                   The server decides per animal (fasting vs the animal's
+ *                   own usual meal gap, refusals, molt interval) and skips
+ *                   grazers and matured animals; pinned to
+ *                   premolt_service.PREMOLT_TAXA in test_taxon_lists_in_sync.py.
  *   - feedingStats: backed by /inverts/{id}/feeding-stats, which is
  *                   taxon-agnostic. (This comment used to say the module was
  *                   blocked on "a generic invert feeding-stats endpoint" —
@@ -38,25 +41,25 @@ export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding' |
 
 export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   tarantula: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
-  scorpion: ['feedingStats', 'growth', 'breeding', 'eggSacs'], // breeding pilot — ADR-021 Phase D (web + mobile)
+  scorpion: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'], // breeding pilot — ADR-021 Phase D (web + mobile)
   // Centipede breeding enabled 2026-10-06 (consistency audit C): the female
   // broods a clutch of eggs (no egg sac), which is exactly what the 'Clutch' /
   // 'plings' entry in BREEDING_VOCABULARY below says. The word 'plings' still
   // wants a keeper's second opinion.
-  centipede: ['feedingStats', 'growth', 'breeding'],
+  centipede: ['premolt', 'feedingStats', 'growth', 'breeding'],
   // Growth enabled 2026-10-06 (consistency audit C): both molt through visible
   // instars and keepers measure them; /inverts/{id}/growth is taxon-agnostic
   // and growthLengthLabel() already labels whip spiders 'Leg span' and
   // vinegaroons 'Body length'. Breeding left off for now: a vinegaroon
   // breeding module has no keeper demand on record.
-  whip_spider: ['feedingStats', 'growth'],
-  vinegaroon: ['feedingStats', 'growth'],
+  whip_spider: ['premolt', 'feedingStats', 'growth'],
+  vinegaroon: ['premolt', 'feedingStats', 'growth'],
   // Jumping spiders are the demand here — one keeper has 24 of them, 9 males
   // and 10 females. They lay an egg sac like a tarantula, so the whole
   // pairing → sac → offspring chain is biologically the same shape.
   // Growth (2026-10-07): keepers measure huntsmen, wolf spiders and big
   // jumpers after a molt; the chart only appears once a molt has a size.
-  true_spider: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
+  true_spider: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Detritivore: no live-prey cadence. Growth is opt-in (2026-10-07): most
   // millipedes molt underground and are never measured, but some keepers of
   // giants do; the chart shows only once a molt carries a measurement
@@ -66,7 +69,7 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   // the ootheca → nymphs vocabulary below is correct and now actually read by
   // the hubs, so a mantis breeder is no longer offered a spider's "egg sac".
   // Demand is real — the first premium subscriber keeps 15 mantids.
-  mantis: ['feedingStats', 'growth', 'breeding', 'eggSacs'],
+  mantis: ['premolt', 'feedingStats', 'growth', 'breeding', 'eggSacs'],
   // Omnivore grazer, and kept as a colony far more often than individually —
   // colonies are a separate table with their own screen (ADR-010), so an
   // individual roach genuinely has nothing here. Not an oversight.
@@ -80,7 +83,7 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   // odd arachnids). Both cards appear only with data, and with no species
   // there is no cadence to invent: a countdown needs the keeper's own
   // schedule. Enabled 2026-10-07 (every taxon first-class).
-  other: ['feedingStats', 'growth'],
+  other: ['premolt', 'feedingStats', 'growth'],
 };
 
 /** Whether a taxon opts into a given feature module. */
@@ -107,7 +110,7 @@ export function showGrowthChart(
 
 /** "today" / "yesterday" / "12 days ago" for the most recent molt, by calendar
  *  day in the viewer's timezone. A fact, not a prediction, so every taxon
- *  that logs molts gets it (premolt prediction stays tarantula-only). */
+ *  that logs molts gets it (premolt is a separate, rule-based module). */
 export function lastMoltAgo(molts: { molted_at: string }[]): string | null {
   if (!molts.length) return null;
   const latest = molts.reduce((a, b) => (new Date(b.molted_at) > new Date(a.molted_at) ? b : a));

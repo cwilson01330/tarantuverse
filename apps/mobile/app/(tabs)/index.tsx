@@ -35,6 +35,7 @@ import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
 import InsightsCard from '../../src/components/analytics/InsightsCard';
 import type { CollectionAnalytics } from '../../src/lib/analytics-view';
 import { setCollectionAnimalCount } from '../../src/lib/collection-summary';
+import { alertCount, type PremoltPrediction } from '../../src/lib/premolt-view';
 import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
 import { FirstFeedingCard } from '../../src/components/FirstFeedingCard';
 import { NotificationAskSheet, useNotificationAsk } from '../../src/components/NotificationAskSheet';
@@ -94,15 +95,6 @@ interface FeedingStatusItem {
 // screen — they would disagree (e.g. dashboard "2 alerts" while
 // collection card said "All Clear"). Both surfaces now read from the
 // canonical /premolt/dashboard service so counts agree.
-interface PremoltPrediction {
-  tarantula_id: string;
-  tarantula_name: string;
-  is_premolt_likely: boolean;
-  confidence: 'high' | 'medium' | 'low' | 'none';
-  recent_refusal_streak: number;
-  days_since_last_molt: number | null;
-  data_quality: 'good' | 'fair' | 'insufficient';
-}
 
 interface Enclosure {
   id: string;
@@ -467,7 +459,7 @@ function DashboardHubScreen() {
       const response = await apiClient.get('/premolt/dashboard');
       const predictions: PremoltPrediction[] = response.data?.predictions ?? [];
       for (const p of predictions) {
-        predictionMap.set(p.tarantula_id, p);
+        predictionMap.set(p.invert_id ?? p.tarantula_id, p);
       }
     } catch {
       // Leave map empty on error; UI gracefully renders zero alerts.
@@ -505,10 +497,23 @@ function DashboardHubScreen() {
   // the premolt service. PremoltAlertCard on the collection screen uses
   // the same flag, so the two surfaces agree (was the original bug:
   // dashboard "2 alerts" while collection card said "All Clear").
-  const premoltAlerts = tarantulas.filter((t) => {
-    const prediction = premoltPredictions.get(t.id);
-    return prediction?.is_premolt_likely === true;
-  });
+  // Any taxon: the server's `show_alert` decides, via the same predictions list.
+  // Names and photos come from the feeding-status rows (all taxa), then the
+  // tarantula list, then the prediction's own name.
+  const premoltAlerts = Array.from(premoltPredictions.entries())
+    .filter(([, p]) => alertCount([p]) === 1)
+    .map(([id, prediction]) => {
+      const row = feedingStatusItems.find((i) => i.id === id);
+      const t = tarantulas.find((x) => x.id === id);
+      return {
+        id,
+        prediction,
+        name: row?.name || row?.common_name || t?.common_name || t?.name || prediction.tarantula_name,
+        species: row?.scientific_name || t?.scientific_name || '',
+        photo_url: row?.photo_url ?? t?.photo_url ?? null,
+        taxon: row?.taxon ?? prediction.taxon ?? 'tarantula',
+      };
+    });
 
   const communalEnclosures = enclosures.filter(e => e.is_communal);
 
@@ -1120,7 +1125,7 @@ function DashboardHubScreen() {
             tint="#8b5cf6"
             label="Premolt"
             value={premoltAlerts.length}
-            footer={premoltAlerts.length > 0 ? 'Medium+ confidence' : 'No alerts'}
+            footer={premoltAlerts.length > 0 ? 'May be in premolt' : 'No alerts'}
             onPress={() => router.push('/(tabs)/collection')}
             styles={styles}
             colors={colors}
@@ -1341,38 +1346,32 @@ function DashboardHubScreen() {
         {/* Premolt Watch List (conditional) */}
         {premoltAlerts.length > 0 && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>🔮 Premolt Watch List</Text>
+            <Text style={styles.sectionTitle}>Premolt watch list</Text>
             {premoltAlerts.slice(0, 5).map(t => {
-              const prediction = premoltPredictions.get(t.id)!;
+              const prediction = t.prediction;
               return (
                 <TouchableOpacity
                   key={t.id}
                   style={styles.premoltRow}
-                  onPress={() => router.push(`/tarantula/${t.id}`)}
+                  onPress={() => router.push(`/invert/${t.id}`)}
                   activeOpacity={0.7}
                 >
                   {t.photo_url ? (
                     <Image source={{ uri: getImageUrl(t.photo_url) }} style={styles.alertImage} />
                   ) : (
                     <View style={styles.alertImagePlaceholder}>
-                      <MaterialCommunityIcons name="spider" size={20} color={colors.textSecondary} />
+                      <MaterialCommunityIcons name={taxonMdiIcon(t.taxon) as any} size={20} color={colors.textSecondary} />
                     </View>
                   )}
                   <View style={styles.premoltInfo}>
-                    <Text style={styles.premoltName}>{t.common_name || t.name}</Text>
-                    <Text style={styles.premoltSpecies}>{t.scientific_name}</Text>
+                    <Text style={styles.premoltName}>{t.name}</Text>
+                    <Text style={styles.premoltSpecies}>{t.species}</Text>
                   </View>
                   <View style={[
                     styles.premoltBadge,
                     { backgroundColor: getPremoltBadgeColor(prediction.confidence) },
                   ]}>
-                    {/* The canonical predictor doesn't expose a 0-100
-                        probability, just the confidence tier. Render the
-                        tier capitalized + indicator counts so the badge
-                        still conveys "how sure are we?" at a glance. */}
-                    <Text style={styles.premoltBadgeText}>
-                      🦋 {prediction.confidence.charAt(0).toUpperCase() + prediction.confidence.slice(1)}
-                    </Text>
+                    <Text style={styles.premoltBadgeText}>May be in premolt</Text>
                   </View>
                 </TouchableOpacity>
               );

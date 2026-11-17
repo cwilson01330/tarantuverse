@@ -4,12 +4,14 @@ In-app notification center endpoints (ADR-009).
 Reads the `notifications` table. Independent of push delivery — the center works
 even before FCM/APNs are configured.
 """
+import logging
 import os
 from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.database import get_db
 from app.models.user import User
@@ -18,6 +20,7 @@ from app.schemas.notification import NotificationResponse, UnreadCountResponse
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=List[NotificationResponse])
@@ -134,4 +137,19 @@ async def run_digests(
     # DigestEmail objects carry addresses: they are sent here and never returned.
     emails = result.pop("emails", [])
     result["emails_sent"] = await send_digest_emails(db, emails)
+    # Premolt episodes (premolt v2): its own once-a-UTC-day guard, independent
+    # of digest settings. Never allowed to break the digest result.
+    # Synchronous DB work over every keeper, so it runs in the threadpool and
+    # the single uvicorn worker keeps serving requests meanwhile. `db` is safe
+    # to hand over: this handler is suspended on the await and touches the
+    # session again only after the pass has returned (one thread at a time).
+    try:
+        from app.services import premolt_episodes
+        result["premolt_episodes"] = await run_in_threadpool(
+            premolt_episodes.run_premolt_episodes,
+            db, force=ignore_schedule, only_user_id=test_user_id,
+        )
+    except Exception:
+        logger.exception("[premolt] episode pass failed during run-digests")
+        result["premolt_episodes"] = {"error": True}
     return result

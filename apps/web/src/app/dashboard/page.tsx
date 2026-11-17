@@ -12,6 +12,7 @@ import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
+import { alertCount, type PremoltPrediction } from '@/lib/premoltView'
 import WhatsNewCard from '@/components/WhatsNewCard'
 import FirstFeedingCard from '@/components/FirstFeedingCard'
 import EmailReminderDialog, { fetchEmailReminderPrefs, readAskState } from '@/components/EmailReminderDialog'
@@ -82,15 +83,6 @@ interface FeedingStatusItem {
 // algorithm from the one PremoltAlertCard / mobile uses. The two
 // surfaces could disagree (dashboard "2 alerts" vs collection card
 // "All Clear"). All surfaces now read /premolt/dashboard.
-interface PremoltPrediction {
-  tarantula_id: string
-  tarantula_name: string
-  is_premolt_likely: boolean
-  confidence: 'high' | 'medium' | 'low' | 'none'
-  recent_refusal_streak: number
-  days_since_last_molt: number | null
-  data_quality: 'good' | 'fair' | 'insufficient'
-}
 
 interface Enclosure {
   id: string
@@ -294,7 +286,7 @@ export default function DashboardHub() {
         const data = await response.json()
         const predictions: PremoltPrediction[] = data?.predictions ?? []
         for (const p of predictions) {
-          predictionMap.set(p.tarantula_id, p)
+          predictionMap.set(p.invert_id ?? p.tarantula_id, p)
         }
       }
     } catch { /* leave empty on error; UI shows zero alerts */ }
@@ -341,10 +333,9 @@ export default function DashboardHub() {
   // Source of truth: the canonical `is_premolt_likely` boolean from
   // /premolt/dashboard. Same flag PremoltAlertCard / mobile use, so
   // the dashboard count agrees with what the collection screen says.
-  const premoltAlerts = tarantulas.filter(t => {
-    const prediction = premoltPredictions.get(t.id)
-    return prediction?.is_premolt_likely === true
-  })
+  const premoltAlerts = Array.from(premoltPredictions.values()).filter(
+    (p) => alertCount([p]) === 1,
+  )
 
   const communalEnclosures = enclosures.filter(e => e.is_communal)
 
@@ -579,7 +570,7 @@ export default function DashboardHub() {
           {/* Premolt Alerts */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
-            aria-label={`Premolt alerts: ${premoltAlerts.length} ${premoltAlerts.length > 0 ? 'at medium or higher confidence' : 'no alerts'}.`}
+            aria-label={`Premolt alerts: ${premoltAlerts.length} ${premoltAlerts.length > 0 ? 'animals may be in premolt' : 'no alerts'}.`}
             className={`rounded-2xl shadow-lg border p-6 hover:shadow-xl transition-all text-left ${
               premoltAlerts.length > 0
                 ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
@@ -600,7 +591,7 @@ export default function DashboardHub() {
               </div>
             </div>
             <p className="mt-3 text-sm text-theme-tertiary">
-              {premoltAlerts.length > 0 ? 'Medium+ confidence' : 'No alerts'}
+              {premoltAlerts.length > 0 ? (premoltAlerts.length === 1 ? 'animal may be in premolt' : 'animals may be in premolt') : 'No alerts'}
             </p>
           </button>
         </div>
@@ -762,20 +753,21 @@ export default function DashboardHub() {
                   🔮 Premolt Watch List
                 </h2>
                 <div className="space-y-3">
-                  {premoltAlerts.slice(0, 5).map(t => {
-                    const prediction = premoltPredictions.get(t.id)!
+                  {premoltAlerts.slice(0, 5).map(prediction => {
+                    const animalId = prediction.invert_id ?? prediction.tarantula_id
+                    const t = tarantulas.find(x => x.id === animalId)
                     return (
                       <div
-                        key={t.id}
-                        onClick={() => router.push(`/dashboard/inverts/${t.id}`)}
+                        key={animalId}
+                        onClick={() => router.push(`/dashboard/inverts/${animalId}`)}
                         className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated hover:shadow-md transition cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30 flex-shrink-0">
-                            {t.photo_url ? (
+                            {t?.photo_url ? (
                               <img
                                 src={getImageUrl(t.photo_url)}
-                                alt={t.common_name}
+                                alt={prediction.tarantula_name}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -783,8 +775,12 @@ export default function DashboardHub() {
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-theme-primary">{t.common_name}</p>
-                            <p className="text-sm text-theme-secondary italic">{t.scientific_name}</p>
+                            <p className="font-semibold text-theme-primary">{prediction.tarantula_name}</p>
+                            {prediction.reason ? (
+                              <p className="text-sm text-theme-secondary">{prediction.reason}</p>
+                            ) : t?.scientific_name ? (
+                              <p className="text-sm text-theme-secondary italic">{t.scientific_name}</p>
+                            ) : null}
                           </div>
                         </div>
                         {/* Canonical predictor exposes confidence tier
@@ -796,7 +792,7 @@ export default function DashboardHub() {
                           prediction.confidence === 'medium' ? 'bg-orange-500' :
                           'bg-yellow-500'
                         }`}>
-                          🦋 {prediction.confidence}
+                          {prediction.confidence}
                         </span>
                       </div>
                     )

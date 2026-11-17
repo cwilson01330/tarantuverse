@@ -24,8 +24,8 @@ def test_clause_matches_either_column():
 
 def test_premolt_reads_both_columns():
     src = (APP / "services" / "premolt_service.py").read_text()
-    assert "tarantula_logs(MoltLog, tarantula_id)" in src
-    assert "tarantula_logs(FeedingLog, tarantula_id)" in src
+    assert "tarantula_logs(MoltLog, invert_id)" in src
+    assert "tarantula_logs(FeedingLog, invert_id)" in src
 
 
 # Places that may still compare tarantula_id alone, and why.

@@ -1339,7 +1339,12 @@ function InvertDetailScreen() {
           tarantula screen is what makes that screen safe to retire. */}
       {taxonHasModule(invert.taxon, 'premolt') && (
         <View style={{ marginHorizontal: SPACING.lg, marginVertical: SPACING.xs }}>
-          <PremoltPredictionCard key={premoltKey} tarantulaId={id!} />
+          <PremoltPredictionCard
+            key={premoltKey}
+            invertId={id!}
+            canAnswer={canKeep && !invert.died_at && !invert.transferred_out_at}
+            onAnswered={() => { refreshSlices(['invert', 'feedingStats']); }}
+          />
         </View>
       )}
 

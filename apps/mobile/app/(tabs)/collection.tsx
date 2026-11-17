@@ -32,6 +32,7 @@ import { feedingStatusColor } from '../../src/utils/status-colors';
 import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
 import { matureBadge, stageChip } from '../../src/lib/everyday-logging';
 import { pauseLabel } from '../../src/lib/post-molt';
+import { alertCount, type PremoltPrediction } from '../../src/lib/premolt-view';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
   scorpionDisplayName,
@@ -113,26 +114,11 @@ interface FeedingStatus {
   matured_at?: string | null;
 }
 
-/**
- * Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.
- *
- * This deliberately has NO `probability`. The retired legacy endpoint
- * returned an additive 0–100 score that was never calibrated against recorded
- * molt outcomes — a number that looked like a measurement and wasn't. The
- * canonical service reports a boolean plus the observations behind it, which
- * is what we can actually stand behind.
- *
- * `confidence` describes how much DATA supports the call (interval history,
- * refusal streak length), not predictive accuracy. Don't render it as a
- * likelihood.
- */
-interface PremoltPrediction {
-  tarantula_id: string;
-  is_premolt_likely: boolean;
-  confidence: 'high' | 'medium' | 'low' | string;
-  data_quality: 'good' | 'fair' | 'insufficient' | string;
-  recent_refusal_streak?: number;
-  days_since_last_molt?: number | null;
+/** The server's `show_alert` decides. Only a response from before premolt v2 (no `show_alert`) falls back to the
+ *  old rule: likely AND enough data to say so. */
+function premoltShown(p: PremoltPrediction): boolean {
+  if (p.show_alert !== undefined) return alertCount([p]) === 1;
+  return alertCount([p]) === 1 && p.data_quality !== 'insufficient';
 }
 
 // Taxon discriminator drives the FlatList row dispatcher: tarantulas
@@ -445,7 +431,7 @@ function CollectionScreen() {
       const response = await apiClient.get('/premolt/dashboard');
       const predictions: PremoltPrediction[] = response.data?.predictions ?? [];
       for (const p of predictions) {
-        predictionMap.set(p.tarantula_id, p);
+        predictionMap.set(p.invert_id ?? p.tarantula_id, p);
       }
     } catch {
       // NB: an empty map currently renders as "no premolt signals", which
@@ -489,7 +475,7 @@ function CollectionScreen() {
   const showsPremolt = (tarantulaId: string): boolean => {
     const prediction = premoltPredictions.get(tarantulaId);
     if (!prediction) return false;
-    return prediction.is_premolt_likely && prediction.data_quality !== 'insufficient';
+    return premoltShown(prediction);
   };
 
   const getPremoltBadge = (tarantulaId: string) => {
@@ -505,6 +491,19 @@ function CollectionScreen() {
         accessibilityLabel="Premolt signals detected"
       >
         <Text style={styles.premoltBadgeText}>🦋 Premolt</Text>
+      </View>
+    );
+  };
+
+  /** The list-row premolt pill, for every taxon (same rule as the card badge). */
+  const renderPremoltListBadge = (animalId: string) => {
+    if (!showsPremolt(animalId)) return null;
+    return (
+      <View
+        style={[styles.listBadge, { backgroundColor: '#f97316' }]}
+        accessibilityLabel="Premolt signals detected"
+      >
+        <Text style={styles.listBadgeText}>🦋 Premolt</Text>
       </View>
     );
   };
@@ -902,11 +901,6 @@ function CollectionScreen() {
   };
 
 
-  // Scorpion card — same visual frame as renderTarantula so the
-  // unified grid reads as one collection. No feeding-status pill or
-  // premolt badge (those features don't exist for scorpions yet); no
-  // long-press action sheet either. Add taxon-specific affordances
-  // here as the scorpion surface grows.
   // Scorpion / centipede / whip spider / generic-invert cards were four
   // near-identical copies of the same JSX that had already drifted apart.
   // They all route to /invert/[id] and differ only in taxon, so they're one
@@ -937,6 +931,7 @@ function CollectionScreen() {
               }
             : undefined
         }
+        premolt={showsPremolt(item.id)}
         stageChip={stageChip(taxon, feedingStatuses.get(item.id)?.current_instar)}
         matureBadge={matureBadge(feedingStatuses.get(item.id)?.matured_at ?? null, new Date())}
         onPress={() => router.push(`/invert/${item.id}` as any)}
@@ -980,7 +975,6 @@ function CollectionScreen() {
 
   const renderListItem = ({ item }: { item: Tarantula }) => {
     const feedingStatus = feedingStatuses.get(item.id);
-    const premoltPrediction = premoltPredictions.get(item.id);
     const days = feedingStatus?.days_since_last_feeding;
     const feedingColor = feedingStatusColor(days, colors);
     // "First meal not logged" / "Due · no meal logged yet" for an animal with no feeding on record.
@@ -1083,16 +1077,7 @@ function CollectionScreen() {
               </Text>
             </View>
           )}
-          {premoltPrediction
-            && premoltPrediction.is_premolt_likely
-            && premoltPrediction.data_quality !== 'insufficient' && (
-            <View
-              style={[styles.listBadge, { backgroundColor: '#f97316' }]}
-              accessibilityLabel="Premolt signals detected"
-            >
-              <Text style={styles.listBadgeText}>🦋 Premolt</Text>
-            </View>
-          )}
+          {renderPremoltListBadge(item.id)}
         </View>
         <MaterialCommunityIcons
           name="chevron-right"
@@ -1107,8 +1092,8 @@ function CollectionScreen() {
 
   // Compact list row for every non-tarantula taxon. Mirrors the tarantula
   // renderListItem chrome (same styles.listItem / listImage / listContent /
-  // sexChip) so list view reads as one collection. Feeding-status + premolt
-  // badges are tarantula-only today, so this row omits them. The placeholder
+  // sexChip) so list view reads as one collection. Feeding-status and premolt
+  // badges follow the same rules as the tarantula row. The placeholder
   // shows the taxon emoji glyph instead of the spider icon. Without this, the
   // taxon cards fell through to renderRow's card branch and rendered as big
   // cards even in list view (the "scorpions look larger in list view" bug).
@@ -1243,6 +1228,7 @@ function CollectionScreen() {
               </Text>
             </View>
           ) : null}
+          {renderPremoltListBadge(item.id)}
         </View>
         <MaterialCommunityIcons
           name="chevron-right"
