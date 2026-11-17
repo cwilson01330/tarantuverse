@@ -278,9 +278,15 @@ def check_and_award(
     return newly_awarded
 
 
-def get_user_achievements(db: Session, user_id: uuid.UUID) -> Dict:
+# Badges that count forum posts. While forums are paused they can't be earned,
+# so the gallery hides them unless already earned.
+FORUM_ACHIEVEMENT_KEYS = ("first_post", "contributor_10")
+
+
+def get_user_achievements(db: Session, user_id: uuid.UUID, hide_forum_unearned: bool = False) -> Dict:
     """
-    Get all achievements for a user (earned + unearned), with recently earned summary
+    Get all achievements for a user (earned + unearned), with recently earned summary.
+    `hide_forum_unearned` drops unearned FORUM_ACHIEVEMENT_KEYS rows (forums paused).
     """
     # Get all active achievements
     all_achievements = db.query(AchievementDefinition).filter(
@@ -300,6 +306,8 @@ def get_user_achievements(db: Session, user_id: uuid.UUID) -> Dict:
     achievements = []
     for achievement in all_achievements:
         earned_at = earned_dict.get(achievement.id)
+        if hide_forum_unearned and earned_at is None and achievement.key in FORUM_ACHIEVEMENT_KEYS:
+            continue
         achievements.append({
             "id": achievement.id,
             "key": achievement.key,

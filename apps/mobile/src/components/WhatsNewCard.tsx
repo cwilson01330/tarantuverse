@@ -18,6 +18,7 @@ import { SPACING, TYPE } from '../theme/tokens';
 import { AppText, Card } from './ui';
 import { WhatsNewEntryView } from './WhatsNewList';
 import { useWhatsNew } from '../lib/whats-new';
+import { openRoute } from '../lib/open-route';
 
 const MAX_ENTRIES = 3;
 
@@ -40,7 +41,7 @@ export default function WhatsNewCard() {
   const act = (route: string) => {
     setDismissed(true);
     void markSeen();
-    router.push(route as never);
+    openRoute(router, route);
   };
 
   // Same layout as Herpetoverse's card: title row with only the close button,

@@ -26,6 +26,7 @@ import app.routers.analytics as analytics
 import app.routers.follows as follows
 import app.routers.direct_messages as direct_messages
 import app.routers.forums as forums
+from app.utils import forums_gate
 import app.routers.activity as activity
 import app.routers.subscriptions as subscriptions
 import app.routers.pairings as pairings
@@ -108,6 +109,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Expense tracking's 403 carries a machine-readable `code` next to `detail`.
 app.add_exception_handler(expenses.PremiumRequired, expenses.premium_required_handler)
+app.add_exception_handler(forums_gate.ForumsPaused, forums_gate.forums_paused_handler)
 
 # Configure CORS
 # Automatically include both www and non-www versions of each origin

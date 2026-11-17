@@ -10,7 +10,7 @@ describe('resolveDeeplink', () => {
     expect(resolveDeeplink('/invert/abc/edit')).toBeNull();
   });
   it('keeps existing behaviour', () => {
-    expect(resolveDeeplink('/feeding-day')).toBe('/feeding-day');
+    expect(resolveDeeplink('/feeding-day')).toBe('/(tabs)/feeding');
     expect(resolveDeeplink('/shared')).toBe('/sharing');
     expect(resolveDeeplink('https://evil.example')).toBeNull();
     expect(resolveDeeplink('//evil')).toBeNull();

@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { useAuth } from '../src/contexts/AuthContext'
 import { AppHeader } from '../src/components/AppHeader'
+import { useFeatures } from '../src/hooks/useFeatures'
 
 interface DiscoverResponse {
   stats: {
@@ -101,6 +102,7 @@ export default function DiscoverScreen() {
   const router = useRouter()
   const { colors, layout } = useTheme()
   const { token } = useAuth()
+  const { forumsEnabled } = useFeatures()
   const [discover, setDiscover] = useState<DiscoverResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -222,25 +224,28 @@ export default function DiscoverScreen() {
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.textSecondary }}>Species</Text>
               </View>
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: 'rgba(249, 115, 22, 0.1)',
-                  borderRadius: 12,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 }}>
-                  {discover.stats.total_forum_threads}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Discussions</Text>
-              </View>
+              {forumsEnabled && (
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 }}>
+                    {discover.stats.total_forum_threads}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>Discussions</Text>
+                </View>
+              )}
             </View>
           </View>
 
-          {/* Trending Discussions */}
+          {/* Trending Discussions: forum content, hidden while the forums are paused */}
+          {forumsEnabled && (
           <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 }}>
               🔥 Trending Discussions
@@ -306,6 +311,7 @@ export default function DiscoverScreen() {
               </Text>
             )}
           </View>
+          )}
 
           {/* Active Keepers */}
           <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>

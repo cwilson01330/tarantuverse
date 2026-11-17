@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
+import withForumsGate from "@/components/withForumsGate";
 
 interface ThreadAuthor {
   id: string;
@@ -39,7 +40,7 @@ interface ThreadListResponse {
   has_more: boolean;
 }
 
-export default function CategoryPage() {
+function CategoryPage() {
   const params = useParams();
   const router = useRouter();
   const categorySlug = params?.category as string;
@@ -345,3 +346,5 @@ export default function CategoryPage() {
     </DashboardLayout>
   );
 }
+
+export default withForumsGate(CategoryPage);

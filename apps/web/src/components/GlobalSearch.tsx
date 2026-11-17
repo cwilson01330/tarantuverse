@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { INVERT_TAXA, type InvertTaxon } from '@/lib/inverts'
+import { useFeatures } from '@/lib/features'
 
 interface SearchResult {
   id: string
@@ -49,6 +50,7 @@ function resultIcon(type: string): string {
 export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const router = useRouter()
   const { token } = useAuth()
+  const { forumsEnabled } = useFeatures()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -61,7 +63,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     ...results.tarantulas,
     ...results.species,
     ...results.keepers,
-    ...results.forums,
+    ...(forumsEnabled ? results.forums ?? [] : []),
   ] : []
 
   // Fetch search results
@@ -196,7 +198,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Search animals, species, keepers, forums..."
+                placeholder={forumsEnabled ? 'Search animals, species, keepers, forums...' : 'Search animals, species, keepers...'}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-1 bg-transparent text-lg outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
@@ -282,7 +284,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 )}
 
                 {/* Forums Section */}
-                {results?.forums && results.forums.length > 0 && (
+                {forumsEnabled && results?.forums && results.forums.length > 0 && (
                   <div className="p-4">
                     <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">💬 Forums</p>
                     {results.forums.map((result) => (

@@ -50,6 +50,7 @@ async def get_system_status(db: Session = Depends(get_db)):
             "herpetoverse_app_enabled": settings_service.get(
                 db, "features.herpetoverse_app_enabled", False
             ),
+            "forums_enabled": settings_service.is_feature_enabled(db, "forums"),
         },
         "announcements": {
             "herpetoverse_banner": {

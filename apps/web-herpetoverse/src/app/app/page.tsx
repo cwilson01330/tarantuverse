@@ -71,7 +71,7 @@ export default function AppHomePage() {
         <DashCard
           icon="🌐"
           title="Community"
-          body="Shared with Tarantuverse — forums, keepers, and discovery."
+          body="Shared with Tarantuverse — keepers and discovery."
           soon
         />
       </section>

@@ -112,7 +112,6 @@ export default function HelpPage() {
             <ul className="space-y-2 text-gray-600">
               <li><Link href="#" className="hover:text-purple-600">Setting up your profile</Link></li>
               <li><Link href="#" className="hover:text-purple-600">Following other keepers</Link></li>
-              <li><Link href="#" className="hover:text-purple-600">Message boards</Link></li>
               <li><Link href="#" className="hover:text-purple-600">Direct messaging</Link></li>
             </ul>
           </div>

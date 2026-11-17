@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { withForumsGate } from '../../src/components/ForumsGate';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -25,7 +26,7 @@ interface ForumCategory {
   slug: string;
 }
 
-export default function NewThreadScreen() {
+function NewThreadScreen() {
   const router = useRouter();
   const { category: initialCategory } = useLocalSearchParams();
   const { colors, layout } = useTheme();
@@ -413,3 +414,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default withForumsGate(NewThreadScreen);

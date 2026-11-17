@@ -23,6 +23,7 @@ from app.models.species import Species
 from app.models.forum import ForumThread
 from app.schemas.search import SearchResult, SearchResponse
 from app.utils.auth import decode_access_token
+from app.utils.forums_gate import forums_open
 
 router = APIRouter()
 
@@ -218,8 +219,8 @@ async def global_search(
                 )
             )
 
-    # Search forum threads (public, always visible)
-    if not type or type == "forums":
+    # Search forum threads (public, always visible) - none while forums are paused
+    if (not type or type == "forums") and forums_open(db, current_user):
         threads = db.query(ForumThread).filter(
             ForumThread.title.ilike(search_term)
         ).limit(5).all()

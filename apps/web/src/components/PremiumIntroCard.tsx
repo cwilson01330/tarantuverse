@@ -52,7 +52,7 @@ const FREE = [
   'Tracking for every taxon — feedings, molts, substrate, photos',
   'Feeding Day and reminders',
   'Care sheets and keeper signals',
-  'Forums, messages and keeper profiles',
+  'Messages and keeper profiles',
   'Up to 15 animals, 5 photos each',
   'Full data export, any time',
 ]

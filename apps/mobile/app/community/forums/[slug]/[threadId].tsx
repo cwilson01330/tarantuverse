@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../../src/contexts/ThemeContext';
 import { AppHeader } from '../../../../src/components/AppHeader';
 import ReportModal from '../../../../src/components/ReportModal';
+import { withForumsGate } from '../../../../src/components/ForumsGate';
 
 interface Author {
   id: string;
@@ -57,7 +58,7 @@ interface Thread {
   first_post?: Post;
 }
 
-export default function ThreadDetailScreen() {
+function ThreadDetailScreen() {
   const { slug, threadId } = useLocalSearchParams<{ slug: string; threadId: string }>();
   const router = useRouter();
   const { colors, layout } = useTheme();
@@ -612,3 +613,5 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 });
+
+export default withForumsGate(ThreadDetailScreen);

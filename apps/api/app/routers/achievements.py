@@ -7,6 +7,7 @@ from app.database import get_db
 from app.utils.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.achievement import AchievementResponse, AchievementSummary
+from app.utils.forums_gate import forums_open
 from app.services.achievement_service import check_and_award, get_user_achievements
 
 router = APIRouter()
@@ -28,7 +29,9 @@ async def list_achievements(
     """
     # Always run a check first so existing data is reflected immediately
     check_and_award(db, current_user.id)
-    result = get_user_achievements(db, current_user.id)
+    result = get_user_achievements(
+        db, current_user.id, hide_forum_unearned=not forums_open(db, current_user)
+    )
     return AchievementSummary(**result)
 
 
@@ -70,7 +73,11 @@ async def get_user_public_achievements(
             detail="User not found"
         )
 
-    result = get_user_achievements(db, user.id)
+    # Anonymous viewer: while forums are paused the unearned forum badges are
+    # not counted either (earned ones stay).
+    result = get_user_achievements(
+        db, user.id, hide_forum_unearned=not forums_open(db, None)
+    )
     # For public view, only return earned achievements in the list
     result["achievements"] = [a for a in result["achievements"] if a["earned_at"] is not None]
 

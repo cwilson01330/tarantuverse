@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useFeatures } from "@/lib/features";
 import ActivityFeedItem, {
   ActivityFeedItemData,
   ActionType,
@@ -28,6 +29,7 @@ export default function ActivityFeed({
   showFilters = true,
 }: ActivityFeedProps) {
   const { data: session } = useSession();
+  const { forumsEnabled } = useFeatures();
   const [activities, setActivities] = useState<ActivityFeedItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,8 +136,12 @@ export default function ActivityFeed({
     { value: "molt", label: "Molts" },
     { value: "feeding", label: "Feedings" },
     { value: "follow", label: "Follows" },
-    { value: "forum_thread", label: "Forum Threads" },
-    { value: "forum_post", label: "Forum Posts" },
+    ...(forumsEnabled
+      ? [
+          { value: "forum_thread" as const, label: "Forum Threads" },
+          { value: "forum_post" as const, label: "Forum Posts" },
+        ]
+      : []),
   ];
 
   if (loading && activities.length === 0) {

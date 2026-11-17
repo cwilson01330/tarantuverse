@@ -10,6 +10,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
+import { openRoute } from '../../src/lib/open-route';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ import { setCollectionAnimalCount } from '../../src/lib/collection-summary';
 import { FIRST_FEEDING_COPY, feedingStatusText } from '../../src/lib/first-feeding';
 import { FirstFeedingCard } from '../../src/components/FirstFeedingCard';
 import { NotificationAskSheet, useNotificationAsk } from '../../src/components/NotificationAskSheet';
+import { useFeatures } from '../../src/hooks/useFeatures';
 
 /** "Good morning" / "Good afternoon" / "Good evening" from the device clock. */
 function timeGreeting(): string {
@@ -197,6 +199,8 @@ function StatChip({
 
 function DashboardHubScreen() {
   const router = useRouter();
+  // Forums tile only while the forums are on (hidden until known).
+  const { forumsEnabled } = useFeatures();
   const { user } = useAuth();
   // Read inside async fetches so a fetch started before sign-in settles (or
   // across an account switch) still files the count under the current user.
@@ -1204,7 +1208,7 @@ function DashboardHubScreen() {
                   <Text style={styles.heroBreakdown}>{overdueTaxaBreakdown}</Text>
                 </View>
                 <PrimaryButton
-                  onPress={() => router.push('/feeding-day')}
+                  onPress={() => openRoute(router, '/(tabs)/feeding')}
                   style={styles.heroStartButton}
                   accessibilityRole="button"
                   accessibilityLabel={`Start Feeding Day. ${overdueFeedings.length} animals due.`}
@@ -1271,7 +1275,7 @@ function DashboardHubScreen() {
               })}
               {overdueFeedings.length > 3 && (
                 <TouchableOpacity
-                  onPress={() => router.push('/feeding-day')}
+                  onPress={() => openRoute(router, '/(tabs)/feeding')}
                   accessibilityRole="button"
                   accessibilityLabel={`See all ${overdueFeedings.length} animals due for feeding`}
                 >
@@ -1401,7 +1405,7 @@ function DashboardHubScreen() {
               { icon: 'bug-outline', label: 'Feeders', route: '/feeders' },
               { icon: 'forum-outline', label: 'Forums', route: '/(tabs)/forums' },
               { icon: 'tray-arrow-up', label: 'Import', route: '/import' },
-            ] as const).map((item) => (
+            ] as const).filter((item) => item.label !== 'Forums' || forumsEnabled).map((item) => (
               <TouchableOpacity
                 key={item.label}
                 style={[

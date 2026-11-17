@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { View as RNView } from 'react-native';
+import { withForumsGate } from '../../src/components/ForumsGate';
 
 interface Message {
   id: string;
@@ -37,7 +38,7 @@ interface Reply {
 
 const REACTION_EMOJIS = ['❤️', '👍', '😂', '🔥', '🕷️', '🎉'];
 
-export default function BoardScreen() {
+function BoardScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -794,3 +795,5 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
 });
+
+export default withForumsGate(BoardScreen);

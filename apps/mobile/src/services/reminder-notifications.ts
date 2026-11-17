@@ -62,7 +62,7 @@ export async function handleNotificationResponse(response: ResponseLike, deps: R
   const id = response?.actionIdentifier ?? DEFAULT_ACTION;
 
   if (id === 'open_feeding_day') {
-    deps.navigate('/feeding-day');
+    deps.navigate('/(tabs)/feeding');
     return;
   }
 

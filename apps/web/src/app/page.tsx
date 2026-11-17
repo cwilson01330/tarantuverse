@@ -871,7 +871,7 @@ export default function Home() {
             <span className="bg-gradient-primary bg-clip-text text-transparent">seen by the right people</span>
           </h2>
           <p className="text-xl text-gray-300 mb-16 max-w-2xl">
-            Public profiles, keeper forums, and direct messaging — everything you need to
+            Public profiles, a keeper directory, and direct messaging — everything you need to
             connect, share, and find homes for your offspring.
           </p>
 
@@ -882,9 +882,9 @@ export default function Home() {
               <p className="text-gray-300 text-sm">Public profiles with your collection, experience level, specialties, and social links. Let buyers and the community find you.</p>
             </div>
             <div className="bg-dark border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 transition">
-              <div className="text-3xl mb-3">💬</div>
-              <h3 className="font-bold mb-2 text-gray-100">Forums</h3>
-              <p className="text-gray-300 text-sm">Category-based discussion boards for care questions, introductions, and species deep-dives. Moderated by keepers.</p>
+              <div className="text-3xl mb-3">🧭</div>
+              <h3 className="font-bold mb-2 text-gray-100">Keeper Directory</h3>
+              <p className="text-gray-300 text-sm">Browse keepers by experience level and specialty, and visit the collections they have chosen to make public.</p>
             </div>
             <div className="bg-dark border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 transition">
               <div className="text-3xl mb-3">📩</div>
@@ -964,14 +964,14 @@ export default function Home() {
             <div className="w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🔍</div>
             <h3 className="font-bold mb-2 text-gray-100">Global search (⌘K)</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Press Cmd/Ctrl+K from anywhere to jump to any animal, species, keeper, or forum thread.
+              Press Cmd/Ctrl+K from anywhere to jump to any animal, species, or keeper.
             </p>
           </div>
           <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 transition">
             <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">📦</div>
             <h3 className="font-bold mb-2 text-gray-100">Your data, any time</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Download everything — collection, logs, photos, forum history — as JSON, CSV, or a full ZIP whenever you want.
+              Download everything — collection, logs, and photos — as JSON, CSV, or a full ZIP whenever you want.
             </p>
           </div>
         </div>
@@ -1039,7 +1039,7 @@ export default function Home() {
                 <span className="text-2xl">🕷️</span> Tarantuverse
               </h3>
               <ul className="space-y-3 text-gray-300 text-sm">
-                {['Automatic feeding predictions per animal', 'Push reminders when feedings are overdue', 'Cloud photo storage with QR scan upload', 'Premolt detection from feeding patterns', 'Cloud sync — always backed up', 'Full-featured iOS & Android app', 'Public profiles, forums & direct messages', 'Complete breeding module (premium)'].map(text => (
+                {['Automatic feeding predictions per animal', 'Push reminders when feedings are overdue', 'Cloud photo storage with QR scan upload', 'Premolt detection from feeding patterns', 'Cloud sync — always backed up', 'Full-featured iOS & Android app', 'Public profiles & direct messages', 'Complete breeding module (premium)'].map(text => (
                   <li key={text} className="flex items-start gap-2">
                     <span className="text-green-400 flex-shrink-0 font-bold">✓</span>
                     <span>{text}</span>
@@ -1199,8 +1199,6 @@ export default function Home() {
             <div>
               <h4 className="font-semibold text-gray-100 mb-3">Community</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="/community/forums" className="hover:text-electric-blue-400 transition">Forums</Link></li>
-                <li><Link href="/community/board" className="hover:text-electric-blue-400 transition">Activity Board</Link></li>
                 <li><Link href="/blog" className="hover:text-electric-blue-400 transition">Blog</Link></li>
                 <li><Link href="/help" className="hover:text-electric-blue-400 transition">Help Center</Link></li>
               </ul>

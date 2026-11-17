@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonList } from '@/components/ui/skeleton'
+import OutsideCommunities from '@/components/OutsideCommunities'
+import { useFeatures } from '@/lib/features'
 
 interface Keeper {
   id: number
@@ -28,6 +30,7 @@ interface Keeper {
 export default function CommunityPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const { forumsEnabled } = useFeatures()
   const [keepers, setKeepers] = useState<Keeper[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -114,12 +117,14 @@ export default function CommunityPage() {
               <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">🌐 Keeper Community</h1>
               <p className="text-gray-600 dark:text-gray-400 text-lg">Discover fellow keepers</p>
             </div>
-            <button
-              onClick={() => router.push('/community/forums')}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all duration-200 font-medium"
-            >
-              💬 Forums
-            </button>
+            {forumsEnabled && (
+              <button
+                onClick={() => router.push('/community/forums')}
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all duration-200 font-medium"
+              >
+                💬 Forums
+              </button>
+            )}
           </div>
 
           {/* Search and Filters */}
@@ -185,6 +190,9 @@ export default function CommunityPage() {
             </div>
           </div>
         </div>
+
+        {/* Outside communities (always shown) */}
+        <OutsideCommunities className="mb-6" />
 
         {/* Tabs */}
         <div className="border-b border-gray-200 dark:border-gray-700 mb-6">

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { apiClient } from '../src/services/api'
 import { toMobilePath } from '../src/utils/links'
+import { useFeatures } from '../src/hooks/useFeatures'
 
 interface SearchResult {
   id: string
@@ -39,6 +40,7 @@ const SECTION_ICONS = {
 export default function SearchScreen() {
   const router = useRouter()
   const { colors, layout } = useTheme()
+  const { forumsEnabled } = useFeatures()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -78,7 +80,9 @@ export default function SearchScreen() {
       })
     }
 
-    if (results.forums.length > 0) {
+    // The server already drops forum hits while paused; this keeps an old
+    // cached answer from showing a Forums section either.
+    if (forumsEnabled && results.forums.length > 0) {
       newSections.push({
         title: 'Forums',
         icon: '💬',
@@ -87,7 +91,7 @@ export default function SearchScreen() {
     }
 
     setSections(newSections)
-  }, [results])
+  }, [results, forumsEnabled])
 
   // Perform search
   const performSearch = useCallback(async (q: string) => {

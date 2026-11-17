@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
+import withForumsGate from "@/components/withForumsGate";
 
 interface NewThreadFormData {
   title: string;
@@ -18,7 +19,7 @@ interface Category {
   slug: string;
 }
 
-export default function NewThreadPage() {
+function NewThreadPage() {
   const params = useParams();
   const router = useRouter();
   const categorySlug = params?.category as string;
@@ -277,3 +278,5 @@ export default function NewThreadPage() {
     </DashboardLayout>
   );
 }
+
+export default withForumsGate(NewThreadPage);

@@ -57,7 +57,7 @@ class PlatformStats(BaseModel):
     total_keepers: int
     total_tarantulas: int
     total_species: int
-    total_forum_threads: int
+    total_forum_threads: Optional[int] = None  # None while forums are paused
 
 
 class DiscoverResponse(BaseModel):

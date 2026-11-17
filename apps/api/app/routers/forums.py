@@ -24,6 +24,7 @@ from app.services.activity_service import create_activity
 from app.utils.push_notifications import send_forum_reply_notification
 from app.services.notification_service import create_notification
 from app.utils.spam_protection import full_spam_check
+from app.utils.forums_gate import refuse_write_if_paused, hide_read_if_paused
 
 router = APIRouter(prefix="/api/v1/forums", tags=["forums"])
 
@@ -51,9 +52,11 @@ def is_admin(user: User) -> bool:
 
 @router.get("/categories", response_model=List[ForumCategoryResponse])
 async def list_categories(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get all forum categories ordered by display_order"""
+    hide_read_if_paused(db, current_user)
     categories = db.query(ForumCategory).order_by(ForumCategory.display_order).all()
     return categories
 
@@ -61,9 +64,11 @@ async def list_categories(
 @router.get("/categories/{category_slug}", response_model=ForumCategoryResponse)
 async def get_category(
     category_slug: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get a single category by slug"""
+    hide_read_if_paused(db, current_user)
     category = db.query(ForumCategory).filter(
         ForumCategory.slug == category_slug
     ).first()
@@ -79,6 +84,7 @@ async def create_category(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new forum category (admin only)"""
+    refuse_write_if_paused(db, current_user)
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -102,6 +108,7 @@ async def update_category(
     current_user: User = Depends(get_current_user)
 ):
     """Update a forum category (admin only)"""
+    refuse_write_if_paused(db, current_user)
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -127,6 +134,7 @@ async def delete_category(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a forum category (admin only)"""
+    refuse_write_if_paused(db, current_user)
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -149,9 +157,11 @@ async def list_threads(
     page: int = Query(1, ge=1, le=10000),
     limit: int = Query(20, ge=1, le=100),
     sort: str = Query("recent", regex="^(recent|popular|pinned)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get threads in a category with pagination"""
+    hide_read_if_paused(db, current_user)
     # Find category
     category = db.query(ForumCategory).filter(ForumCategory.slug == category_slug).first()
     if not category:
@@ -195,6 +205,7 @@ async def get_thread(
     current_user: User = Depends(get_current_user_optional)
 ):
     """Get thread details with first post"""
+    hide_read_if_paused(db, current_user)
     thread = db.query(ForumThread).filter(ForumThread.id == thread_id).options(
         joinedload(ForumThread.author),
         joinedload(ForumThread.last_post_user)
@@ -243,6 +254,7 @@ async def create_thread(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new thread with initial post"""
+    refuse_write_if_paused(db, current_user)
     # Run spam protection checks (rate limit, account requirements, honeypot, content filter)
     is_allowed, error_message = full_spam_check(
         db=db,
@@ -320,6 +332,7 @@ async def update_thread(
     current_user: User = Depends(get_current_user)
 ):
     """Update thread (author or admin only)"""
+    refuse_write_if_paused(db, current_user)
     thread = db.query(ForumThread).filter(ForumThread.id == thread_id).first()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
@@ -361,6 +374,7 @@ async def delete_thread(
     current_user: User = Depends(get_current_user)
 ):
     """Delete thread (author or admin only)"""
+    refuse_write_if_paused(db, current_user)
     thread = db.query(ForumThread).filter(ForumThread.id == thread_id).first()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
@@ -389,9 +403,11 @@ async def list_posts(
     thread_id: int,
     page: int = Query(1, ge=1, le=10000),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get posts in a thread with pagination"""
+    hide_read_if_paused(db, current_user)
     # Verify thread exists
     thread = db.query(ForumThread).filter(ForumThread.id == thread_id).first()
     if not thread:
@@ -426,6 +442,7 @@ async def create_post(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new post (reply) in a thread"""
+    refuse_write_if_paused(db, current_user)
     # Run spam protection checks (rate limit, account requirements, honeypot, content filter)
     is_allowed, error_message = full_spam_check(
         db=db,
@@ -515,6 +532,7 @@ async def update_post(
     current_user: User = Depends(get_current_user)
 ):
     """Update a post (author or admin only)"""
+    refuse_write_if_paused(db, current_user)
     post = db.query(ForumPost).filter(ForumPost.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -546,6 +564,7 @@ async def delete_post(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a post (author or admin only)"""
+    refuse_write_if_paused(db, current_user)
     post = db.query(ForumPost).filter(ForumPost.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")

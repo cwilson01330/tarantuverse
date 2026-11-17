@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
+import withForumsGate from "@/components/withForumsGate";
 
 interface ThreadAuthor {
   id: string;
@@ -51,7 +52,7 @@ interface PostListResponse {
   has_more: boolean;
 }
 
-export default function ThreadPage() {
+function ThreadPage() {
   const params = useParams();
   const router = useRouter();
   const threadId = params?.id as string;
@@ -765,3 +766,5 @@ export default function ThreadPage() {
     </DashboardLayout>
   );
 }
+
+export default withForumsGate(ThreadPage);

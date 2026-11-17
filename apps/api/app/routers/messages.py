@@ -13,7 +13,8 @@ from app.schemas.message import (
     ReplyCreate, ReplyResponse,
     LikeResponse, ReactionCreate, ReactionResponse
 )
-from app.utils.dependencies import get_current_user
+from app.utils.dependencies import get_current_user, get_current_user_optional
+from app.utils.forums_gate import refuse_write_if_paused, hide_read_if_paused
 
 router = APIRouter()
 
@@ -75,12 +76,14 @@ def build_message_response(message: Message, user: User, current_user_id: Option
 def get_messages(
     skip: int = Query(0, ge=0, le=10000),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get all messages from the community board (public, no auth required).
     Returns messages with author information and interaction counts.
     """
+    hide_read_if_paused(db, current_user)
     # Try to get current user if authenticated
     current_user_id = None
     
@@ -104,11 +107,13 @@ def get_messages(
 @router.get("/{message_id}", response_model=MessageResponse)
 def get_message(
     message_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get a single message by ID with interaction counts.
     """
+    hide_read_if_paused(db, current_user)
     message = (
         db.query(Message, User)
         .join(User, Message.user_id == User.id)
@@ -137,6 +142,7 @@ def create_message(
     """
     Create a new message on the community board (auth required).
     """
+    refuse_write_if_paused(db, current_user)
     db_message = Message(
         user_id=str(current_user.id),
         title=message.title,
@@ -163,6 +169,7 @@ def update_message(
     """
     Update a message (only by the author).
     """
+    refuse_write_if_paused(db, current_user)
     db_message = db.query(Message).filter(Message.id == message_id).first()
     
     if not db_message:
@@ -202,6 +209,7 @@ def delete_message(
     """
     Delete a message (only by the author).
     """
+    refuse_write_if_paused(db, current_user)
     db_message = db.query(Message).filter(Message.id == message_id).first()
     
     if not db_message:
@@ -230,11 +238,13 @@ def get_replies(
     message_id: str,
     skip: int = Query(0, ge=0, le=10000),
     limit: int = Query(100, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get all replies for a message (public, no auth required).
     """
+    hide_read_if_paused(db, current_user)
     # Verify message exists
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
@@ -281,6 +291,7 @@ def create_reply(
     """
     Create a reply to a message (auth required).
     """
+    refuse_write_if_paused(db, current_user)
     # Verify message exists
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
@@ -324,6 +335,7 @@ def delete_reply(
     """
     Delete a reply (only by the author).
     """
+    refuse_write_if_paused(db, current_user)
     db_reply = db.query(MessageReply).filter(MessageReply.id == reply_id).first()
     
     if not db_reply:
@@ -357,6 +369,7 @@ def toggle_like(
     Toggle like on a message (auth required).
     Returns {"liked": true/false, "like_count": number}
     """
+    refuse_write_if_paused(db, current_user)
     # Verify message exists
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
@@ -405,6 +418,7 @@ def toggle_reaction(
     Toggle reaction on a message (auth required).
     Returns {"reacted": true/false, "reactions": {emoji: count}}
     """
+    refuse_write_if_paused(db, current_user)
     # Verify message exists
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:

@@ -232,10 +232,6 @@ export default function FeaturesPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Message boards and discussions</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-500 mt-1">✓</span>
                 <span>Follow other keepers and get updates</span>
               </li>
               <li className="flex items-start gap-2">

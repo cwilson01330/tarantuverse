@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { TarantuverseLogoTransparent } from './TarantuverseLogo'
 import { useAuth } from '@/hooks/useAuth'
 import { useWhatsNew } from '@/lib/whatsNew'
+import { useFeatures } from '@/lib/features'
 
 interface SidebarProps {
   isOpen: boolean
@@ -42,6 +43,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
   const router = useRouter()
   const { user, token } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
+  const { forumsEnabled } = useFeatures()
 
   useEffect(() => {
     // Check admin status from useAuth hook first
@@ -74,6 +76,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
   const baseNavItems: NavItem[] = [
     { icon: '🏠', label: 'Dashboard', path: '/dashboard' },
     { icon: '🐾', label: 'Collection', path: '/dashboard/tarantulas' },
+    { icon: '🍽️', label: 'Feeding Day', path: '/dashboard/feeding-day' },
     { icon: '📖', label: 'Species', path: '/species' },
     { icon: '🔖', label: 'Shortlist', path: '/dashboard/shortlist' },
     { icon: '📊', label: 'Analytics', path: '/dashboard/analytics' },
@@ -87,7 +90,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
     { icon: '✨', label: "What's new", path: '/dashboard/whats-new', whatsNewDot: true },
     { icon: '🧭', label: 'Discover', path: '/community/discover' },
     { icon: '🌐', label: 'Community', path: '/community' },
-    { icon: '💬', label: 'Forums', path: '/community/forums' },
+    ...(forumsEnabled ? [{ icon: '💬', label: 'Forums', path: '/community/forums' }] : []),
     { icon: '⚙️', label: 'Settings', path: '/dashboard/settings' },
   ]
 

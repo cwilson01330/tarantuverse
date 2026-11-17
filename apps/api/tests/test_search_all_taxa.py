@@ -89,6 +89,16 @@ _SNAKE = SimpleNamespace(
 )
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _forums_open(monkeypatch):
+    # These tests use a fake session and are about animals; the forum block
+    # asks the forums gate (settings table), which a fake session can't answer.
+    monkeypatch.setattr(search, "forums_open", lambda db, user: True)
+
+
 def _run(db, app=None, user=_ME, type=None):
     return asyncio.run(search.global_search(q="nood", type=type, app=app, db=db, current_user=user))
 

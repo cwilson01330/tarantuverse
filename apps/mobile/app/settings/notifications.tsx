@@ -28,6 +28,7 @@ import {
 import { FIRST_FEEDING_COPY } from '../../src/lib/first-feeding';
 import type { Permission } from '../../src/lib/notification-ask';
 import { SPACING, TYPE } from '../../src/theme/tokens';
+import { useFeatures } from '../../src/hooks/useFeatures';
 
 interface NotificationPreferences {
   daily_digest_enabled: boolean;
@@ -101,6 +102,7 @@ function formatClock(hhmm: string | null | undefined): string {
 export default function NotificationSettingsScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
+  const { forumsEnabled } = useFeatures();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const backButton = (
     <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
@@ -543,19 +545,21 @@ export default function NotificationSettingsScreen() {
             />
           </View>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Forum Replies</Text>
-              <Text style={styles.settingDescription}>
-                When someone replies to your forum posts
-              </Text>
+          {forumsEnabled && (
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Forum Replies</Text>
+                <Text style={styles.settingDescription}>
+                  When someone replies to your forum posts
+                </Text>
+              </View>
+              <Switch
+                value={preferences.forum_replies_enabled}
+                onValueChange={(value) => setPreferences({ ...preferences, forum_replies_enabled: value })}
+                trackColor={{ false: colors.border, true: colors.primary }}
+              />
             </View>
-            <Switch
-              value={preferences.forum_replies_enabled}
-              onValueChange={(value) => setPreferences({ ...preferences, forum_replies_enabled: value })}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
-          </View>
+          )}
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>

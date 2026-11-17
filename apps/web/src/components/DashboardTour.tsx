@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useFeatures } from '@/lib/features'
 
 const TOUR_KEY = 'dashboard_tour_completed'
 
@@ -11,7 +12,7 @@ interface TourStep {
   content: string
 }
 
-const steps: TourStep[] = [
+const BASE_STEPS: TourStep[] = [
   {
     target: '[data-tour="stats"]',
     title: 'Your Dashboard',
@@ -30,9 +31,19 @@ const steps: TourStep[] = [
   {
     target: '[data-tour="sidebar-nav"]',
     title: 'Navigation',
-    content: 'Use the sidebar to switch between your Dashboard, Collection, Community, Forums, Species database, and more.',
+    content: 'Use the sidebar to switch between your Dashboard, Collection, Feeding Day, Community, Species database, and more.',
   },
 ]
+
+/** Same steps every time; the Navigation step names Forums only while they are switched on. */
+function tourSteps(forumsEnabled: boolean): TourStep[] {
+  if (!forumsEnabled) return BASE_STEPS
+  return BASE_STEPS.map((s) =>
+    s.target === '[data-tour="sidebar-nav"]'
+      ? { ...s, content: 'Use the sidebar to switch between your Dashboard, Collection, Feeding Day, Community, Forums, Species database, and more.' }
+      : s
+  )
+}
 
 export function resetDashboardTour() {
   if (typeof window !== 'undefined') {
@@ -62,6 +73,8 @@ function TourOverlay({
 }) {
   const [rect, setRect] = useState<SpotlightRect | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const { forumsEnabled } = useFeatures()
+  const steps = tourSteps(forumsEnabled)
   const step = steps[stepIndex]
   const isFirst = stepIndex === 0
   const isLast = stepIndex === steps.length - 1
@@ -217,6 +230,7 @@ function TourOverlay({
 }
 
 export default function DashboardTour() {
+  const steps = BASE_STEPS // length is the same whichever switches are on
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   const [mounted, setMounted] = useState(false)

@@ -15,6 +15,7 @@ import { AppHeader } from '../src/components/AppHeader';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { resolveDeeplink } from '../src/lib/deeplinks';
+import { openRoute } from '../src/lib/open-route';
 
 interface Notification {
   id: string;
@@ -144,7 +145,7 @@ export default function NotificationCenterScreen() {
     // dead taps forever.
     const resolved = resolveDeeplink(n.deeplink);
     if (resolved) {
-      router.push(resolved as any);
+      openRoute(router, resolved);
       return;
     }
 

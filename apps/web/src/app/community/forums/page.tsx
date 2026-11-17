@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import withForumsGate from "@/components/withForumsGate";
 
 interface ForumCategory {
   id: number;
@@ -19,7 +20,7 @@ interface ForumCategory {
   updated_at: string;
 }
 
-export default function ForumsPage() {
+function ForumsPage() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,3 +200,5 @@ export default function ForumsPage() {
     </DashboardLayout>
   );
 }
+
+export default withForumsGate(ForumsPage);

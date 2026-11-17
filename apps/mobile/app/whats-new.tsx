@@ -16,6 +16,7 @@ import { withErrorBoundary } from '../src/components/ErrorBoundary';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { SPACING } from '../src/theme/tokens';
 import { useWhatsNew } from '../src/lib/whats-new';
+import { openRoute } from '../src/lib/open-route';
 
 function WhatsNewScreen() {
   const { colors, layout } = useTheme();
@@ -53,7 +54,7 @@ function WhatsNewScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <WhatsNewList weeks={weeks} onAction={(route) => router.push(route as never)} />
+          <WhatsNewList weeks={weeks} onAction={(route) => openRoute(router, route)} />
         </ScrollView>
       )}
     </View>

@@ -30,7 +30,7 @@ async function sessionKey(): Promise<string> {
 /** Where each entry button goes in THIS app. `null` = this app has no such screen: no button. */
 export const TARGET_ROUTES: Record<WhatsNewTarget, string | null> = {
   expenses: '/expenses',
-  feeding_day: '/feeding-day',
+  feeding_day: '/(tabs)/feeding',
   analytics_advanced: '/analytics',
   collection: '/(tabs)/collection',
   species: '/(tabs)/species',

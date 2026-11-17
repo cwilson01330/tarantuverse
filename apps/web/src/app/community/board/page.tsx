@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import withForumsGate from '@/components/withForumsGate'
 
 interface Message {
   id: string
@@ -37,7 +38,7 @@ const REACTION_EMOJIS = ['❤️', '👍', '😂', '🔥', '🕷️', '🎉']
 
 type SortOption = 'newest' | 'popular' | 'most_replies'
 
-export default function CommunityBoardPage() {
+function CommunityBoardPage() {
   const router = useRouter()
   const { user, token } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
@@ -455,3 +456,5 @@ export default function CommunityBoardPage() {
     </DashboardLayout>
   )
 }
+
+export default withForumsGate(CommunityBoardPage)

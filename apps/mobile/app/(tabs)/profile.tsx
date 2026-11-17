@@ -282,6 +282,12 @@ function ProfileScreen() {
         <MenuRow icon="bell-cog-outline" label="Notification settings" onPress={() => router.push('/settings/notifications')} />
       </MenuSection>
 
+      <MenuSection title="Community">
+        {/* Community left the bottom bar when Feeding took its slot. */}
+        <MenuRow icon="account-group" label="Community" onPress={() => router.push('/community-feed' as never)}
+          accessibilityHint="Keeper activity feed, discover and keeper directory" />
+      </MenuSection>
+
       <MenuSection title="Your collection">
         {/* README §3 "You · Analytics row": first in the group. The count comes
             from Home's /analytics/collection response (no request here); until

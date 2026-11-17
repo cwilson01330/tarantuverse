@@ -12,6 +12,8 @@ from app.models.activity_feed import ActivityFeed
 from app.models.follow import Follow
 from app.schemas.activity import ActivityFeedItemResponse, ActivityFeedList
 from app.routers.auth import get_current_user
+from app.utils.dependencies import get_current_user_optional
+from app.utils.forums_gate import forums_open
 
 router = APIRouter(prefix="/api/v1/activity", tags=["activity"])
 
@@ -26,6 +28,18 @@ router = APIRouter(prefix="/api/v1/activity", tags=["activity"])
 ACTION_TYPE_GROUPS: dict[str, list[str]] = {
     "forums": ["forum_thread", "forum_post"],
 }
+
+
+FORUM_ACTION_TYPES = ACTION_TYPE_GROUPS["forums"]
+
+
+def _hide_forum_items(query, db: Session, viewer: Optional[User]):
+    """While forums are paused, forum items leave every feed (admins still see
+    them). Combined with `_apply_action_type`, `action_type=forums` then
+    matches nothing: an empty list, not an error."""
+    if forums_open(db, viewer):
+        return query
+    return query.filter(ActivityFeed.action_type.notin_(FORUM_ACTION_TYPES))
 
 
 def _apply_action_type(query, action_type: Optional[str]):
@@ -81,6 +95,7 @@ async def get_personalized_feed(
 
     # Filter by action type if specified
     query = _apply_action_type(query, action_type)
+    query = _hide_forum_items(query, db, current_user)
     
     # Order by most recent
     query = query.order_by(desc(ActivityFeed.created_at))
@@ -122,7 +137,8 @@ async def get_global_feed(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post|forums)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     Get global activity feed — PUBLIC ACCOUNTS ONLY.
@@ -155,6 +171,7 @@ async def get_global_feed(
 
     # Filter by action type if specified
     query = _apply_action_type(query, action_type)
+    query = _hide_forum_items(query, db, current_user)
     
     # Order by most recent
     query = query.order_by(desc(ActivityFeed.created_at))
@@ -197,7 +214,8 @@ async def get_user_activity(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post|forums)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     Get activity for a specific user
@@ -228,6 +246,7 @@ async def get_user_activity(
     
     # Filter by action type if specified
     query = _apply_action_type(query, action_type)
+    query = _hide_forum_items(query, db, current_user)
     
     # Order by most recent
     query = query.order_by(desc(ActivityFeed.created_at))

@@ -72,10 +72,10 @@ describe('handleNotificationResponse', () => {
     expect(d.showToast).toHaveBeenCalledTimes(1);
   });
 
-  it('open_feeding_day navigates to /feeding-day', async () => {
+  it('open_feeding_day navigates to the Feeding tab', async () => {
     const d = deps();
     await handleNotificationResponse(resp('open_feeding_day', { type: 'feeding_digest', deeplink: '/feeding-day' }) as any, d);
-    expect(d.navigate).toHaveBeenCalledWith('/feeding-day');
+    expect(d.navigate).toHaveBeenCalledWith('/(tabs)/feeding');
     expect(d.post).not.toHaveBeenCalled();
   });
 

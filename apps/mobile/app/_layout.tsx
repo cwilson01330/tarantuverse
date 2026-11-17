@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
+import { openRoute } from '../src/lib/open-route';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -116,7 +117,7 @@ function ReminderBridge() {
         },
         navigate: (href) => {
           try {
-            router.push(href as never);
+            openRoute(router, href);
           } catch (error) {
             console.warn('[Reminders] navigate failed for', href, error);
           }

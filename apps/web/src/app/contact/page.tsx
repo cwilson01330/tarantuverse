@@ -71,8 +71,8 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg mb-1">Community</h3>
-                  <Link href="/community/board" className="text-purple-600 hover:underline">
-                    Visit our message boards
+                  <Link href="/community" className="text-purple-600 hover:underline">
+                    Browse the keeper directory
                   </Link>
                 </div>
               </div>

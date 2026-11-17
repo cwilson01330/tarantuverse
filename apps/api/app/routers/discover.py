@@ -12,6 +12,7 @@ from app.models.tarantula import Tarantula
 from app.models.species import Species
 from app.models.forum import ForumThread, ForumCategory, ForumPost
 from app.models.activity_feed import ActivityFeed
+from app.utils.forums_gate import forums_open
 from app.schemas.discover import (
     DiscoverResponse,
     TrendingThread,
@@ -36,7 +37,10 @@ async def get_discover_feed(db: Session = Depends(get_db)):
     # ============================================================
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
-    trending_threads_data = (
+    # Anonymous endpoint: while forums are paused nothing forum-related shows.
+    forums_visible = forums_open(db, None)
+
+    trending_threads_data = [] if not forums_visible else (
         db.query(
             ForumThread.id,
             ForumThread.title,
@@ -136,7 +140,7 @@ async def get_discover_feed(db: Session = Depends(get_db)):
     # ============================================================
     # 4. RECENT ACTIVITY (Latest 10 items)
     # ============================================================
-    recent_activity_data = (
+    recent_activity_query = (
         db.query(
             ActivityFeed.id,
             User.username.label("user_username"),
@@ -145,6 +149,13 @@ async def get_discover_feed(db: Session = Depends(get_db)):
             ActivityFeed.created_at,
         )
         .join(User, ActivityFeed.user_id == User.id)
+    )
+    if not forums_visible:
+        recent_activity_query = recent_activity_query.filter(
+            ActivityFeed.action_type.notin_(["forum_thread", "forum_post"])
+        )
+    recent_activity_data = (
+        recent_activity_query
         .order_by(desc(ActivityFeed.created_at))
         .limit(10)
         .all()
@@ -167,7 +178,9 @@ async def get_discover_feed(db: Session = Depends(get_db)):
     total_keepers = db.query(func.count(User.id)).filter(User.is_active == True, real_user_clause()).scalar() or 0
     total_tarantulas = db.query(func.count(Tarantula.id)).scalar() or 0
     total_species = db.query(func.count(Species.id)).filter(Species.is_verified == True).scalar() or 0
-    total_forum_threads = db.query(func.count(ForumThread.id)).scalar() or 0
+    total_forum_threads = (
+        (db.query(func.count(ForumThread.id)).scalar() or 0) if forums_visible else None
+    )
 
     stats = PlatformStats(
         total_keepers=total_keepers,

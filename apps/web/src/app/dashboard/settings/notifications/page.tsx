@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
 import { FIRST_FEEDING_COPY } from '@/lib/firstFeeding';
+import { useFeatures } from '@/lib/features';
 
 interface NotificationPreferences {
   daily_digest_enabled: boolean;
@@ -123,6 +124,7 @@ function Toggle({
 }
 
 export default function NotificationSettingsPage() {
+  const { forumsEnabled } = useFeatures();
   const router = useRouter();
   const { user: authUser, token, isAuthenticated, isLoading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -394,13 +396,15 @@ export default function NotificationSettingsPage() {
               <Toggle on={preferences.direct_messages_enabled} onClick={() => togglePreference('direct_messages_enabled')} label="Direct message notifications" />
             </div>
 
-            <div className={row}>
-              <div className="flex-1">
-                <h3 className={title}>Forum Replies</h3>
-                <p className={desc}>When someone replies to your forum posts</p>
+            {forumsEnabled && (
+              <div className={row}>
+                <div className="flex-1">
+                  <h3 className={title}>Forum Replies</h3>
+                  <p className={desc}>When someone replies to your forum posts</p>
+                </div>
+                <Toggle on={preferences.forum_replies_enabled} onClick={() => togglePreference('forum_replies_enabled')} label="Forum reply notifications" />
               </div>
-              <Toggle on={preferences.forum_replies_enabled} onClick={() => togglePreference('forum_replies_enabled')} label="Forum reply notifications" />
-            </div>
+            )}
 
             <div className={row}>
               <div className="flex-1">

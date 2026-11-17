@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { openRoute } from '../../lib/open-route';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { SPACING, TYPE } from '../../theme/tokens';
@@ -18,7 +19,8 @@ const TILE_LOOK: Record<RightNowTile['key'], { icon: IconName; color: string }> 
 function openTarget(tile: RightNowTile) {
   const t = tile.target;
   if (!t) return;
-  router.push((t.kind === 'feeding_day' ? '/feeding-day' : `/invert/${t.id}`) as never);
+  if (t.kind === 'feeding_day') openRoute(router, '/(tabs)/feeding');
+  else openRoute(router, `/invert/${t.id}`);
 }
 
 /** The three "Right now" tiles. Zero animals: nothing is rendered. */

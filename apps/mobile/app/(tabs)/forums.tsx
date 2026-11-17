@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { withForumsGate } from '../../src/components/ForumsGate';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -295,4 +296,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default withErrorBoundary(ForumsScreen, 'forums');
+export default withForumsGate(withErrorBoundary(ForumsScreen, 'forums'));

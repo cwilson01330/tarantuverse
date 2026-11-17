@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import { SkeletonList } from '@/components/ui/skeleton'
+import { useFeatures } from '@/lib/features'
 
 interface DiscoverResponse {
   stats: {
@@ -113,6 +114,7 @@ function getCareLeveColor(level?: string): string {
 export default function DiscoverPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const { forumsEnabled } = useFeatures()
   const [discover, setDiscover] = useState<DiscoverResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -181,7 +183,7 @@ export default function DiscoverPage() {
         {discover && (
           <>
             {/* Platform Stats Banner */}
-            <div className="mb-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`mb-12 grid grid-cols-2 ${forumsEnabled ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
               <div className="bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-2xl p-6 border border-purple-200 dark:border-purple-700/50">
                 <div className="text-3xl font-bold text-purple-700 dark:text-purple-300">
                   {discover.stats.total_keepers}
@@ -206,60 +208,64 @@ export default function DiscoverPage() {
                   Species in Database
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 rounded-2xl p-6 border border-orange-200 dark:border-orange-700/50">
-                <div className="text-3xl font-bold text-orange-700 dark:text-orange-300">
-                  {discover.stats.total_forum_threads}
+              {forumsEnabled && (
+                <div className="bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 rounded-2xl p-6 border border-orange-200 dark:border-orange-700/50">
+                  <div className="text-3xl font-bold text-orange-700 dark:text-orange-300">
+                    {discover.stats.total_forum_threads}
+                  </div>
+                  <div className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                    Discussions
+                  </div>
                 </div>
-                <div className="text-sm text-orange-600 dark:text-orange-400 mt-1">
-                  Discussions
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Trending Discussions Section */}
-            <section className="mb-12">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <span>🔥</span> Trending Discussions
-              </h2>
-              <div className="space-y-3">
-                {discover.trending_threads.length > 0 ? (
-                  discover.trending_threads.map((thread) => (
-                    <button
-                      key={thread.id}
-                      onClick={() => router.push(`/community/forums/thread/${thread.id}`)}
-                      className="w-full text-left bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg dark:hover:shadow-lg hover:border-primary-600 dark:hover:border-primary-400 transition-all duration-200"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition">
-                            {thread.title}
-                          </h3>
-                          <div className="flex items-center gap-3 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-medium">
-                              {thread.category}
-                            </span>
-                            <span>by @{thread.author_username}</span>
-                            <span>{formatDate(thread.created_at)}</span>
+            {forumsEnabled && (
+              <section className="mb-12">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                  <span>🔥</span> Trending Discussions
+                </h2>
+                <div className="space-y-3">
+                  {discover.trending_threads.length > 0 ? (
+                    discover.trending_threads.map((thread) => (
+                      <button
+                        key={thread.id}
+                        onClick={() => router.push(`/community/forums/thread/${thread.id}`)}
+                        className="w-full text-left bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg dark:hover:shadow-lg hover:border-primary-600 dark:hover:border-primary-400 transition-all duration-200"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-primary-600 dark:hover:text-primary-400 transition">
+                              {thread.title}
+                            </h3>
+                            <div className="flex items-center gap-3 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-medium">
+                                {thread.category}
+                              </span>
+                              <span>by @{thread.author_username}</span>
+                              <span>{formatDate(thread.created_at)}</span>
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 text-right">
+                            <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                              {thread.reply_count}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              replies
+                            </div>
                           </div>
                         </div>
-                        <div className="flex-shrink-0 text-right">
-                          <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                            {thread.reply_count}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            replies
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    No trending discussions yet
-                  </div>
-                )}
-              </div>
-            </section>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      No trending discussions yet
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* Active Keepers Section */}
             <section className="mb-12">

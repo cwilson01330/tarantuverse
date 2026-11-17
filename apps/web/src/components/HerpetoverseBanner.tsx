@@ -1,13 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getSystemStatus } from '@/lib/features'
 
 // Bump this suffix if you ever need to re-show the banner to users who
 // already dismissed a previous version (e.g. after rewording).
 const DISMISS_KEY = 'herpetoverse_banner_dismissed_v1'
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
 interface BannerConfig {
   enabled: boolean
@@ -55,11 +53,8 @@ export default function HerpetoverseBanner() {
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(`${API_URL}/api/v1/system/status`, {
-          cache: 'no-store',
-        })
-        if (!res.ok) return
-        const data: SystemStatus = await res.json()
+        // One shared status call per page load (also feeds the feature switches).
+        const data = (await getSystemStatus()) as SystemStatus | null
         const banner = data?.announcements?.herpetoverse_banner
         if (!cancelled && banner) setConfig(banner)
       } catch {

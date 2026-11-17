@@ -1,5 +1,5 @@
-import { Tabs, useRouter } from 'expo-router';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -9,7 +9,6 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 // imports NotificationBell or useUnreadMessages.
 export default function TabLayout() {
   const { colors, layout } = useTheme();
-  const router = useRouter();
 
   const tintColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
@@ -87,6 +86,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="feeding"
+        options={{
+          // Feeding Day as a bottom tab (took Community's slot). The screen
+          // draws its own gradient AppHeader ("Feeding Day"), so the navigator
+          // must not stack a second one. No badge.
+          title: 'Feeding Day',
+          tabBarLabel: 'Feeding',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="silverware-fork-knife" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="scorpions"
         options={{
           // Hidden from the tab bar — the Collection tab now surfaces
@@ -102,9 +115,8 @@ export default function TabLayout() {
           href: null, // Hidden from tab bar, still accessible via navigation
         }}
       />
-      {/* Declaration order below IS the bottom-bar order, so species is
-          declared before community to land on the handoff's spine:
-          Home · Collection · Species · Community · You. */}
+      {/* Declaration order IS the bottom-bar order:
+          Home · Collection · Feeding · Species · You. */}
       <Tabs.Screen
         name="species"
         options={{
@@ -124,29 +136,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="community"
         options={{
-          title: 'Community',
-          // The screen draws its own gradient header (title + scope subtitle +
-          // discover/directory actions), same as Home and Collection. Discover
-          // moved into that header rather than being dropped.
-          headerShown: false,
-          headerRight: ({ tintColor: tc }) => (
-            <TouchableOpacity
-              onPress={() => router.push('/discover')}
-              style={styles.headerButton}
-              accessibilityLabel="Discover community"
-            >
-              <MaterialCommunityIcons name="star" size={24} color={tc} />
-            </TouchableOpacity>
-          ),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-group" size={size} color={color} />
-          ),
+          // No longer a tab: Community is a stack screen (/community-feed)
+          // opened from the You tab. This route is a redirect to it.
+          href: null,
         }}
       />
       <Tabs.Screen
         name="forums"
         options={{
-          href: null, // Accessible from Community tab
+          href: null, // Reached from Community (or paused page); not a tab
         }}
       />
       <Tabs.Screen
@@ -174,11 +172,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  headerButton: {
-    marginRight: 12,
-    padding: 6,
-    position: 'relative',
-  },
-});

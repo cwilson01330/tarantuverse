@@ -159,7 +159,7 @@ export default function MessagesScreen() {
               </Text>
               <TouchableOpacity
                 style={[styles.browseCommunityButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/(tabs)/community')}
+                onPress={() => router.push('/community-feed' as never)}
               >
                 <Text style={styles.browseCommunityButtonText}>Browse Community</Text>
               </TouchableOpacity>

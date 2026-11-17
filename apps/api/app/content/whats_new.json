@@ -9,6 +9,22 @@
       "action": { "label": "Open your collection", "target": "collection" }
     },
     {
+      "id": "2026-11-23-feeding-day-tab",
+      "published_on": "2026-11-23",
+      "title": "Feeding Day has its own tab",
+      "body": "Feeding Day now sits in the tab bar on your phone and in the sidebar on the web, one tap from anywhere. On your phone, Community is now under the You tab.",
+      "premium": false,
+      "action": { "label": "Open Feeding Day", "target": "feeding_day" }
+    },
+    {
+      "id": "2026-11-23-egg-sac-photos",
+      "published_on": "2026-11-23",
+      "title": "Photos for egg sacs",
+      "body": "Add a photo to an egg sac. Mature male jumping spiders linked to a jumper species also show a sourced note from a lab study on how long males lived after their final molt.",
+      "premium": false,
+      "action": { "label": "Open your collection", "target": "collection" }
+    },
+    {
       "id": "2026-11-16-smarter-reminders",
       "published_on": "2026-11-16",
       "title": "Smarter feeding reminders",

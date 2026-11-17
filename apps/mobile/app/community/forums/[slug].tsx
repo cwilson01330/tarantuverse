@@ -13,6 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { useTheme } from '../../../src/contexts/ThemeContext';
+import { withForumsGate } from '../../../src/components/ForumsGate';
 
 interface Thread {
   id: number;
@@ -40,7 +41,7 @@ interface Category {
   post_count: number;
 }
 
-export default function ForumCategoryScreen() {
+function ForumCategoryScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const { colors, layout } = useTheme();
@@ -409,3 +410,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+export default withForumsGate(ForumCategoryScreen);
