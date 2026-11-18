@@ -6,11 +6,14 @@
  * backend serves four clients with four different route shapes, so the
  * canonical string is never a literal path; each client maps it here.
  *
- * HV mobile currently serves only Feeding Day. It has no transfers index, no
+ * HV mobile serves Feeding Day and a single animal (/reptile/<id>). It has no transfers index, no
  * forums, no DMs, and no keeper profiles — those canonical routes resolve to
  * null and the caller must not navigate. Previously this screen pushed the raw
  * string, so a transfer notification tried to open a route that doesn't exist.
  */
+
+/** Per-animal feeding reminders deep-link to /reptile/<id> (app/reptile/[id].tsx). */
+const REPTILE_PATH = /^\/reptile\/[A-Za-z0-9-]+$/;
 
 const EXACT_MAP: Record<string, string> = {
   '/feeding-day': '/feeding-day',
@@ -24,6 +27,8 @@ export function resolveDeeplink(deeplink: string | null | undefined): string | n
   // Only ever navigate to in-app paths. A deeplink is server data, and an
   // absolute URL here would be an open-redirect shaped hole.
   if (!deeplink.startsWith('/') || deeplink.startsWith('//')) return null;
+
+  if (REPTILE_PATH.test(deeplink)) return deeplink;
 
   return EXACT_MAP[deeplink] ?? null;
 }

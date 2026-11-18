@@ -763,6 +763,16 @@ export interface AnimalFeedingStatus {
   fed_today: boolean;
   /** Brumating / aestivating — never overdue. Older API builds omit it. */
   is_brumating?: boolean;
+  /** First-feeding rule (shared with TV): never fed, has a cadence, not paused
+   *  and not yet due — show "First meal not logged" / the dashboard card.
+   *  Older API builds omit these four fields. */
+  needs_first_feeding?: boolean;
+  /** Never-fed animals only: local days since the later of the created day and date_acquired. */
+  days_since_baseline?: number | null;
+  /** Newest feeding of either kind; set only when "refusal restarts the wait" is on. */
+  last_offered_date?: string | null;
+  /** Plant-eater with no keeper interval: listed and feedable, never due ("No schedule"). */
+  no_schedule?: boolean;
 }
 
 /**

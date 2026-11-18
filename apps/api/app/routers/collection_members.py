@@ -215,12 +215,15 @@ async def _send_invite(owner: User, m: CollectionMember, raw: str) -> bool:
         return False
 
 
-def _notify(db: Session, user_id: UUID, type_: str, title: str, body: str, data: dict) -> None:
+def _notify(db: Session, user_id: UUID, type_: str, title: str, body: str, data: dict,
+            *, app: str) -> None:
+    """`app` = the membership's app (CollectionMember.app): the push goes to
+    that app on the person's phone."""
     try:
         from app.services.notification_service import create_notification
 
         create_notification(db, user_id=user_id, type=type_, title=title, body=body,
-                            deeplink="/shared", data=data)
+                            deeplink="/shared", data=data, app=app)
     except Exception:
         logger.exception("collection member notification failed")
         db.rollback()
@@ -253,7 +256,7 @@ def _activate(db: Session, m: CollectionMember, user: User) -> CollectionMember:
         _notify(db, owner.id, "collection_member_joined",
                 f"{_name(user)} joined your {APP_NAME[m.app]} collection",
                 f"They can now {'see' if m.role == 'viewer' else 'log in'} your collection as a {m.role}.",
-                {"membership_id": str(m.id), "app": m.app})
+                {"membership_id": str(m.id), "app": m.app}, app=m.app)
     return m
 
 
@@ -521,7 +524,7 @@ async def invite(
         _notify(db, invitee.id, "collection_invite",
                 f"{_name(owner)} invited you to their {APP_NAME[body.app]} collection",
                 f"As a {body.role}. Open Shared with me to accept.",
-                {"membership_id": str(m.id), "app": body.app})
+                {"membership_id": str(m.id), "app": body.app}, app=body.app)
     return InviteCreated(**_member_out(db, m).model_dump(),
                          accept_url=f"{APP_ORIGIN[m.app]}/invite#{raw}", email_sent=sent,
                          invite_code=_code_for(m.invite_token_hash))
@@ -619,7 +622,7 @@ async def remove_member(
     if was_active and member_id:
         _notify(db, member_id, "collection_member_removed",
                 f"You're no longer a co-keeper on {_name(current_user)}'s collection",
-                "The owner ended your access.", {"app": m.app})
+                "The owner ended your access.", {"app": m.app}, app=m.app)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -644,5 +647,5 @@ async def leave(
     db.commit()
     _notify(db, m.owner_user_id, "collection_member_left",
             f"{_name(current_user)} left your {APP_NAME[m.app]} collection", "They no longer have access.",
-            {"app": m.app})
+            {"app": m.app}, app=m.app)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

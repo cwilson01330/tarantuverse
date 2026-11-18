@@ -39,6 +39,10 @@ class Brand:
 TARANTUVERSE = Brand(name="Tarantuverse", button_hex="#7c3aed")
 HERPETOVERSE = Brand(name="Herpetoverse", button_hex="#0B6B3A")
 
+# Where server-initiated Herpetoverse mail (the daily reminder email) links to.
+# A fixed address: FRONTEND_URL is Tarantuverse's site.
+HERPETOVERSE_ORIGIN = "https://herpetoverse.com"
+
 
 def resolve_frontend_origin(requested: Optional[str]) -> str:
     """The allowlisted origin the client asked for, else the default."""

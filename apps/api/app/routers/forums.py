@@ -512,6 +512,7 @@ async def create_post(
                 deeplink=f"/forums/thread/{thread.id}",
                 data={"thread_id": str(thread.id), "replier": current_user.username},
                 push_category="forum_replies_enabled",
+                app="tarantuverse",  # social notifications live on Tarantuverse
             )
     except Exception:
         pass  # never block the reply on notification issues

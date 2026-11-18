@@ -8,7 +8,11 @@ rate-limited by Resend (2 requests/second) and capped per day.
 Privacy and safety rules, all enforced here or in the digest loop:
   * opt-in only (`email_digest_enabled`), active accounts only, and never a
     merged (`@merged.invalid`) or automated test-domain address;
-  * at most one email per person per UTC day and `DIGEST_EMAIL_DAILY_CAP` per day;
+  * at most one email per person per app per UTC day (Tarantuverse and
+    Herpetoverse each have their own last-sent column), and
+    `DIGEST_EMAIL_DAILY_CAP` per day counting both apps' emails;
+  * each email is branded and linked to its app (`DigestEmail.app`): TV goes to
+    FRONTEND_URL's /dashboard pages, HV to https://herpetoverse.com/app/...;
   * every user-provided value in the HTML is escaped; the only data in any URL is
     the signed unsubscribe token;
   * nothing logs an address or a body.
@@ -29,7 +33,12 @@ from app.config import settings
 from app.models.notification_preferences import NotificationPreferences
 from app.services.email import EmailService
 from app.utils.digest_unsubscribe_token import make_unsubscribe_token
-from app.utils.frontend_origin import TARANTUVERSE, resolve_frontend_origin
+from app.utils.frontend_origin import (
+    HERPETOVERSE,
+    HERPETOVERSE_ORIGIN,
+    TARANTUVERSE,
+    resolve_frontend_origin,
+)
 from app.utils.test_accounts import is_test_account
 
 logger = logging.getLogger(__name__)
@@ -40,12 +49,32 @@ SEND_PAUSE_SECONDS = 0.6
 MERGED_SUFFIX = "@merged.invalid"
 
 
+APP_TARANTUVERSE = "tarantuverse"
+APP_HERPETOVERSE = "herpetoverse"
+
+
 @dataclass
 class DigestEmail:
     user_id: uuid.UUID
     to: str = field(repr=False)  # an address: never let a stray log of the object print it
     due_count: int
     names: List[str] = field(default_factory=list)
+    # Which app's animals are due: decides brand, links and which once-a-day
+    # guard column the send checks and stamps.
+    app: str = APP_TARANTUVERSE
+
+
+def _is_hv(email: DigestEmail) -> bool:
+    return email.app == APP_HERPETOVERSE
+
+
+def _origin(email: DigestEmail) -> str:
+    return HERPETOVERSE_ORIGIN if _is_hv(email) else resolve_frontend_origin(None)
+
+
+def _guard_column(email: DigestEmail) -> str:
+    """The prefs column holding the UTC date this app's email last went out."""
+    return "email_digest_last_sent_on_hv" if _is_hv(email) else "email_digest_last_sent_on"
 
 
 def display_name(name, common_name, scientific_name) -> str:
@@ -73,13 +102,23 @@ def _headline(due_count: int) -> str:
 
 
 def _build(email: DigestEmail) -> tuple[str, str, dict]:
-    origin = resolve_frontend_origin(None)
+    origin = _origin(email)
     token = make_unsubscribe_token(email.user_id)
-    feeding_day = f"{origin}/dashboard/feeding-day"
     unsubscribe = f"{origin}/unsubscribe/{token}"
-    settings_link = f"{origin}/dashboard/settings/notifications"
     api = settings.API_PUBLIC_URL.rstrip("/")
-    list_unsubscribe = f"<{api}/api/v1/notification-preferences/email-unsubscribe?token={token}>"
+    if _is_hv(email):
+        brand = HERPETOVERSE
+        feeding_day = f"{origin}/app/feeding-day"
+        settings_link = f"{origin}/app/settings/notifications"
+        # The GET on this URL redirects to the HV unsubscribe page.
+        list_unsubscribe = (
+            f"<{api}/api/v1/notification-preferences/email-unsubscribe?token={token}&app={APP_HERPETOVERSE}>"
+        )
+    else:
+        brand = TARANTUVERSE
+        feeding_day = f"{origin}/dashboard/feeding-day"
+        settings_link = f"{origin}/dashboard/settings/notifications"
+        list_unsubscribe = f"<{api}/api/v1/notification-preferences/email-unsubscribe?token={token}>"
 
     subject = _headline(email.due_count)
     names = email.names[:MAX_NAMES]
@@ -90,18 +129,24 @@ def _build(email: DigestEmail) -> tuple[str, str, dict]:
         extra = f"<p>and {more} more.</p>" if more > 0 else ""
         names_block = f'<ul style="padding-left: 20px;">{items}</ul>{extra}'
 
+    # The shared sender (RESEND_FROM_EMAIL) can't be renamed per send, so the
+    # Herpetoverse email names its product in the footer. TV's text is untouched.
+    from_line = "You're getting this because you turned on daily email reminders."
+    if _is_hv(email):
+        from_line = "You're getting this because you turned on daily email reminders from Herpetoverse."
+
     body = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>{html.escape(subject)}</h2>
             {names_block}
             <p style="margin: 20px 0;">
-                <a href="{html.escape(feeding_day)}" style="background-color: {TARANTUVERSE.button_hex}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                <a href="{html.escape(feeding_day)}" style="background-color: {brand.button_hex}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
                     Open Feeding Day
                 </a>
             </p>
             <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
             <p style="color: #666; font-size: 12px;">
-                You're getting this because you turned on daily email reminders.
+                {from_line}
                 <a href="{html.escape(unsubscribe)}">Unsubscribe</a> &middot;
                 <a href="{html.escape(settings_link)}">Reminder settings</a>
             </p>
@@ -117,17 +162,23 @@ def _build(email: DigestEmail) -> tuple[str, str, dict]:
 async def send_digest_emails(db: Session, emails: List[DigestEmail]) -> int:
     """Send the collected digest emails; returns how many went out.
 
-    Applies the daily cap (rows already stamped with today's UTC date count),
-    re-checks opt-in and the one-per-UTC-day rule against the live row, stamps
-    `email_digest_last_sent_on` after each successful send, and skips (logging
-    no address) any send that fails.
+    Drops everything when the TV frontend origin isn't https. Applies the daily
+    cap (rows stamped today in either guard column count, so a keeper's two
+    emails are two), re-checks opt-in and the one-per-UTC-day rule against the
+    live row, stamps the app's own guard column after each successful send
+    (`email_digest_last_sent_on` for Tarantuverse,
+    `email_digest_last_sent_on_hv` for Herpetoverse), and skips (logging no
+    address) any send that fails.
     """
     if not emails:
         return 0
 
     # The unsubscribe link and Feeding Day button are built from the frontend
     # origin. A misconfigured (non-https, e.g. localhost) origin would put dead
-    # links in a real keeper's inbox, so send nothing this run.
+    # links in a real keeper's inbox, so send none this run.
+    # A non-https FRONTEND_URL (non-production) is treated as "not a real
+    # environment": drop ALL digest emails, TV and HV, so staging never mails
+    # real addresses.
     if not resolve_frontend_origin(None).startswith("https://"):
         logger.warning(
             "Daily digest emails skipped: FRONTEND_URL is not https (%d email(s) not sent)",
@@ -136,9 +187,14 @@ async def send_digest_emails(db: Session, emails: List[DigestEmail]) -> int:
         return 0
 
     today = datetime.now(timezone.utc).date()
+    # Both apps' emails count toward the one cap: a row stamped today in both
+    # columns is two emails.
     already = (
         db.query(NotificationPreferences)
         .filter(NotificationPreferences.email_digest_last_sent_on == today)
+        .count()
+        + db.query(NotificationPreferences)
+        .filter(NotificationPreferences.email_digest_last_sent_on_hv == today)
         .count()
     )
     remaining = max(0, int(settings.DIGEST_EMAIL_DAILY_CAP) - already)
@@ -157,10 +213,11 @@ async def send_digest_emails(db: Session, emails: List[DigestEmail]) -> int:
             .filter(NotificationPreferences.user_id == email.user_id)
             .first()
         )
+        guard = _guard_column(email)
         if (
             prefs is None
             or not prefs.email_digest_enabled
-            or prefs.email_digest_last_sent_on == today
+            or getattr(prefs, guard) == today
         ):
             continue
 
@@ -175,7 +232,7 @@ async def send_digest_emails(db: Session, emails: List[DigestEmail]) -> int:
             logger.error("Daily digest email failed to send (user %s)", email.user_id)
             continue
 
-        prefs.email_digest_last_sent_on = today
+        setattr(prefs, guard, today)
         db.commit()
         sent += 1
         remaining -= 1

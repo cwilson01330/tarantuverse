@@ -129,6 +129,11 @@ class Animal(Base):
     # animal is actually kept rather than what the species generally needs.
     feeding_interval_days = Column(Integer, nullable=True)
 
+    # HV smart reminders (hvr_20261118): the "Tomorrow" button on a per-animal
+    # reminder. The first local day the animal is reminded again — not a
+    # feeding pause (due status is unchanged). TV twin: inverts.reminder_snoozed_until.
+    reminder_snoozed_until = Column(Date, nullable=True)
+
     # CGD override — NULL inherits from herp_species.feeds_on_cgd,
     # true/false explicitly overrides for this animal. Drives CGD-aware
     # feeding-status thresholds in the clients (overdue at day 4 instead

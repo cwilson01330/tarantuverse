@@ -62,6 +62,11 @@ class NotificationPreferences(Base):
     # counts rows carrying today's date.
     email_digest_enabled = Column(Boolean, default=False, nullable=False, server_default="false")
     email_digest_last_sent_on = Column(Date, nullable=True)
+    # The Herpetoverse email's own guard (same meaning, UTC date of the last HV
+    # send); `email_digest_last_sent_on` above is the Tarantuverse one. The cap
+    # counts today's date in either column. One `email_digest_enabled` switch
+    # covers both apps.
+    email_digest_last_sent_on_hv = Column(Date, nullable=True)
 
     # Effortless logging switches. Existing rows are FALSE (server default);
     # only ensure_notification_preferences creates rows with TRUE.

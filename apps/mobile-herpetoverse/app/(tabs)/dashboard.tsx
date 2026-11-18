@@ -56,6 +56,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { GradientBand } from '../../src/components/GradientBand';
 import { NotificationBell } from '../../src/components/NotificationBell';
 import { WhatsNewCard } from '../../src/components/WhatsNewCard';
+import { FirstFeedingCard } from '../../src/components/FirstFeedingCard';
+import { NotificationAskSheet, useNotificationAsk } from '../../src/components/NotificationAskSheet';
+import { feedingStatusText, firstFeedingRows } from '../../src/lib/first-feeding';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -146,6 +149,10 @@ function DashboardScreen() {
   // Ids currently being marked fed — disables the row's check button and
   // shows a spinner, so a double tap can't post two feedings.
   const [feeding, setFeeding] = useState<Set<string>>(new Set());
+  // One-time "want a reminder on days something is due?" ask (see
+  // NotificationAskSheet). The hook decides whether it was asked already.
+  const ask = useNotificationAsk();
+  const maybeAskWhenDue = ask.maybeAskWhenDue;
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -190,7 +197,11 @@ function DashboardScreen() {
       );
     }
 
-    if (Array.isArray(feedingRes)) setFeedingStatus(feedingRes);
+    if (Array.isArray(feedingRes)) {
+      setFeedingStatus(feedingRes);
+      // After statuses load: the one-time "due" ask, only if something is due.
+      maybeAskWhenDue(feedingRes.some((r) => r.is_overdue));
+    }
     if (limitsRes) setLimits(limitsRes);
 
     if (Array.isArray(feedersRes)) {
@@ -201,7 +212,7 @@ function DashboardScreen() {
       );
       setLowStock(feedersRes.filter((s) => s.is_low_stock).length);
     }
-  }, []);
+  }, [maybeAskWhenDue]);
 
   useFocusEffect(
     useCallback(() => {
@@ -237,6 +248,13 @@ function DashboardScreen() {
           (a, b) =>
             (b.days_since_last_feeding ?? 0) - (a.days_since_last_feeding ?? 0),
         ),
+    [feedingStatus],
+  );
+
+  // Day one: never-fed animals that aren't due yet get the "First meal not
+  // logged" card (server flag needs_first_feeding, at most three).
+  const firstFeedingItems = useMemo(
+    () => firstFeedingRows(feedingStatus).map((a) => ({ id: a.id, name: feedingName(a) })),
     [feedingStatus],
   );
 
@@ -372,6 +390,9 @@ function DashboardScreen() {
         {/* ---------- What's new (renders nothing unless there is something unseen) ---------- */}
         <WhatsNewCard />
 
+        {/* ---------- First meal not logged (hidden for 14 days by its X) ---------- */}
+        <FirstFeedingCard items={firstFeedingItems} onLogged={() => void fetchDashboard()} />
+
         {/* ---------- Feeding hero ---------- */}
         <View
           style={[
@@ -448,7 +469,9 @@ function DashboardScreen() {
                     activeOpacity={0.7}
                     accessibilityRole="button"
                     accessibilityLabel={`${label}, ${
-                      days == null ? 'not yet fed' : `${days} days since last feeding`
+                      days == null
+                        ? feedingStatusText(a) ?? 'not yet fed'
+                        : `${days} days since last feeding`
                     }. Opens detail.`}
                   >
                     {a.photo_url ? (
@@ -478,12 +501,12 @@ function DashboardScreen() {
                           {
                             color:
                               days == null
-                                ? colors.textTertiary
+                                ? (a.is_overdue ? colors.warning : colors.textTertiary)
                                 : overdueColor(days, colors),
                           },
                         ]}
                       >
-                        {days == null ? 'Not yet fed' : `${days}d overdue`}
+                        {days == null ? feedingStatusText(a) ?? 'Not yet fed' : `${days}d overdue`}
                       </Text>
                     </View>
 
@@ -640,6 +663,7 @@ function DashboardScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <NotificationAskSheet {...ask.sheetProps} />
     </View>
   );
 }

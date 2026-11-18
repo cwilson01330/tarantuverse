@@ -6,7 +6,7 @@ One row per notify-worthy event for a user. Written by
 chokepoint; push delivery is an optional side-effect of creating a row, so the
 center works even when push can't be delivered yet.
 """
-from sqlalchemy import Column, String, Boolean, Text, DateTime, ForeignKey, Index
+from sqlalchemy import CheckConstraint, Column, String, Boolean, Text, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 import uuid
@@ -31,9 +31,17 @@ class Notification(Base):
     data = Column(JSONB, nullable=True)
     is_read = Column(Boolean, nullable=False, default=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Which app the row belongs to (hvr_20261118): NULL = Tarantuverse (every
+    # older row and every TV call), 'herpetoverse' for HV reminders. The list
+    # and unread-count routes show each app its own rows (routers/notifications).
+    app = Column(String(20), nullable=True)
 
     __table_args__ = (
         Index("ix_notifications_user_unread", "user_id", "is_read", "created_at"),
+        CheckConstraint(
+            "app IS NULL OR app IN ('tarantuverse', 'herpetoverse')",
+            name="ck_notifications_app",
+        ),
     )
 
     def __repr__(self):

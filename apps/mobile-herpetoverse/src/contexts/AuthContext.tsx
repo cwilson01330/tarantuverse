@@ -20,7 +20,7 @@ import {
   TOKEN_KEY,
   USER_KEY,
 } from '../services/api';
-import { getExpoPushToken } from '../services/notifications';
+import { registerPushToken } from '../services/notifications';
 import { signInWithGoogle, signInWithApple, type OAuthResult } from '../services/google-signin';
 import { HV_WEB_ORIGIN } from '../lib/web-origin';
 import { getErrorMessage } from '../utils/errors';
@@ -63,8 +63,9 @@ interface AuthContextType {
   // an account: the call then throws a NoAccountError (lib/session) whose
   // `createAccount()` finishes the sign-in with the same credentials if the
   // keeper confirms. Default true = the REGISTER screen / old behaviour.
-  loginWithGoogle: (options?: { allowCreate?: boolean }) => Promise<void>;
-  loginWithApple: (options?: { allowCreate?: boolean }) => Promise<void>;
+  /** Resolves `{ isNewUser }` — true when this sign-in created the account. */
+  loginWithGoogle: (options?: { allowCreate?: boolean }) => Promise<{ isNewUser: boolean }>;
+  loginWithApple: (options?: { allowCreate?: boolean }) => Promise<{ isNewUser: boolean }>;
   register: (
     email: string,
     username: string,
@@ -184,35 +185,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [handleAuthExpired]);
 
   // Register this device's Expo push token whenever we have an auth
-  // session — fresh login OR app relaunch once the stored token hydrates.
-  // Previously HV mobile never registered a token at all, so the
-  // server-sent daily feeding digest could not be delivered (ADR-009).
-  // Fire-and-forget: returns null in Expo Go or if permission is denied,
-  // and never blocks the app.
+  // session — fresh login OR app relaunch once the stored token hydrates —
+  // so the server's daily feeding digest reaches this phone (ADR-009).
+  // NEVER prompts (HV day one): registerPushToken only saves a token when the
+  // OS permission is already granted. The keeper is asked through
+  // NotificationAskSheet after saving an animal or when something is due, or
+  // from notification settings. It sends `app: 'herpetoverse'` so the server
+  // files it as this app's push address. Fire-and-forget, never blocks.
   // Keyed on "signed in as this user", not on the token string, so the daily
   // token refresh doesn't re-post the push token.
   const hasToken = !!token;
   const userId = user?.id ?? null;
   useEffect(() => {
     if (!hasToken) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const pushToken = await getExpoPushToken();
-        if (!cancelled && pushToken) {
-          await apiClient.post('/notification-preferences/push-token', {
-            token: pushToken,
-            tz_offset_minutes: new Date().getTimezoneOffset(),
-          });
-        }
-      } catch {
-        // non-fatal — reminders still schedule locally; digest just won't
-        // reach this device until a later successful registration.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void registerPushToken();
   }, [hasToken, userId]);
 
   // A keeper who has never chosen units gets the device region's default,
@@ -359,11 +345,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn: (o: { allowCreate: boolean }) => Promise<OAuthResult>,
     failure: string,
     options?: { allowCreate?: boolean },
-  ): Promise<void> {
+  ): Promise<{ isNewUser: boolean }> {
     sessionEpoch.bump();
     try {
       const result = await signIn({ allowCreate: options?.allowCreate !== false });
       await finishSocialLogin(method, result);
+      return { isNewUser: result.isNewUser === true };
     } catch (error: any) {
       if (isNoAccountError(error)) {
         // Hand the screen a retry that also persists the session.

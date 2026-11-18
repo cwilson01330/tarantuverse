@@ -2,8 +2,12 @@
 Notification preferences schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Literal, Optional
 import uuid
+
+# Which app a push address belongs to (push_tokens.app). Lockstep with
+# models/push_token.PUSH_APPS.
+PushApp = Literal["tarantuverse", "herpetoverse"]
 
 
 class NotificationPreferencesBase(BaseModel):
@@ -110,3 +114,14 @@ class NotificationPreferencesResponse(NotificationPreferencesBase):
 
     class Config:
         from_attributes = True
+
+
+class PushTokenBody(BaseModel):
+    """POST /notification-preferences/push-token.
+
+    `app` names the app the token belongs to; old clients don't send it and
+    are treated as Tarantuverse.
+    """
+    token: str = Field(..., max_length=255)
+    tz_offset_minutes: Optional[int] = None
+    app: Optional[PushApp] = None

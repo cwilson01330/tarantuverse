@@ -15,13 +15,12 @@ Ownership model: every query filters by
 through `/t/{id}` (qr router).
 """
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -53,6 +52,7 @@ from app.schemas.feeding import (
     AnimalBulkFeedingSkip,
 )
 from app.services.feeding_reminder_service import parse_frequency_string
+from app.services.animal_feeding_status import compute_animal_feeding_status
 from app.services.snake_feeding_advisory import cgd_applies
 from app.utils.dependencies import get_current_user
 from app.utils.access import load_animal, policy, require_own_enclosure, scope_collection, strip_owner_only
@@ -74,15 +74,6 @@ router = APIRouter()
 # different schedules, so the interval is resolved per-animal, degrading to
 # None (never flagged overdue) rather than guessing wrong.
 # ---------------------------------------------------------------------------
-
-def _calendar_day_diff(later: datetime, earlier: datetime, tz_offset_minutes: Optional[int]) -> int:
-    """Calendar-day difference in the keeper's local timezone (flips at local
-    midnight, not UTC). Mirrors tarantulas/inverts._calendar_day_diff."""
-    if tz_offset_minutes is None:
-        return (later - earlier).days
-    local_delta = timedelta(minutes=-tz_offset_minutes)
-    return ((later + local_delta).date() - (earlier + local_delta).date()).days
-
 
 def _parse_reptile_interval(s: Optional[str]) -> Optional[int]:
     """Days-between-feedings from a free-text schedule/frequency, upper bound.
@@ -152,7 +143,7 @@ def _interval_from_life_stage_feeding(brackets, weight_g) -> Optional[int]:
 def _animal_feeding_interval(animal: Animal) -> Optional[int]:
     """Resolve the recommended feeding interval (days) for one animal.
 
-    Priority: an explicit keeper-set interval → CGD (geckos on a complete diet,
+    Priority: an explicit keeper-set interval → plant-eater species (None) → CGD (geckos on a complete diet,
     refreshed ~every few days → overdue day 4) → weight-bracketed snake
     schedule → the animal's own free-text schedule → the species' per-stage
     frequency → None (unknown).
@@ -175,6 +166,13 @@ def _animal_feeding_interval(animal: Animal) -> Optional[int]:
         return animal.feeding_interval_days
 
     species = animal.herp_species
+    # Plant-eaters (linked species diet_type "herbivore", e.g. uromastyx) graze
+    # on fresh greens offered daily; there is no meal to be late for, so no
+    # interval: never due, no reminders, "No schedule" on Feeding Day. The
+    # keeper's own number above still wins. An unlinked animal changes nothing.
+    # Keep this in lockstep with weight_logs._resolve_interval_window.
+    if species is not None and getattr(species, "diet_type", None) == "herbivore":
+        return None
     # Gated by cgd_applies: the raw flag put a corn snake on a 4-day gecko
     # cadence because the add form's CGD toggle has no taxon gate. See
     # services.snake_feeding_advisory.cgd_applies. Keep this in lockstep
@@ -512,10 +510,13 @@ async def list_feeding_status(
 ):
     """Feeding status for every animal the caller owns — powers HV Feeding Day.
 
-    One grouped query for the last ACCEPTED feeding per animal (no N+1),
-    herp_species eager-loaded for the cadence resolver. `is_overdue` is
-    species/schedule-aware and NEVER fires for paused animals or animals whose
-    cadence can't be determined.
+    Batched queries (no N+1), herp_species eager-loaded for the cadence
+    resolver. `is_overdue` is species/schedule-aware and NEVER fires for paused
+    or brumating animals, plant-eaters without a keeper interval
+    (`no_schedule`) or animals whose cadence can't be determined. A never-fed
+    animal created on/after HV_FIRST_FEEDING_DUE_FROM turns due once its
+    interval has passed from its baseline; before then it gets
+    `needs_first_feeding`.
     """
     access = scope_collection(db, current_user, "herpetoverse", collection)
     # The shared "active" definition — which excludes died animals (ADR-015).
@@ -526,81 +527,9 @@ async def list_feeding_status(
         .options(selectinload(Animal.herp_species))
         .all()
     )
-    if not animals:
-        return []
-
-    ids = [a.id for a in animals]
-    rows = (
-        db.query(FeedingLog.animal_id, func.max(FeedingLog.fed_at))
-        .filter(FeedingLog.animal_id.in_(ids), FeedingLog.accepted.is_(True))
-        .group_by(FeedingLog.animal_id)
-        .all()
-    )
-    last_by_id = {row[0]: row[1] for row in rows}
-
-    now = datetime.now(timezone.utc)
-    today_local = (
-        (now + timedelta(minutes=-(tz_offset_minutes or 0))).date()
-        if tz_offset_minutes is not None
-        else now.date()
-    )
-
-    items: List[AnimalFeedingStatusItem] = []
-    for a in animals:
-        last = last_by_id.get(a.id)
-        days = _calendar_day_diff(now, last, tz_offset_minutes) if last else None
-        paused = bool(
-            a.feeding_paused_reason
-            and (a.feeding_paused_until is None or a.feeding_paused_until >= today_local)
-        )
-        # Brumation / aestivation: the keeper has said the animal is resting
-        # and won't eat. Same treatment as a pause — never overdue.
-        brumating = bool(getattr(a, "brumation_active", False))
-        interval = _animal_feeding_interval(a)
-        # Never-fed is NOT overdue (no cadence established yet) — matches
-        # /inverts/feeding-status + the digest so the dashboard, Feeding Day,
-        # and the notification all agree.
-        is_overdue = (
-            (not paused)
-            and (not brumating)
-            and interval is not None
-            and last is not None
-            and days is not None
-            and days >= interval
-        )
-        # Cadence-aware presentation: a frequent feeder (fed daily or more —
-        # interval <= 1 day) uses a fed-today check, not a days-since/overdue
-        # badge that would sit red every morning. Everything else keeps the
-        # discrete-feeder treatment.
-        status_mode = "daily" if (interval is not None and interval <= 1) else "interval"
-        fed_today = days == 0
-
-        items.append(
-            AnimalFeedingStatusItem(
-                id=a.id,
-                name=a.name,
-                common_name=a.common_name,
-                scientific_name=a.scientific_name,
-                taxon=a.taxon,
-                photo_url=a.photo_url,
-                location=a.location,
-                last_feeding_date=last,
-                days_since_last_feeding=days,
-                is_feeding_paused=paused,
-                is_overdue=is_overdue,
-                interval_days=interval,
-                feeds_on_cgd=bool(getattr(a, "feeds_on_cgd", False)),
-                status_mode=status_mode,
-                fed_today=fed_today,
-                is_brumating=brumating,
-            )
-        )
-
-    # Never-fed first, then longest-since-fed — the neediest float to the top.
-    items.sort(
-        key=lambda x: (0 if x.days_since_last_feeding is None else 1, -(x.days_since_last_feeding or 0))
-    )
-    return items
+    # The one HV rule (services/animal_feeding_status.py, on the core TV uses),
+    # shared with the per-animal status and the daily digest.
+    return compute_animal_feeding_status(db, animals, tz_offset_minutes)
 
 
 @router.post(

@@ -148,7 +148,7 @@ describe('FIRST_FEEDING_COPY', () => {
   it('push ask', () => {
     expect(c.pushAskAfterSaveTitle('Hairy')).toBe('Want a heads-up when Hairy is due to eat?');
     expect(c.pushAskWhenDueTitle).toBe('Want a reminder on days something is due?');
-    expect(c.pushAskBody).toBe('At most one reminder a day, at the hour you choose in Settings.');
+    expect(c.pushAskBody).toBe('Reminders come at the hour you choose in Settings, only on days something is due.');
     expect(c.pushAskAccept).toBe('Turn on reminders');
     expect(c.pushAskDecline).toBe('Not now');
   });

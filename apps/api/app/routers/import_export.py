@@ -172,6 +172,8 @@ async def _import_commit_animals(
             continue
 
         payload = norm["payload"]
+        # Not an animal column: becomes one accepted feeding log below.
+        last_fed = payload.pop("last_fed", None)
         key = (
             (payload.get("name") or "").strip().lower(),
             (payload.get("scientific_name") or "").strip().lower(),
@@ -206,6 +208,10 @@ async def _import_commit_animals(
                         val = canonical_location(db, current_user.id, val, SCOPE_HERPETOVERSE)
                     if hasattr(existing, fld):
                         setattr(existing, fld, val)
+                # HV refuses new feedings on died/transferred animals, so a
+                # re-import must not log one (or resume/bump last_fed_at) either.
+                if last_fed and not (existing.died_at or existing.transferred_out_at):
+                    _add_imported_animal_feeding(db, current_user, existing, last_fed, only_if_newer=True)
                 db.commit()
                 updated += 1
             else:
@@ -248,6 +254,9 @@ async def _import_commit_animals(
         db.add(animal)
         db.commit()
         db.refresh(animal)
+        if last_fed:
+            _add_imported_animal_feeding(db, current_user, animal, last_fed, only_if_newer=False)
+            db.commit()
         imported += 1
         existing_by_key[key] = animal
 
@@ -401,6 +410,40 @@ def _add_imported_feeding(db: Session, user: User, inv, last_fed: str, *, only_i
     ))
     # Same as the feeding route: taking food ends a pause.
     resume_if_accepted(inv, True, db)
+    return True
+
+
+def _add_imported_animal_feeding(db: Session, user: User, animal: Animal, last_fed: str, *, only_if_newer: bool) -> bool:
+    """Herpetoverse twin of `_add_imported_feeding`: the spreadsheet's "last fed"
+    date as ONE accepted feeding on the animal, at 12:00 UTC of that date (no
+    keeper time zone on the import path). `only_if_newer` (update mode): skip
+    when an accepted feeding already exists on or after that date, so
+    re-importing a sheet never doubles up. Like the HV feeding route it ends a
+    pause and moves `animals.last_fed_at` forward only. The caller commits."""
+    day = date.fromisoformat(last_fed)
+    fed_at = datetime.combine(day, time(12, 0), tzinfo=timezone.utc)
+    if only_if_newer:
+        day_start = datetime.combine(day, time(0, 0), tzinfo=timezone.utc)
+        already = (
+            db.query(FeedingLog.id)
+            .filter(
+                FeedingLog.animal_id == animal.id,
+                FeedingLog.accepted.is_(True),
+                FeedingLog.fed_at >= day_start,
+            )
+            .first()
+        )
+        if already is not None:
+            return False
+    db.add(FeedingLog(
+        animal_id=animal.id,
+        logged_by_user_id=user.id,
+        fed_at=fed_at,
+        accepted=True,
+    ))
+    resume_if_accepted(animal, True)
+    if animal.last_fed_at is None or fed_at > animal.last_fed_at:
+        animal.last_fed_at = fed_at
     return True
 
 

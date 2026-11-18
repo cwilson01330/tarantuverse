@@ -43,6 +43,10 @@ every switch off the output is exactly what it was before them.
   label). Nothing is stored on the animal: deleting the molt ends the pause.
 
 Callers decide WHICH animals to pass in (access scoping stays in the route).
+
+The decision itself is `services/feeding_rule.py::decide`, shared with
+Herpetoverse (`services/animal_feeding_status.py`); this module only loads TV
+rows and turns them into the core's keeper-local days.
 """
 from __future__ import annotations
 
@@ -60,6 +64,7 @@ from app.models.invert_species import InvertSpecies
 from app.models.molt_log import MoltLog
 from app.models.notification_preferences import NotificationPreferences
 from app.schemas.invert import InvertFeedingStatusItem
+from app.services.feeding_rule import decide
 from app.utils.feeding_pause import is_feeding_paused
 from app.utils.post_molt_pause import default_pause_days, pause_until
 
@@ -78,6 +83,40 @@ def _local_date(moment: datetime, tz_offset_minutes: Optional[int]) -> date:
     if tz_offset_minutes is None:
         return moment.date()
     return (moment + timedelta(minutes=-tz_offset_minutes)).date()
+
+
+def count_day(now: datetime, moment: datetime, tz_offset_minutes: Optional[int]) -> date:
+    """The day the core counts a log from, such that `today - count_day` is
+    exactly the "days since" the feeding endpoints have always reported
+    (`routers.inverts._calendar_day_diff`).
+
+    With an offset that is simply the keeper-local date of `moment`. Without
+    one, the legacy count is a 24-hour delta (`(now - moment).days`), which can
+    be a day less than the UTC date difference; it is expressed as the day that
+    many days before today so the core's date arithmetic returns it unchanged.
+    """
+    if tz_offset_minutes is None:
+        return now.date() - timedelta(days=(now - moment).days)
+    return _local_date(moment, tz_offset_minutes)
+
+
+def offered_day(
+    now: datetime,
+    last_accepted: Optional[datetime],
+    last_offered: Optional[datetime],
+    tz_offset_minutes: Optional[int],
+) -> Optional[date]:
+    """The newest-log day handed to the core for "refusal restarts the wait".
+
+    Fed animals count it like the meal (`count_day`); never-fed animals have
+    always compared the refusal's calendar date with the baseline
+    (`_local_date`). The two differ only for a caller with no offset.
+    """
+    if last_offered is None:
+        return None
+    if last_accepted is not None:
+        return count_day(now, last_offered, tz_offset_minutes)
+    return _local_date(last_offered, tz_offset_minutes)
 
 
 @dataclass(frozen=True)
@@ -174,10 +213,7 @@ def compute_feeding_status(
     """
     # The cadence helpers live next to the routes that grew them. Imported here,
     # not at module level, because routers.inverts imports this service.
-    from app.routers.inverts import (
-        _calendar_day_diff,
-        _recommended_feeding_interval_with_source,
-    )
+    from app.routers.inverts import _recommended_feeding_interval_with_source
 
     if not inverts:
         return []
@@ -240,45 +276,21 @@ def compute_feeding_status(
         rules = rules_by_owner.get(inv.user_id, off)
         last = last_by_id.get(inv.id)
         last_offered = offered_by_id.get(inv.id) if rules.refusal_restarts_wait else None
-        days = _calendar_day_diff(now, last, tz_offset_minutes) if last else None
         paused = is_feeding_paused(inv.feeding_paused_reason, inv.feeding_paused_until, today_local)
         species = species_by_id.get(inv.species_id) if inv.species_id else None
         interval, interval_source = _recommended_feeding_interval_with_source(
             inv.life_stage, species, inv.feeding_interval_days, taxon=inv.taxon
         )
-        eligible = (not paused) and interval is not None
+        created_local = _local_date(inv.created_at, tz_offset_minutes) if inv.created_at else today_local
+        baseline = created_local
+        if inv.date_acquired is not None and inv.date_acquired > baseline:
+            baseline = inv.date_acquired  # a future date pushes the baseline out
 
-        days_since_baseline: Optional[int] = None
-        needs_first_feeding = False
-        if last is not None:
-            # Switch on: count from the newest log (>= the last meal, so the
-            # switch can only push the due day out, never pull it in).
-            wait_days = days
-            if last_offered is not None and last_offered > last:
-                wait_days = _calendar_day_diff(now, last_offered, tz_offset_minutes)
-            is_overdue = eligible and wait_days is not None and wait_days >= interval
-        else:
-            created_local = _local_date(inv.created_at, tz_offset_minutes) if inv.created_at else today_local
-            baseline = created_local
-            if inv.date_acquired is not None and inv.date_acquired > baseline:
-                baseline = inv.date_acquired  # a future date pushes the baseline out
-            days_since_baseline = max(0, (today_local - baseline).days)
-            wait_days = days_since_baseline
-            if last_offered is not None:
-                # A refusal restarts the wait, from the later of it and the baseline.
-                wait_start = max(baseline, _local_date(last_offered, tz_offset_minutes))
-                wait_days = max(0, (today_local - wait_start).days)
-            is_overdue = (
-                eligible
-                and created_local >= cutoff
-                and wait_days >= interval
-            )
-            needs_first_feeding = eligible and inv.id not in logged_ids and not is_overdue
-
-        # Post-molt pause: owner's switch on, a cadence, no keeper pause.
-        post_molt_until: Optional[date] = None
+        # Post-molt pause candidate (owner's switch on). The core applies it
+        # only to an animal with a cadence and no keeper pause.
+        post_molt_candidate: Optional[date] = None
         newest_molt = newest_molt_by_id.get(inv.id) if rules.post_molt_pause else None
-        if newest_molt is not None and eligible:
+        if newest_molt is not None:
             molted_at, override_days, molt_created_at = newest_molt
             molt_local_day = _local_date(molted_at, tz_offset_minutes)
             window = override_days if override_days is not None else default_pause_days(inv.taxon, inv.life_stage)
@@ -286,15 +298,31 @@ def compute_feeding_status(
                 # An accepted meal on or after the molt day: the animal is
                 # eating again, so the pause is over.
                 window = None
-            post_molt_until = pause_until(
+            post_molt_candidate = pause_until(
                 molt_local_day,
                 today_local,
                 window,
                 _local_date(molt_created_at, tz_offset_minutes) if molt_created_at else None,
             )
-            if post_molt_until is not None:
-                is_overdue = False
-                needs_first_feeding = False
+
+        decision = decide(
+            last_accepted=count_day(now, last, tz_offset_minutes) if last else None,
+            last_offered=offered_day(now, last, last_offered, tz_offset_minutes),
+            baseline=baseline,
+            interval_days=interval,
+            paused=paused,
+            today=today_local,
+            created_local=created_local,
+            cutoff=cutoff,
+            refusal_restarts_wait=rules.refusal_restarts_wait,
+            has_any_log=inv.id in logged_ids,
+            post_pause_until=post_molt_candidate,
+        )
+        days = decision.days_since_last_feeding
+        is_overdue = decision.is_overdue
+        needs_first_feeding = decision.needs_first_feeding
+        days_since_baseline = decision.days_since_baseline
+        post_molt_until = decision.post_pause_until
 
         items.append(
             InvertFeedingStatusItem(

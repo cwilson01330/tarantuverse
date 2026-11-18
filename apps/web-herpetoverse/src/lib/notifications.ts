@@ -7,8 +7,16 @@
  *
  * Trailing-slash rule: the collection endpoints use `/notifications/`; the
  * by-id and named-action endpoints do not.
+ *
+ * App scope: the list, unread count, read-all and clear-all send
+ * `app=herpetoverse`, so HV sees its own rows (HV reminders) plus untagged
+ * ones, and never rows tagged for Tarantuverse. Without it the API answers
+ * with Tarantuverse's view, which leaves HV reminders out.
  */
 import { apiFetch } from './apiClient'
+
+/** Which app's notifications these calls ask for (API `?app=`). */
+export const NOTIFICATIONS_APP = 'herpetoverse'
 
 export interface AppNotification {
   id: string
@@ -37,13 +45,14 @@ export function listNotifications(
   const params = new URLSearchParams({
     limit: String(limit),
     unread_only: String(unreadOnly),
+    app: NOTIFICATIONS_APP,
   })
   return apiFetch<AppNotification[]>(`/api/v1/notifications/?${params.toString()}`)
 }
 
 /** Poll target for the bell badge. */
 export function getUnreadCount(): Promise<UnreadCount> {
-  return apiFetch<UnreadCount>('/api/v1/notifications/unread-count')
+  return apiFetch<UnreadCount>(`/api/v1/notifications/unread-count?app=${NOTIFICATIONS_APP}`)
 }
 
 /** Mark a single notification read. */
@@ -56,7 +65,7 @@ export function markNotificationRead(id: string): Promise<{ ok: boolean }> {
 
 /** Mark every notification read. */
 export function markAllNotificationsRead(): Promise<{ ok: boolean }> {
-  return apiFetch<{ ok: boolean }>('/api/v1/notifications/read-all', {
+  return apiFetch<{ ok: boolean }>(`/api/v1/notifications/read-all?app=${NOTIFICATIONS_APP}`, {
     method: 'POST',
   })
 }
@@ -70,7 +79,7 @@ export function deleteNotification(id: string): Promise<void> {
 
 /** Clear (delete) all notifications for the current user. Returns 204. */
 export function clearAllNotifications(): Promise<void> {
-  return apiFetch<void>('/api/v1/notifications/', { method: 'DELETE' })
+  return apiFetch<void>(`/api/v1/notifications/?app=${NOTIFICATIONS_APP}`, { method: 'DELETE' })
 }
 
 // ─── Display helpers ─────────────────────────────────────────────────────

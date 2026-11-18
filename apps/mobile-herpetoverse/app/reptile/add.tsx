@@ -16,7 +16,7 @@
  * stale add screen).
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -37,6 +37,7 @@ import {
   ThemedInput,
   dateToISO,
   extractErrorMessage,
+  todayISO,
 } from '../../src/components/forms/FormPrimitives';
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
 import { LocationPicker } from '../../src/components/LocationPicker';
@@ -55,11 +56,21 @@ import {
   type CreateAnimalPayload,
   type Sex,
   type Source,
+  animalTitle,
   createAnimal,
+  createFeeding,
   getAnimalLimits,
   isAnimalTaxon,
 } from '../../src/lib/animals';
 import { maybeRequestReview } from '../../src/lib/reviewPrompt';
+import {
+  FIRST_FEEDING_COPY,
+  lastFedIso,
+  lastFedPickError,
+  parseLocalYmd,
+  type LastFedChoice,
+} from '../../src/lib/first-feeding';
+import { NotificationAskSheet, useNotificationAsk } from '../../src/components/NotificationAskSheet';
 
 // Taxon chips sourced from the registry (ADR-011) — glyph + label per
 // entry, in display order. Adding a herp group in lib/animals.ts makes
@@ -85,6 +96,15 @@ const TAXON_EXAMPLES: Partial<
 };
 
 const GENERIC_EXAMPLE = { name: 'Rex', common: 'Species name', weight: '100' };
+
+// "When did it last eat?" (HV day one). Default "Not sure": nothing is logged
+// and the dashboard's first-meal card asks later.
+const LAST_FED_OPTIONS: { value: LastFedChoice; label: string }[] = [
+  { value: 'today', label: FIRST_FEEDING_COPY.chipToday },
+  { value: 'yesterday', label: FIRST_FEEDING_COPY.chipYesterday },
+  { value: 'pick', label: FIRST_FEEDING_COPY.chipPickDate },
+  { value: 'not_sure', label: FIRST_FEEDING_COPY.chipNotSure },
+];
 
 function exampleFor(taxon: AnimalTaxon): {
   name: string;
@@ -186,6 +206,21 @@ function AddReptileScreen() {
   // taxon; once chosen, only that group's species are offered.
   const [taxonChosen, setTaxonChosen] = useState<boolean>(() => isAnimalTaxon(params.taxon));
   const [notes, setNotes] = useState('');
+  // "When did it last eat?" — a choice, plus the typed day for "Pick a date".
+  // Shown for every species: the species search result carries no diet type,
+  // and a logged meal for a plant-eater is harmless (it never turns due).
+  const [lastFedChoice, setLastFedChoice] = useState<LastFedChoice>('not_sure');
+  const [lastFedTyped, setLastFedTyped] = useState('');
+  const ask = useNotificationAsk();
+  // The ask can outlive the screen (keeper backs out while it is open): then
+  // we must not navigate from a screen that is gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   // Genes picked before the animal exists. Held locally and attached
   // after createAnimal returns an id — see handleSubmit.
   const [genes, setGenes] = useState<PickedGene[]>([]);
@@ -242,6 +277,19 @@ function AddReptileScreen() {
       return;
     }
 
+    if (lastFedChoice === 'pick') {
+      const problem = lastFedPickError(lastFedTyped);
+      if (problem) {
+        setError(problem);
+        return;
+      }
+    }
+    // Local noon of the chosen day; null for "Not sure" (nothing is logged).
+    const lastFedAt = lastFedIso(
+      lastFedChoice,
+      lastFedChoice === 'pick' ? parseLocalYmd(lastFedTyped) : null,
+    );
+
     const payload: CreateAnimalPayload = {
       taxon,
       name: trimmedName || null,
@@ -280,9 +328,28 @@ function AddReptileScreen() {
         genesFailed = results.filter((r) => r.status === 'rejected').length;
       }
 
+      // "When did it last eat?" — one accepted feeding at local noon of that
+      // day. Non-fatal by design: the animal is saved either way, and failing
+      // the whole add over a log would be a far worse trade.
+      if (lastFedAt) {
+        try {
+          await createFeeding(created.id, { fed_at: lastFedAt, accepted: true });
+        } catch {
+          /* ignore */
+        }
+      }
+
+      // The one-time "heads-up when it's due" ask — never into a collection
+      // shared with you (the reminders are the owner's). Resolves AFTER the
+      // sheet has closed (or at once when it isn't shown).
+      if (!collection) {
+        await ask.maybeAskAfterSave(animalTitle(created));
+      }
+
       // Replace so back goes to collection, not back to this form.
-      // ADR-003: one detail route for every taxon.
-      router.replace(`/reptile/${created.id}` as never);
+      // ADR-003: one detail route for every taxon. Skipped when the keeper
+      // backed out while the sheet was open (this screen is gone).
+      if (mountedRef.current) router.replace(`/reptile/${created.id}` as never);
 
       // Success moment: the keeper's 3rd+ animal, in their own collection,
       // with nothing half-failed. Fire-and-forget; gated inside.
@@ -467,6 +534,30 @@ function AddReptileScreen() {
             />
           </Field>
 
+          <Field label={FIRST_FEEDING_COPY.lastFedLabel} hint={FIRST_FEEDING_COPY.lastFedHint}>
+            <ChipGroup<LastFedChoice>
+              options={LAST_FED_OPTIONS}
+              value={lastFedChoice}
+              onChange={(v) => {
+                setLastFedChoice(v);
+                if (v === 'pick' && !lastFedTyped) setLastFedTyped(todayISO());
+              }}
+            />
+            {lastFedChoice === 'pick' && (
+              <ThemedInput
+                value={lastFedTyped}
+                onChangeText={setLastFedTyped}
+                placeholder={todayISO()}
+                keyboardType="numbers-and-punctuation"
+                autoCorrect={false}
+                autoCapitalize="none"
+                maxLength={10}
+                accessibilityLabel={`${FIRST_FEEDING_COPY.lastFedLabel} (YYYY-MM-DD)`}
+                style={{ marginTop: 8 }}
+              />
+            )}
+          </Field>
+
           <Field label="Source" hint="Optional.">
             <ChipGroup
               options={SOURCE_OPTIONS}
@@ -571,6 +662,8 @@ function AddReptileScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <NotificationAskSheet {...ask.sheetProps} />
 
       {/* Free-tier cap gate — informational, no in-app purchase yet. */}
       <UpgradeModal source="collection_cap"

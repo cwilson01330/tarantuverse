@@ -543,6 +543,8 @@ ANIMAL_IMPORT_FIELDS: List[Dict[str, str]] = [
     {"field": "taxon", "label": "Taxon (group)", "type": "animal_taxon"},
     {"field": "sex", "label": "Sex", "type": "sex"},
     {"field": "date_acquired", "label": "Date acquired", "type": "date"},
+    # Not an animal column: the commit route turns it into one accepted feeding.
+    {"field": "last_fed", "label": "Last fed", "type": "date"},
     {"field": "hatch_date", "label": "Hatch date", "type": "date"},
     {"field": "source", "label": "Source", "type": "source"},
     {"field": "price_paid", "label": "Price paid", "type": "decimal"},
@@ -564,6 +566,11 @@ ANIMAL_HEADER_SYNONYMS: Dict[str, str] = {
     "date acquired": "date_acquired", "acquired": "date_acquired",
     "acquired date": "date_acquired", "purchase date": "date_acquired",
     "date": "date_acquired", "acquired on": "date_acquired",
+    # Exact synonyms only (same list as TV's HEADER_SYNONYMS): "Last feeding"
+    # used to loose-match "feeding" -> feeding_schedule.
+    "last fed": "last_fed", "last feeding": "last_fed", "last fed date": "last_fed",
+    "fed": "last_fed", "last feeding date": "last_fed", "date last fed": "last_fed",
+    "last fed on": "last_fed", "date of last feeding": "last_fed",
     "hatch date": "hatch_date", "hatched": "hatch_date", "dob": "hatch_date",
     "birth date": "hatch_date", "hatch": "hatch_date",
     "source": "source", "origin": "source", "acquired from": "source",
@@ -697,6 +704,10 @@ def suggest_animal_mapping(
         if ch in ANIMAL_HEADER_SYNONYMS:
             return ANIMAL_HEADER_SYNONYMS[ch], "high"
         for key, fld in ANIMAL_HEADER_SYNONYMS.items():
+            # last_fed is exact-synonym only, as on TV: a "Feeding notes" or
+            # "Fed by" column is text, not the date of the last meal.
+            if fld == "last_fed":
+                continue
             if key in ch or ch in key:
                 return fld, "medium"
         return None
@@ -735,6 +746,7 @@ def normalize_animal_row(
     taxon (+ source), matched herp species, and any per-row errors."""
     payload: Dict[str, Any] = {}
     extra_notes: List[str] = []
+    errors: List[str] = []
 
     for header, value in raw.items():
         field = mapping.get(header)
@@ -743,6 +755,13 @@ def normalize_animal_row(
                 extra_notes.append(f"{header}: {value}")
             continue
         coerced = _coerce_animal(field, value)
+        if field == "last_fed" and value is not None and str(value).strip() != "":
+            # As on TV: a last-fed we can't read (or one in the future) is a
+            # row error, never silently dropped.
+            err = _last_fed_error(coerced)
+            if err:
+                errors.append(err)
+                continue
         if coerced is not None:
             payload[field] = coerced
 
@@ -767,7 +786,6 @@ def normalize_animal_row(
     if species is not None:
         payload["herp_species_id"] = str(species.id)
 
-    errors: List[str] = []
     if not payload.get("name") and not payload.get("scientific_name"):
         errors.append("needs a name or a scientific name")
     if taxon not in ANIMAL_TAXON_VALUES:

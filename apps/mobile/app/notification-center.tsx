@@ -62,7 +62,7 @@ export default function NotificationCenterScreen() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await apiClient.get<Notification[]>('/notifications/?limit=40');
+      const res = await apiClient.get<Notification[]>('/notifications/?app=tarantuverse&limit=40');
       setItems(res.data ?? []);
       setLoadError('');
     } catch (e: any) {
@@ -88,7 +88,7 @@ export default function NotificationCenterScreen() {
     // Optimistic
     setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
     try {
-      await apiClient.post('/notifications/read-all');
+      await apiClient.post('/notifications/read-all?app=tarantuverse');
       await fetchNotifications();
     } catch {
       await fetchNotifications();
@@ -122,7 +122,7 @@ export default function NotificationCenterScreen() {
           // Optimistic
           setItems([]);
           try {
-            await apiClient.delete('/notifications/');
+            await apiClient.delete('/notifications/?app=tarantuverse');
             await fetchNotifications();
           } catch {
             await fetchNotifications();

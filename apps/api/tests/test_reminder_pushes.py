@@ -329,15 +329,33 @@ def test_switch_on_four_due_summary_with_button(client, db_session, pushes):
 
 
 @pytest.mark.requires_postgres
-def test_hv_due_forces_summary_in_digest(client, db_session, monkeypatch, pushes):
+def test_hv_due_no_longer_forces_a_tv_summary_in_digest(client, db_session, monkeypatch, pushes):
+    """HV day one (spec §5 call 4, §7 "planned per app"): TV's reminders are
+    planned from TV animals alone and HV due animals get their own HV plan.
+    (Before, one due HV animal turned TV's per-animal push into a combined
+    "2 animals are due" summary.) Since HV Step 2 the HV plan is per-animal
+    too with the switch on AND an own HV push address (tests/test_hv_reminders.py)."""
+    from app.schemas.animal import AnimalFeedingStatusItem
+
     u = mk_user(db_session)
     due_animal(client, u, "Rosie")
     mk_prefs(db_session, u, smart=True)
-    monkeypatch.setattr(digest_service, "_animal_overdue_count", lambda db, uid, tz: 1)
+    # Per-animal HV pushes need the account's own Herpetoverse address.
+    from app.services.push_tokens import set_push_token
+    set_push_token(db_session, u.id, "herpetoverse", "ExponentPushToken[hv-own]")
+    db_session.commit()
+    monkeypatch.setattr(
+        digest_service, "_animal_overdue_items",
+        lambda db, uid, tz: [AnimalFeedingStatusItem(id=uuid.uuid4(), name="Monty", taxon="snake", is_overdue=True)],
+    )
     run(db_session, u)
     rows = _rows(db_session, u)
-    assert [(r.type, r.body) for r in rows] == [("feeding_digest", "2 animals are due for feeding.")]
-    assert pushes[0]["category_id"] == "feeding_summary"
+    assert sorted((r.type, r.title, r.body) for r in rows) == [
+        ("feeding_due", "Monty", "Due for a meal · no meal logged yet"),
+        ("feeding_due", "Rosie", "Due for a meal · last ate 20 days ago"),
+    ]
+    assert [p.get("category_id") for p in pushes] == ["feeding_due", "feeding_due"]
+    assert "invert_id" in pushes[0]["data"] and "animal_id" in pushes[1]["data"]
 
 
 @pytest.mark.requires_postgres

@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { refreshTokenIfStale } from '@/lib/auth'
 import Sidebar from './Sidebar'
+import TimezoneSync from './TimezoneSync'
 import TopBar from './TopBar'
 
 interface AppShellProps {
@@ -25,6 +26,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-neutral-950">
+      <TimezoneSync />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main content pushes over to the right of the fixed sidebar on desktop */}

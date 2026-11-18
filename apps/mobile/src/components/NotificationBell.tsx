@@ -16,7 +16,7 @@ export function NotificationBell({ color, size = 24 }: { color?: string; size?: 
 
   const fetchCount = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ unread_count: number }>('/notifications/unread-count');
+      const res = await apiClient.get<{ unread_count: number }>('/notifications/unread-count?app=tarantuverse');
       setCount(res.data?.unread_count ?? 0);
     } catch {
       // non-fatal — bell just shows no badge

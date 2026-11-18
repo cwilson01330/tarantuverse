@@ -146,6 +146,8 @@ export async function registerPushToken(): Promise<boolean> {
     await apiClient.post('/notification-preferences/push-token', {
       token,
       tz_offset_minutes: new Date().getTimezoneOffset(),
+      // One push address per app per account: this token only reaches this app.
+      app: 'tarantuverse',
     });
     return true;
   } catch {

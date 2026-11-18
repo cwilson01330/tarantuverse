@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.notification import Notification
 from app.models.notification_preferences import NotificationPreferences
+from app.services.push_tokens import push_token_for
 from app.utils.push_notifications import PushNotificationService
 
 logger = logging.getLogger(__name__)
@@ -58,11 +59,12 @@ DEEPLINK_PATTERNS = (
 _COMPILED_DEEPLINK_PATTERNS = tuple(re.compile(p) for p in DEEPLINK_PATTERNS)
 
 # Patterns allowed for ONE notification type only. A per-animal feeding
-# reminder opens that animal; mobile serves /invert/<id> directly. Web has no
+# reminder opens that animal; TV mobile serves /invert/<id> and HV mobile
+# /reptile/<id> directly (HV web maps it to /app/reptiles/<id>). Web has no
 # push buttons and the digest summary keeps /feeding-day, so the link stays
 # scoped to the type that needs it rather than widening the shared vocabulary.
 TYPE_DEEPLINK_PATTERNS = {
-    "feeding_due": (r"^/invert/[0-9a-fA-F-]+$",),
+    "feeding_due": (r"^/invert/[0-9a-fA-F-]+$", r"^/reptile/[0-9a-fA-F-]+$"),
 }
 
 _COMPILED_TYPE_DEEPLINK_PATTERNS = {
@@ -144,6 +146,7 @@ def create_notification(
     push: bool = True,
     push_category: Optional[str] = None,
     push_category_id: Optional[str] = None,
+    app: Optional[str] = None,
 ) -> Notification:
     """Write a notification row and (best-effort) push it.
 
@@ -153,6 +156,11 @@ def create_notification(
     push_category_id: Expo notification category (`categoryId`) for the push —
       the action buttons the app registered under that name. Not stored on the
       row; the push simply doesn't carry one when None.
+    app: which app the notification belongs to ('tarantuverse' |
+      'herpetoverse'; None = tarantuverse). The push goes to that app's
+      address, else the account's other address (services/push_tokens). It is
+      stored on the row as given (None stays NULL), so each app's bell lists
+      its own rows (routers/notifications.py).
     """
     notif = Notification(
         user_id=user_id,
@@ -161,6 +169,7 @@ def create_notification(
         body=body,
         deeplink=_validate_deeplink(deeplink, type),
         data=data,
+        app=app,
     )
     db.add(notif)
     db.commit()
@@ -177,13 +186,12 @@ def create_notification(
             # Quiet hours hold the PUSH only; the in-app row above is already
             # written, so nothing is lost — it's waiting in the bell.
             quiet = type not in QUIET_HOURS_EXEMPT_TYPES and in_quiet_hours(prefs)
-            if (
-                prefs
-                and getattr(prefs, "push_notifications_enabled", False)
-                and prefs.expo_push_token
-                and category_ok
-                and not quiet
-            ):
+            token = (
+                push_token_for(db, user_id, app, prefs=prefs)
+                if prefs and getattr(prefs, "push_notifications_enabled", False)
+                else None
+            )
+            if token and category_ok and not quiet:
                 payload: Dict[str, Any] = {"type": type, "notification_id": str(notif.id)}
                 # notif.deeplink, NOT the raw argument — the push payload and the
                 # stored row must agree, or a tap from the tray goes somewhere
@@ -196,7 +204,7 @@ def create_notification(
                 if push_category_id:
                     extra["category_id"] = push_category_id
                 PushNotificationService.send_notification(
-                    expo_push_token=prefs.expo_push_token,
+                    expo_push_token=token,
                     title=title,
                     body=body or "",
                     data=payload,
@@ -205,8 +213,17 @@ def create_notification(
                     priority="high" if type == "direct_message" else "default",
                     **extra,
                 )
-        except Exception:
-            # Push is best-effort; the in-app row is the source of truth.
-            pass
+        except Exception as exc:
+            # Push is best-effort; the in-app row is the source of truth. Logged
+            # so a failure (an unknown app, Expo down) isn't silent: the row id,
+            # type, app and the error's class only — never its message or a
+            # traceback, which could carry the push address or an email.
+            logger.warning(
+                "Push for notification %s (type %r, app %r) failed: %s",
+                notif.id,
+                type,
+                app,
+                exc.__class__.__name__,
+            )
 
     return notif

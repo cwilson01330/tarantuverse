@@ -1127,6 +1127,13 @@ async def sitter_undo_feeding(
 
 # ── keeper notifications ──────────────────────────────────────────────────────
 
+def _pass_app(p: KeeperPass) -> str:
+    """The app whose phone hears about this pass. A pass covers animals in ONE
+    app (`keeper_passes.app`): HV animals -> herpetoverse; inverts and colonies
+    -> tarantuverse."""
+    return "herpetoverse" if getattr(p, "app", None) == "herpetoverse" else "tarantuverse"
+
+
 def _notify_sitter_log(db: Session, p: KeeperPass, target, accepted: bool) -> None:
     """One heads-up per feeding round, not one per animal: a 20-animal round
     would otherwise be 20 pushes. The activity list has every entry."""
@@ -1158,6 +1165,7 @@ def _notify_sitter_log(db: Session, p: KeeperPass, target, accepted: bool) -> No
             deeplink="/sitter",
             data={"pass_id": str(p.id)},
             push_category="sitter_activity_enabled",
+            app=_pass_app(p),
         )
     except Exception:  # a notification must never fail the sitter's write
         logger.exception("sitter_log notification failed")
@@ -1183,6 +1191,7 @@ def _notify_fed_while_paused(db: Session, p: KeeperPass, target) -> None:
                   "Check on them when you can — if it was premolt, any live prey should come out."),
             deeplink="/sitter",
             data={"pass_id": str(p.id), "paused_feed": True},
+            app=_pass_app(p),
         )
     except Exception:
         logger.exception("sitter fed-while-paused notification failed")
@@ -1207,6 +1216,7 @@ def _notify_locked(db: Session, p: KeeperPass) -> None:
                   "if you're not sure who it was."),
             deeplink="/sitter",
             data={"pass_id": str(p.id)},
+            app=_pass_app(p),
         )
     except Exception:
         logger.exception("sitter_pass_locked notification failed")

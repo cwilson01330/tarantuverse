@@ -48,6 +48,7 @@ if (!isExpoGo) {
 
 export interface OAuthResult {
   accessToken: string;
+  isNewUser?: boolean;
   user: {
     id: string;
     email: string;
@@ -95,7 +96,13 @@ async function exchangeWithBackend(
     throw new Error(detailMessage(err?.detail, 'OAuth login failed'));
   }
   const data = await response.json();
-  return { accessToken: data.access_token, user: data.user };
+  return {
+    accessToken: data.access_token,
+    user: data.user,
+    // The server says whether this sign-in just made the account, so the
+    // register screen can show the welcome screen to new keepers.
+    isNewUser: data.is_new_user === true,
+  };
 }
 
 /** Native Google sign-in → shared backend → session tokens. */

@@ -33,6 +33,7 @@ import {
 import { apiClient } from '../src/services/api';
 import { HV_WEB_ORIGIN } from '../src/lib/web-origin';
 import { takePostAuthRoute } from '../src/lib/claim';
+import { resolvePostAuthRoute } from '../src/lib/onboarding';
 import {
   NO_ACCOUNT_BODY,
   NO_ACCOUNT_CREATE,
@@ -113,8 +114,9 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
       captureEvent('login_success', { method: 'email' });
-      // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
-      router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
+      // A parked transfer claim (claim/[token].tsx) wins; else the welcome
+      // screen if a sign-up on this phone still owes it; else the dashboard.
+      router.replace((takePostAuthRoute() ?? (await resolvePostAuthRoute())) as never);
     } catch (err: any) {
       if (err?.code === 'email_not_verified') {
         captureEvent('login_failed', { method: 'email', reason: 'unverified' });
@@ -145,7 +147,9 @@ export default function LoginScreen() {
           try {
             await noAccount.createAccount();
             captureEvent('login_success', { method: provider });
-            router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
+            // This just created the account, so it is owed the welcome screen
+            // (a parked transfer claim still wins).
+            router.replace((takePostAuthRoute() ?? (await resolvePostAuthRoute(true))) as never);
           } catch (err: any) {
             captureEvent('login_failed', { method: provider });
             setError(err?.message || 'Could not sign in.');
@@ -168,8 +172,9 @@ export default function LoginScreen() {
         await loginWithApple({ allowCreate: false });
       }
       captureEvent('login_success', { method: provider });
-      // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
-      router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
+      // A parked transfer claim (claim/[token].tsx) wins; else the welcome
+      // screen if a sign-up on this phone still owes it; else the dashboard.
+      router.replace((takePostAuthRoute() ?? (await resolvePostAuthRoute())) as never);
     } catch (err: any) {
       if (isNoAccountError(err)) {
         confirmCreateAccount(provider, err);

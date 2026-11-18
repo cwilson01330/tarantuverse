@@ -6,10 +6,11 @@ even before FCM/APNs are configured.
 """
 import logging
 import os
-from typing import List
+from typing import List, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -23,16 +24,32 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# Which app's bell is asking. Absent = no filter (every row), which is how every
+# build before the per-app bell called these routes; HV store binaries that can
+# never receive the OTA keep seeing their HV rows. Current clients send it.
+AppParam = Optional[Literal["tarantuverse", "herpetoverse"]]
+
+
+def _for_app(q, app: AppParam):
+    """No `app` = all rows. `tarantuverse` = untagged + TV rows (HV rows stay
+    out); `herpetoverse` = untagged + HV rows (hvr_20261118)."""
+    if app is None:
+        return q
+    other = "tarantuverse" if app == "herpetoverse" else "herpetoverse"
+    return q.filter(or_(Notification.app.is_(None), Notification.app != other))
+
+
 @router.get("/", response_model=List[NotificationResponse])
 async def list_notifications(
     limit: int = Query(30, ge=1, le=100),
     offset: int = Query(0, ge=0),
     unread_only: bool = Query(False),
+    app: AppParam = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Newest-first list of the current user's notifications."""
-    q = db.query(Notification).filter(Notification.user_id == current_user.id)
+    """Newest-first list of the current user's notifications for `app`."""
+    q = _for_app(db.query(Notification).filter(Notification.user_id == current_user.id), app)
     if unread_only:
         q = q.filter(Notification.is_read.is_(False))
     return q.order_by(Notification.created_at.desc()).offset(offset).limit(limit).all()
@@ -40,15 +57,16 @@ async def list_notifications(
 
 @router.get("/unread-count", response_model=UnreadCountResponse)
 async def unread_count(
+    app: AppParam = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Unread notification count — powers the bell badge (replaces DM-only count)."""
-    n = (
+    n = _for_app(
         db.query(Notification)
-        .filter(Notification.user_id == current_user.id, Notification.is_read.is_(False))
-        .count()
-    )
+        .filter(Notification.user_id == current_user.id, Notification.is_read.is_(False)),
+        app,
+    ).count()
     return {"unread_count": n}
 
 
@@ -72,13 +90,18 @@ async def mark_read(
 
 @router.post("/read-all")
 async def mark_all_read(
+    app: AppParam = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    db.query(Notification).filter(
-        Notification.user_id == current_user.id,
-        Notification.is_read.is_(False),
-    ).update({"is_read": True})
+    """Mark read what this app's bell lists (the other app's rows stay unread)."""
+    _for_app(
+        db.query(Notification).filter(
+            Notification.user_id == current_user.id,
+            Notification.is_read.is_(False),
+        ),
+        app,
+    ).update({"is_read": True}, synchronize_session=False)
     db.commit()
     return {"ok": True}
 
@@ -104,11 +127,14 @@ async def delete_notification(
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def clear_all_notifications(
+    app: AppParam = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Clear (delete) all of the current user's notifications."""
-    db.query(Notification).filter(Notification.user_id == current_user.id).delete()
+    """Clear (delete) what this app's bell lists; the other app's rows stay."""
+    _for_app(
+        db.query(Notification).filter(Notification.user_id == current_user.id), app
+    ).delete(synchronize_session=False)
     db.commit()
     return None
 

@@ -193,14 +193,36 @@ async def create_animal_feeding_log(
     # A died or transferred animal's record is history: no new logs. Editing
     # or deleting an existing entry stays open (TV parity, tests/test_hv_closed_logs.py).
     refuse_if_closed(animal)
+    new_feeding = _create_animal_feeding(db, animal, feeding_data, access)
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
 
+
+def _create_animal_feeding(
+    db: Session,
+    animal: Animal,
+    data: FeedingLogCreate,
+    access,
+    reminder_date: Optional[date] = None,
+) -> FeedingLog:
+    """One HV feeding, the way POST /animals/{id}/feedings makes it: closed
+    animals refused (409), co-keeper attribution, pause cleared by an accepted
+    meal, `animals.last_fed_at` moved forward only. Adds and flushes; the
+    caller commits.
+
+    `reminder_date` marks a log made from a reminder button (unique per
+    animal + day, see uq_feeding_logs_reminder_animal).
+    """
+    refuse_if_closed(animal)  # also here, so no caller can skip it
     new_feeding = FeedingLog(
-        animal_id=animal_id,
+        animal_id=animal.id,
         logged_by_user_id=access.logged_by_user_id,
-        **feeding_data.model_dump(),
+        reminder_date=reminder_date,
+        **data.model_dump(),
     )
     # Taking food ends a pause; a refusal confirms it. See utils/feeding_pause.
-    resume_if_accepted(animal, feeding_data.accepted)
+    resume_if_accepted(animal, data.accepted)
     db.add(new_feeding)
 
     # Forward-only denormalization.
@@ -208,8 +230,7 @@ async def create_animal_feeding_log(
     if fed_at and (animal.last_fed_at is None or fed_at > animal.last_fed_at):
         animal.last_fed_at = fed_at
 
-    db.commit()
-    db.refresh(new_feeding)
+    db.flush()
     return new_feeding
 
 
@@ -546,6 +567,19 @@ REMINDER_NOTE = "Logged from reminder"
 ALREADY_LOGGED = "Already logged from this reminder"
 
 
+def _already_logged(action: str, name: str, existing_log: Optional[FeedingLog]) -> ReminderActionResponse:
+    """A later tap on a reminder that already logged: say what was actually
+    recorded, not what this tap asked for."""
+    accepted_flag = getattr(existing_log, "accepted", None)
+    if accepted_flag is True:
+        message = f"Already logged: {name} ate"
+    elif accepted_flag is False:
+        message = f"Already logged: {name} refused"
+    else:
+        message = ALREADY_LOGGED
+    return ReminderActionResponse(action=action, created=False, animal_name=name, message=message)
+
+
 def _reminder_feeding(db: Session, invert_id: uuid.UUID, reminder_date: date) -> Optional[FeedingLog]:
     """The log a reminder for this animal + day already made, if any."""
     return (
@@ -604,17 +638,7 @@ async def invert_reminder_action(
         )
 
     def already(existing_log: Optional[FeedingLog]) -> ReminderActionResponse:
-        # Say what was actually recorded, not what this tap asked for.
-        accepted_flag = getattr(existing_log, "accepted", None)
-        if accepted_flag is True:
-            message = f"Already logged: {name} ate"
-        elif accepted_flag is False:
-            message = f"Already logged: {name} refused"
-        else:
-            message = ALREADY_LOGGED
-        return ReminderActionResponse(
-            action=payload.action, created=False, animal_name=name, message=message
-        )
+        return _already_logged(payload.action, name, existing_log)
 
     existing = _reminder_feeding(db, invert.id, payload.reminder_date)
     if existing is not None:
@@ -645,6 +669,95 @@ async def invert_reminder_action(
         if existing is None:
             raise
         return already(existing)
+    db.commit()
+    return ReminderActionResponse(
+        action=payload.action,
+        created=True,
+        animal_name=name,
+        message=f"Logged: {name} ate" if accepted else f"Logged: {name} refused",
+    )
+
+
+def _animal_reminder_feeding(db: Session, animal_id: uuid.UUID, reminder_date: date) -> Optional[FeedingLog]:
+    """The log a reminder for this HV animal + day already made, if any."""
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.animal_id == animal_id, FeedingLog.reminder_date == reminder_date)
+        .first()
+    )
+
+
+@router.post(
+    "/animals/{animal_id}/reminder-action",
+    response_model=ReminderActionResponse,
+)
+@limiter.limit("60/hour", key_func=user_or_ip)
+@policy("logger")
+async def animal_reminder_action(
+    request: Request,
+    animal_id: uuid.UUID,
+    payload: ReminderActionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fed / Refused / Tomorrow from a per-animal HV feeding reminder (spec
+    2026-11-17 §5 call 10, §7). The HV twin of /inverts/{id}/reminder-action.
+
+    fed / refused log a feeding through `_create_animal_feeding` — the helper
+    POST /animals/{id}/feedings uses — with notes "Logged from reminder" and
+    fed now. Fed copies food type and size from the latest ACCEPTED meal
+    (never prey weight: a weight belongs to the meal it was weighed for);
+    Refused logs no prey. One reminder logs one outcome: a later tap — a
+    second phone, or Refused after Fed — returns the first log with
+    created=False; uq_feeding_logs_reminder_animal settles a race.
+
+    tomorrow sets `animals.reminder_snoozed_until` to the owner's local today
+    + 1. Not a feeding pause; never a log.
+
+    Closed (died / transferred) animals: 409 for every action.
+    """
+    animal, access = load_animal(db, current_user, animal_id, "logger")
+    refuse_if_closed(animal)
+    name = animal_title(animal)
+
+    if payload.action == "tomorrow":
+        animal.reminder_snoozed_until = _owner_today(db, animal.user_id) + timedelta(days=1)
+        db.commit()
+        return ReminderActionResponse(
+            action="tomorrow", created=False, animal_name=name, message="We'll remind you tomorrow"
+        )
+
+    existing = _animal_reminder_feeding(db, animal.id, payload.reminder_date)
+    if existing is not None:
+        return _already_logged(payload.action, name, existing)
+
+    accepted = payload.action == "fed"
+    last_meal = None
+    if accepted:
+        last_meal = (
+            db.query(FeedingLog.food_type, FeedingLog.food_size)
+            .filter(FeedingLog.animal_id == animal.id, FeedingLog.accepted.is_(True))
+            .order_by(FeedingLog.fed_at.desc())
+            .first()
+        )
+    data = FeedingLogCreate(
+        fed_at=datetime.now(timezone.utc),
+        food_type=last_meal[0] if last_meal else None,
+        food_size=last_meal[1] if last_meal else None,
+        accepted=accepted,
+        notes=REMINDER_NOTE,
+    )
+    savepoint = db.begin_nested()
+    try:
+        _create_animal_feeding(db, animal, data, access, reminder_date=payload.reminder_date)
+        savepoint.commit()
+    except IntegrityError:
+        # Another tap won between our check and our insert.
+        savepoint.rollback()
+        existing = _animal_reminder_feeding(db, animal.id, payload.reminder_date)
+        if existing is None:
+            raise
+        return _already_logged(payload.action, name, existing)
     db.commit()
     return ReminderActionResponse(
         action=payload.action,

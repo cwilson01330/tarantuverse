@@ -39,7 +39,14 @@ import AddGenesField, {
   type PickedGene,
   pickedGenesToPayloads,
 } from '@/components/AddGenesField'
+import EmailReminderDialog, { decideAskAfterSave } from '@/components/EmailReminderDialog'
 import EnclosurePicker from '@/components/EnclosurePicker'
+import LastFedField, {
+  NOT_SURE_LAST_FED,
+  lastFedFromField,
+  postFirstFeeding,
+  type LastFedValue,
+} from '@/components/LastFedField'
 import { LocationField } from '@/components/LocationPicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import UpgradeModal from '@/components/UpgradeModal'
@@ -224,6 +231,11 @@ function AddReptileForm() {
   )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // "When did it last eat?" - default Not sure: nothing is logged and the
+  // dashboard's First meal card asks later.
+  const [lastFed, setLastFed] = useState<LastFedValue>(NOT_SURE_LAST_FED)
+  // One-time email-reminder ask after save; navigation waits only while it is open.
+  const [ask, setAsk] = useState<{ name: string; to: string } | null>(null)
   // Genes picked before the animal exists — attached after create (H2).
   const [genes, setGenes] = useState<PickedGene[]>([])
   // Snakes only, and not in a shared collection — the same gate as HV
@@ -256,6 +268,12 @@ function AddReptileForm() {
     setError(null)
     if (!taxonPicked) {
       setError('Pick what kind of animal this is before saving.')
+      return
+    }
+    // A typed "Pick a date" past today (or a typo before 1990) would otherwise
+    // be dropped silently after the animal is saved; stop here instead.
+    if (lastFed.choice === 'pick' && !lastFedFromField(lastFed)) {
+      setError('Pick a day on or before today for the last meal, or choose "Not sure".')
       return
     }
 
@@ -323,8 +341,31 @@ function AddReptileForm() {
         }
       }
 
+      // First meal. Deliberately NOT fatal: the animal is saved, and the
+      // dashboard's First meal card asks again if this didn't land.
+      const fedAt = lastFedFromField(lastFed)
+      if (fedAt) await postFirstFeeding(animal.id, fedAt)
+
       // ADR-003: one taxon-agnostic detail route for every taxon.
-      router.push(`/app/reptiles/${animal.id}`)
+      const destination = `/app/reptiles/${animal.id}`
+
+      // One-time email-reminder ask, not in a shared collection (that isn't
+      // this keeper's own digest). A slow or failed preference read never
+      // holds navigation: it counts as "don't ask" after 3 s.
+      if (!collection) {
+        const wants = await Promise.race([
+          decideAskAfterSave().catch(() => false),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
+        ])
+        if (wants) {
+          setAsk({
+            name: form.name.trim() || form.commonName.trim() || form.scientificName.trim() || 'your animal',
+            to: destination,
+          })
+          return
+        }
+      }
+      router.push(destination)
     } catch (err) {
       if (err instanceof ApiError && err.status === 402 && collection) {
         // The cap is the OWNER's — an upgrade prompt aimed at the co-keeper
@@ -635,6 +676,16 @@ function AddReptileForm() {
         </section>
 
         {/* ------------------------------------------------------------- */}
+        {/* First meal. The species SEARCH result carries no diet_type, so */}
+        {/* this shows for every species (a plant-eater with no interval   */}
+        {/* just never turns due; the log is still accurate).              */}
+        {/* ------------------------------------------------------------- */}
+        <section className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
+          <h2 className={SECTION_HDR_CLS}>Feeding</h2>
+          <LastFedField value={lastFed} onChange={setLastFed} />
+        </section>
+
+        {/* ------------------------------------------------------------- */}
         {/* Diet override — lizards only.                                  */}
         {/*                                                                */}
         {/* This section used to render for every taxon, headed "Diet",    */}
@@ -750,6 +801,15 @@ function AddReptileForm() {
           </button>
         </div>
       </form>
+
+      <EmailReminderDialog
+        open={ask !== null}
+        variant="after_save"
+        animalName={ask?.name}
+        onClose={() => {
+          if (ask) router.push(ask.to)
+        }}
+      />
 
       <UpgradeModal source="collection_cap"
         isOpen={capInfo !== null}

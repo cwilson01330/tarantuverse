@@ -769,6 +769,7 @@ async def _claim_animal_transfer(
             # a TV keeper's tap went nowhere good.
             deeplink="/transfers",
             data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
+            app="herpetoverse",  # an HV animal
         )
     except Exception:
         pass
@@ -1009,6 +1010,7 @@ async def _claim_colony_transfer(
             body=f"{current_user.username} claimed {what}.",
             deeplink="/transfers",
             data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
+            app="tarantuverse",  # colonies are Tarantuverse
         )
     except Exception:
         pass  # never block the claim on notification issues
@@ -1237,6 +1239,7 @@ async def claim_transfer(
             # previous hardcoded /dashboard/transfers was a 404 on every client.
             deeplink="/transfers",
             data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
+            app="tarantuverse",  # inverts are Tarantuverse
         )
     except Exception:
         pass  # never block the claim on notification issues

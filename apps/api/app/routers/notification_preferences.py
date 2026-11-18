@@ -14,13 +14,16 @@ from app.schemas.notification_preferences import (
     NON_NULLABLE_FIELDS,
     NotificationPreferencesResponse,
     NotificationPreferencesUpdate,
-    NotificationPreferencesBase
+    NotificationPreferencesBase,
+    PushApp,
+    PushTokenBody,
 )
 from app.services.notification_prefs import ensure_notification_preferences
+from app.services.push_tokens import clear_push_token, set_push_token
 from app.utils.access import policy
 from app.utils.dependencies import get_current_user
 from app.utils.digest_unsubscribe_token import read_unsubscribe_token
-from app.utils.frontend_origin import resolve_frontend_origin
+from app.utils.frontend_origin import HERPETOVERSE_ORIGIN, resolve_frontend_origin
 from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/notification-preferences", tags=["notification-preferences"])
@@ -60,20 +63,21 @@ async def update_notification_preferences(
     prefs = ensure_notification_preferences(db, current_user.id)
 
     # Update fields that were provided
-    for field, value in update_values(preferences).items():
+    values = update_values(preferences)
+    # A push token sent here is a Tarantuverse registration (the HV app only
+    # ever used the push-token route). set/clear also write the legacy column.
+    if "expo_push_token" in values:
+        token = values.pop("expo_push_token")
+        if token:
+            set_push_token(db, current_user.id, "tarantuverse", token)
+        else:
+            clear_push_token(db, current_user.id, "tarantuverse")
+    for field, value in values.items():
         setattr(prefs, field, value)
 
     db.commit()
     db.refresh(prefs)
     return prefs
-
-
-from pydantic import BaseModel
-
-
-class PushTokenBody(BaseModel):
-    token: str
-    tz_offset_minutes: int | None = None
 
 
 @router.post("/push-token", response_model=NotificationPreferencesResponse)
@@ -82,15 +86,16 @@ async def update_push_token(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Register the Expo push token (+ device timezone for the daily digest).
+    """Register this app's Expo push token (+ device timezone for the daily digest).
 
-    Accepts a JSON body {token, tz_offset_minutes?}. The previous signature took
-    `token` as a bare str, which FastAPI treats as a QUERY param — so the app's
-    JSON-body registration 422'd and no tokens were ever saved (ADR-009).
+    JSON body {token, tz_offset_minutes?, app?}. One address per app per account
+    (`push_tokens`); no `app` = Tarantuverse, which is what every client sent
+    before apps were told apart. (The route once took `token` as a bare str,
+    which FastAPI treats as a QUERY param, so JSON registrations 422'd — ADR-009.)
     """
     prefs = ensure_notification_preferences(db, current_user.id)
 
-    prefs.expo_push_token = payload.token
+    set_push_token(db, current_user.id, payload.app, payload.token)
     if payload.tz_offset_minutes is not None:
         prefs.tz_offset_minutes = payload.tz_offset_minutes
     db.commit()
@@ -100,18 +105,13 @@ async def update_push_token(
 
 @router.delete("/push-token", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_push_token(
+    app: Optional[PushApp] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Remove Expo push notification token (e.g., on logout)"""
-    prefs = db.query(NotificationPreferences).filter(
-        NotificationPreferences.user_id == current_user.id
-    ).first()
-
-    if prefs:
-        prefs.expo_push_token = None
-        db.commit()
-
+    """Remove this app's Expo push token (e.g., on logout). No `app` = Tarantuverse."""
+    clear_push_token(db, current_user.id, app)
+    db.commit()
     return None
 
 
@@ -121,14 +121,19 @@ async def delete_push_token(
 async def email_unsubscribe_page(
     request: Request,
     token: str = Query(""),
+    app: Optional[str] = Query(None),
 ):
     """GET changes nothing: mail scanners and link prefetchers open every URL in
     an email, so a state-changing GET would unsubscribe people who never asked.
     It sends the browser to the web page, where the keeper confirms and the page
-    POSTs. A forged or garbled token is a 404."""
+    POSTs. A forged or garbled token is a 404.
+
+    `app=herpetoverse` (the HV email's List-Unsubscribe link) sends the browser
+    to Herpetoverse's page; anything else goes to Tarantuverse's. Either page
+    turns off the one email switch, which covers both apps' emails."""
     if read_unsubscribe_token(token) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    origin = resolve_frontend_origin(None)
+    origin = HERPETOVERSE_ORIGIN if app == "herpetoverse" else resolve_frontend_origin(None)
     return RedirectResponse(
         f"{origin}/unsubscribe/{quote(token, safe='')}",
         status_code=status.HTTP_303_SEE_OTHER,

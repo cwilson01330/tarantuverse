@@ -17,11 +17,18 @@ a retired `@merged.invalid` duplicate, still active). A keeper with no
 The retention split is a correlation, not an effect: keepers choose the
 switch. Compare the same split 2 and 6 weeks after release.
 
+--app herpetoverse (HV smart reminders, 2026-11-18) counts Herpetoverse
+animals' feedings instead, and only keepers who have at least one HV animal
+(the switches are one set per account, so counting every account would just
+repeat the TV figures). HV has no post-molt pause, so that row is left out.
+The default, --app tarantuverse, is exactly the report it was.
+
 Changes nothing: the transaction is opened READ ONLY first.
 
 Run on the Render shell, from apps/api:
     python3 report_reminder_logging.py          # aligned table
     python3 report_reminder_logging.py --csv    # for a spreadsheet
+    python3 report_reminder_logging.py --app herpetoverse
 """
 import argparse
 import sys
@@ -31,23 +38,31 @@ from typing import List, Optional, Tuple
 from sqlalchemy import func, text
 
 RETENTION_WINDOW_DAYS = 30
+APPS = ("tarantuverse", "herpetoverse")
 
 
 def _share(n: int, d: int) -> str:
     return f"{n} of {d} ({100 * n / d:.1f}%)" if d else "0 of 0"
 
 
-def build_rows(db, now: Optional[datetime] = None) -> List[Tuple[str, str]]:
+def build_rows(db, now: Optional[datetime] = None, app: str = "tarantuverse") -> List[Tuple[str, str]]:
+    from app.models.animal import Animal
     from app.models.feeding_log import FeedingLog
     from app.models.invert import Invert
     from app.models.notification_preferences import NotificationPreferences as NP
     from app.models.user import User
     from app.utils.test_accounts import real_user_clause
 
+    if app not in APPS:
+        raise ValueError(f"unknown app {app!r}")
+    hv = app == "herpetoverse"
+    # The app's animals and the feeding column that points at them.
+    owner_model, parent_col = (Animal, FeedingLog.animal_id) if hv else (Invert, FeedingLog.invert_id)
+
     now = now or datetime.now(timezone.utc)
     cut = now - timedelta(days=RETENTION_WINDOW_DAYS)
 
-    users = (
+    q = (
         db.query(
             User.id,
             func.coalesce(NP.smart_reminders_enabled, False),
@@ -60,23 +75,25 @@ def build_rows(db, now: Optional[datetime] = None) -> List[Tuple[str, str]]:
             real_user_clause(),
             ~func.lower(User.email).like("%@merged.invalid"),
         )
-        .all()
     )
+    if hv:
+        q = q.filter(db.query(Animal.id).filter(Animal.user_id == User.id).exists())
+    users = q.all()
     smart = {uid: bool(s) for uid, s, _, _ in users}
 
     reminder_by_owner = {}
     for uid, n in (
-        db.query(Invert.user_id, func.count(FeedingLog.id))
-        .join(FeedingLog, FeedingLog.invert_id == Invert.id)
+        db.query(owner_model.user_id, func.count(FeedingLog.id))
+        .join(FeedingLog, parent_col == owner_model.id)
         .filter(FeedingLog.reminder_date.isnot(None))
-        .group_by(Invert.user_id)
+        .group_by(owner_model.user_id)
     ):
         if uid in smart:
             reminder_by_owner[uid] = n
 
     logged_30d = {
-        uid for (uid,) in db.query(Invert.user_id)
-        .join(FeedingLog, FeedingLog.invert_id == Invert.id)
+        uid for (uid,) in db.query(owner_model.user_id)
+        .join(FeedingLog, parent_col == owner_model.id)
         .filter(FeedingLog.created_at >= cut)
         .distinct()
     }
@@ -86,7 +103,7 @@ def build_rows(db, now: Optional[datetime] = None) -> List[Tuple[str, str]]:
     r_on = sum(n for u, n in reminder_by_owner.items() if smart[u])
     r_off = sum(n for u, n in reminder_by_owner.items() if not smart[u])
 
-    return [
+    rows = [
         ("reminder_logged_feedings_total", str(r_on + r_off)),
         ("reminder_logged_feedings_smart_on", str(r_on)),
         ("reminder_logged_feedings_smart_off", str(r_off)),
@@ -97,11 +114,16 @@ def build_rows(db, now: Optional[datetime] = None) -> List[Tuple[str, str]]:
         ("logged_30d_smart_on", _share(sum(1 for u in on_ids if u in logged_30d), len(on_ids))),
         ("logged_30d_smart_off", _share(sum(1 for u in off_ids if u in logged_30d), len(off_ids))),
     ]
+    if hv:
+        rows = [r for r in rows if r[0] != "keepers_post_molt_pause_on"]
+    return rows
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only smarter-reminders report.")
     parser.add_argument("--csv", action="store_true", help="comma-separated output")
+    parser.add_argument("--app", choices=APPS, default="tarantuverse",
+                        help="whose animals to count (default tarantuverse)")
     args = parser.parse_args(argv)
 
     from app.database import SessionLocal
@@ -110,7 +132,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         # Must be the first statement of the transaction.
         db.execute(text("SET TRANSACTION READ ONLY"))
-        rows = build_rows(db)
+        rows = build_rows(db, app=args.app)
     finally:
         db.rollback()
         db.close()

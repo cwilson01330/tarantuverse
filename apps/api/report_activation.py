@@ -5,7 +5,8 @@ Per signup week (ISO weeks, Monday start, the last 12), for real accounts only:
   signups      accounts created that week
   animal_1d    % with an active animal or colony created within 1 day of signing up
   fed_7d       % with an ACCEPTED feeding logged within 7 days of signing up
-  reminders    % with a push token or the daily email reminder switched on (today)
+  reminders    % with a push address for the app (push_tokens) or the daily
+               email reminder switched on (today)
   active_30d   % who logged any feeding, molt or photo in the last 30 days --
                only for cohorts whose week began 60+ days ago (blank otherwise)
 
@@ -16,6 +17,14 @@ transferred out, not dead, not archived or ended. Logging time is the log's
 `created_at` (when the keeper wrote it), so an imported "last fed" date still
 counts as a feeding logged at signup.
 
+--app herpetoverse (2026-11-18) measures Herpetoverse instead: HV animals
+(`active_animals_query`: not transferred, not dead), their accepted feedings,
+feedings / sheds / photos for activity, and an HV push address. The cohort is
+still every real signup that week (one account serves both apps). The default
+is --app tarantuverse. Push addresses come from `push_tokens` for the chosen
+app (not the legacy notification_preferences.expo_push_token column, which
+held whichever app registered last).
+
 Recent weeks are still maturing (a week-old cohort has not had 7 days yet), so
 read them as a floor. Re-run 2 and 6 weeks after a release and compare.
 
@@ -24,6 +33,7 @@ Changes nothing: the transaction is opened READ ONLY first.
 Run on the Render shell, from apps/api:
     python3 report_activation.py          # aligned table
     python3 report_activation.py --csv    # for a spreadsheet
+    python3 report_activation.py --app herpetoverse
 """
 import argparse
 import sys
@@ -31,11 +41,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, text
 
 WEEKS = 12
 RETENTION_MIN_AGE_DAYS = 60
 RETENTION_WINDOW_DAYS = 30
+
+APPS = ("tarantuverse", "herpetoverse")
 
 COLUMNS = ["signup_week", "signups", "animal_1d_pct", "fed_7d_pct", "reminders_pct", "active_30d_pct"]
 
@@ -59,16 +71,22 @@ def _first_within(events: Dict, signups: Dict, days: int) -> Set:
     return out
 
 
-def build_rows(db, now: Optional[datetime] = None) -> List[Dict[str, str]]:
+def build_rows(db, now: Optional[datetime] = None, app: str = "tarantuverse") -> List[Dict[str, str]]:
+    from app.models.animal import Animal
     from app.models.colony import Colony
     from app.models.feeding_log import FeedingLog
     from app.models.invert import Invert
     from app.models.molt_log import MoltLog
     from app.models.notification_preferences import NotificationPreferences
     from app.models.photo import Photo
+    from app.models.push_token import PushToken
+    from app.models.shed_log import ShedLog
     from app.models.user import User
     from app.utils.test_accounts import real_user_clause
 
+    if app not in APPS:
+        raise ValueError(f"unknown app {app!r}")
+    hv = app == "herpetoverse"
     now = now or datetime.now(timezone.utc)
     first_week = _week_start(now) - timedelta(weeks=WEEKS - 1)
     window_start = datetime.combine(first_week, datetime.min.time(), tzinfo=timezone.utc)
@@ -94,7 +112,34 @@ def build_rows(db, now: Optional[datetime] = None) -> List[Dict[str, str]]:
     recent_activity: Set = set()
     reminders: Set = set()
 
-    if ids:
+    if ids and hv:
+        for uid, created in db.query(Animal.user_id, Animal.created_at).filter(
+            Animal.user_id.in_(ids), Animal.transferred_out_at.is_(None), Animal.died_at.is_(None)
+        ):
+            animal_stamps[uid].append(created)
+
+        recent_cut = now - timedelta(days=RETENTION_WINDOW_DAYS)
+        for uid, created in (
+            db.query(Animal.user_id, FeedingLog.created_at)
+            .join(Animal, Animal.id == FeedingLog.animal_id)
+            .filter(Animal.user_id.in_(ids), FeedingLog.accepted.is_(True))
+        ):
+            fed_stamps[uid].append(created)
+
+        # Any feeding (accepted or not), shed or photo in the last 30 days.
+        for model, parent_col in (
+            (FeedingLog, FeedingLog.animal_id),
+            (ShedLog, ShedLog.animal_id),
+            (Photo, Photo.animal_id),
+        ):
+            recent_activity.update(
+                uid for (uid,) in db.query(Animal.user_id)
+                .join(model, parent_col == Animal.id)
+                .filter(Animal.user_id.in_(ids), model.created_at >= recent_cut)
+                .distinct()
+            )
+
+    elif ids:
         for uid, created in db.query(Invert.user_id, Invert.created_at).filter(
             Invert.user_id.in_(ids), Invert.transferred_out_at.is_(None), Invert.died_at.is_(None)
         ):
@@ -133,14 +178,20 @@ def build_rows(db, now: Optional[datetime] = None) -> List[Dict[str, str]]:
                     .distinct()
                 )
 
+    if ids:
+        # Reachable: the daily email on (one switch per account), or a push
+        # address registered for this app.
         reminders.update(
             uid for (uid,) in db.query(NotificationPreferences.user_id).filter(
                 NotificationPreferences.user_id.in_(ids),
-                or_(
-                    NotificationPreferences.email_digest_enabled.is_(True),
-                    (NotificationPreferences.expo_push_token.isnot(None))
-                    & (NotificationPreferences.expo_push_token != ""),
-                ),
+                NotificationPreferences.email_digest_enabled.is_(True),
+            )
+        )
+        reminders.update(
+            uid for (uid,) in db.query(PushToken.user_id).filter(
+                PushToken.user_id.in_(ids),
+                PushToken.app == app,
+                PushToken.token != "",
             )
         )
 
@@ -168,6 +219,8 @@ def build_rows(db, now: Optional[datetime] = None) -> List[Dict[str, str]]:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only new-keeper activation report.")
     parser.add_argument("--csv", action="store_true", help="comma-separated output")
+    parser.add_argument("--app", choices=APPS, default="tarantuverse",
+                        help="whose animals to measure (default tarantuverse)")
     args = parser.parse_args(argv)
 
     from app.database import SessionLocal
@@ -176,7 +229,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         # Must be the first statement of the transaction.
         db.execute(text("SET TRANSACTION READ ONLY"))
-        rows = build_rows(db)
+        rows = build_rows(db, app=args.app)
     finally:
         db.rollback()
         db.close()

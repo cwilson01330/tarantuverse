@@ -91,6 +91,8 @@ from app.models.card_link import CardLink
 from app.models.expense import Expense, ExpenseShare
 # Premolt v2 episodes (pmv_20261117). FK targets: users, inverts.
 from app.models.premolt_episode import PremoltEpisode
+# Push addresses per app (pta_20261118). FK target: users.
+from app.models.push_token import PushToken
 
 __all__ = [
     "User",
@@ -164,4 +166,5 @@ __all__ = [
     "CardLink",
     "Expense",
     "ExpenseShare",
+    "PushToken",
 ]

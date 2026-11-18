@@ -27,7 +27,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -35,10 +35,13 @@ from app.database import get_db
 from app.models.feeding_log import FeedingLog
 from app.models.user import User
 from app.models.animal import Animal
+from app.models.notification_preferences import NotificationPreferences
 from app.models.reptile_species import ReptileSpecies
 from app.models.weight_log import WeightLog
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.routers.animals import refuse_if_closed
+from app.schemas.animal import AnimalFeedingStatusItem
+from app.services.animal_feeding_status import evaluate_animals
 from app.schemas.weight_log import (
     WeightLogCreate,
     WeightLogUpdate,
@@ -113,7 +116,8 @@ def _resolve_interval_window(
 
     Priority matches `routers.animals._animal_feeding_interval` so the two
     surfaces can't drift again:
-      keeper's number → CGD → weight bracket → species frequency → None.
+      keeper's number → plant-eater (None) → CGD → weight bracket →
+      species frequency → None.
     """
     # 1. ADR-017 — a number the keeper stated is the only cadence the app
     #    can be certain of, so it outranks every inference. Exact, so the
@@ -121,6 +125,12 @@ def _resolve_interval_window(
     keeper = getattr(animal, "feeding_interval_days", None)
     if keeper:
         return int(keeper), int(keeper)
+
+    # 1b. Plant-eaters (species diet_type "herbivore") have no schedule
+    #     unless the keeper set one above — same step as
+    #     _animal_feeding_interval.
+    if species is not None and getattr(species, "diet_type", None) == "herbivore":
+        return None, None
 
     # 2. Complete gecko diet — refreshed every few days, so a hard 4.
     #    Guarded by `cgd_applies` because CGD is a GECKO diet: a keeper
@@ -472,6 +482,12 @@ def _render_pause_note(reason: str, until: Optional[date]) -> str:
     return f"{label}. Reminders paused until {until.isoformat()}."
 
 
+_PLANT_EATER_NOTE = (
+    "Plant-eaters graze on fresh food offered every day, so there's no feeding "
+    "schedule to fall behind on. Set your own cadence to get reminders."
+)
+
+
 def _compute_feeding_status(
     *,
     last_fed_at: Optional[datetime],
@@ -481,8 +497,39 @@ def _compute_feeding_status(
     feeding_paused_reason: Optional[str] = None,
     feeding_paused_until: Optional[date] = None,
     is_species_linked: bool = False,
+    verdict: Optional[AnimalFeedingStatusItem] = None,
+    wait_days: Optional[int] = None,
 ) -> FeedingStatus:
     """Pure function — combines inputs into the canonical FeedingStatus.
+
+    `verdict` is the animal's row from the one HV rule
+    (services/animal_feeding_status.py, the same row Feeding Day and the
+    digest use) and `wait_days` the days its current wait has run, counted
+    by the core (from the last meal, or a later refusal with the owner's
+    switch on; from the baseline for a never-fed animal). When given they are
+    authoritative, so this screen can never disagree with the board (spec §5
+    call 7):
+
+      - paused     = the verdict's keeper pause, else its brumation;
+      - no_data    = also for a plant-eater with no keeper cadence
+                     (`verdict.no_schedule`), with its own note;
+      - the window = (interval, interval) from the verdict when the window
+                     resolver found none OR its window doesn't hold the
+                     verdict's interval (e.g. the keeper's free-text schedule
+                     says 5 days, the species sheet 10-14);
+      - status     = "due" or "overdue" exactly when the board says overdue:
+                     "due" (HV mobile: "Feed today") while the wait is within
+                     the window's max (the interval day itself for an exact
+                     cadence, so a daily feeder fed yesterday is "due", not
+                     "1 day overdue"), "overdue" once past it. When the board
+                     says not overdue it is "upcoming" (or "no_feedings" for a
+                     never-fed animal), whatever the window says;
+      - days_until_due = window min - wait_days, and the next due / overdue
+                     dates move with a refusal that restarted the wait.
+
+    The window fields stay a display of "eat again in X-Y days".
+
+    Without a verdict (old callers) the rule is the original window rule:
 
     Pause precedence (top → bottom):
       1. Manual feeding_paused_reason set + (until is null OR in future)
@@ -490,10 +537,16 @@ def _compute_feeding_status(
       2. brumation_active=True → status='paused' with brumation note
     Anything else falls through to the standard cadence math.
     """
-    today = datetime.now(timezone.utc).date()
-    if feeding_paused_reason and (
-        feeding_paused_until is None or feeding_paused_until >= today
-    ):
+    if verdict is not None:
+        keeper_paused = verdict.is_feeding_paused
+        brumation_active = verdict.is_brumating
+    else:
+        today = datetime.now(timezone.utc).date()
+        keeper_paused = bool(feeding_paused_reason) and (
+            feeding_paused_until is None or feeding_paused_until >= today
+        )
+
+    if keeper_paused and feeding_paused_reason:
         note = _render_pause_note(feeding_paused_reason, feeding_paused_until)
         return FeedingStatus(
             status="paused",
@@ -513,6 +566,23 @@ def _compute_feeding_status(
             is_data_available=True,
             note="Feeding paused for brumation.",
         )
+
+    if verdict is not None and verdict.no_schedule:
+        return FeedingStatus(
+            status="no_data",
+            last_fed_at=last_fed_at,
+            is_data_available=False,
+            note=_PLANT_EATER_NOTE,
+        )
+
+    if verdict is not None and verdict.interval_days is not None and (
+        interval_days_min is None
+        or interval_days_max is None
+        or not (interval_days_min <= verdict.interval_days <= interval_days_max)
+    ):
+        # The window must hold the interval the verdict was decided on, or
+        # "eat again in 10-14 days" would sit next to an overdue badge.
+        interval_days_min = interval_days_max = verdict.interval_days
 
     if interval_days_min is None or interval_days_max is None:
         # The old copy always told the keeper to link a species. When the
@@ -534,6 +604,18 @@ def _compute_feeding_status(
         )
 
     if last_fed_at is None:
+        if verdict is not None and verdict.is_overdue:
+            # Never fed, created after the HV cutoff, at or past its first
+            # wait (from the baseline, or a later refusal with the switch on).
+            waited = wait_days if wait_days is not None else (verdict.days_since_baseline or 0)
+            return FeedingStatus(
+                status="overdue" if waited > interval_days_max else "due",
+                interval_days_min=interval_days_min,
+                interval_days_max=interval_days_max,
+                days_until_due=interval_days_min - waited,
+                is_data_available=True,
+                note="No meal logged yet.",
+            )
         return FeedingStatus(
             status="no_feedings",
             interval_days_min=interval_days_min,
@@ -559,6 +641,20 @@ def _compute_feeding_status(
     else:
         status_str = "overdue"
 
+    if verdict is not None:
+        waited = wait_days if wait_days is not None else elapsed_days
+        if verdict.is_overdue:
+            status_str = "overdue" if waited > interval_days_max else "due"
+        else:
+            status_str = "upcoming"
+        days_until_due = interval_days_min - waited
+        # A refusal that restarted the wait moves the window with it.
+        since_meal = verdict.days_since_last_feeding
+        shift = max(0, since_meal - waited) if since_meal is not None else 0
+        if shift:
+            next_due = fed_at + timedelta(days=interval_days_min + shift)
+            next_overdue = fed_at + timedelta(days=interval_days_max + shift)
+
     return FeedingStatus(
         status=status_str,
         last_fed_at=last_fed_at,
@@ -571,6 +667,17 @@ def _compute_feeding_status(
     )
 
 
+def _owner_tz_offset(db: Session, owner_id) -> Optional[int]:
+    """The owner's saved time zone (what the daily digest counts in), for
+    callers that don't send one."""
+    row = (
+        db.query(NotificationPreferences.tz_offset_minutes)
+        .filter(NotificationPreferences.user_id == owner_id)
+        .first()
+    )
+    return row[0] if row else None
+
+
 @router.get(
     "/animals/{animal_id}/feeding-status",
     response_model=FeedingStatus,
@@ -578,6 +685,7 @@ def _compute_feeding_status(
 @policy("viewer")
 async def animal_feeding_status(
     animal_id: uuid.UUID,
+    tz_offset_minutes: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -585,7 +693,10 @@ async def animal_feeding_status(
 
     Combines the species feeding cadence with the most recent ACCEPTED
     feeding. Brumating/aestivating animals get status='paused' so the
-    dashboard doesn't nag.
+    dashboard doesn't nag. Paused / overdue come from the one HV rule
+    (animal_feeding_status.evaluate_animals), so this agrees with Feeding Day and the
+    digest; days are counted in `tz_offset_minutes`, else the owner's saved
+    zone (the digest's), else UTC.
     """
     animal, access = load_animal(db, current_user, animal_id, "viewer")
     species = _species_for_animal(db, animal)
@@ -608,6 +719,10 @@ async def animal_feeding_status(
     # _resolve_interval_window for the two bugs this fixes.
     interval_min, interval_max = _resolve_interval_window(animal, species, suggestion)
 
+    if tz_offset_minutes is None:
+        tz_offset_minutes = _owner_tz_offset(db, animal.user_id)
+    evaluated = evaluate_animals(db, [animal], tz_offset_minutes)[0]
+
     return _compute_feeding_status(
         last_fed_at=last_fed.fed_at if last_fed else None,
         interval_days_min=interval_min,
@@ -616,4 +731,6 @@ async def animal_feeding_status(
         brumation_active=bool(getattr(animal, "brumation_active", False)),
         feeding_paused_reason=getattr(animal, "feeding_paused_reason", None),
         feeding_paused_until=getattr(animal, "feeding_paused_until", None),
+        verdict=evaluated.item,
+        wait_days=evaluated.wait_days,
     )

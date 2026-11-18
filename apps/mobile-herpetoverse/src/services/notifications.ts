@@ -1,12 +1,11 @@
 /**
  * Local notifications for Herpetoverse mobile.
  *
- * v1 scope is intentionally small: feeding reminders + quiet hours.
- * Shed reminders, push notifications, and community-driven pushes are
- * out (Herpetoverse has no community surface yet, so a push token
- * wouldn't drive anything). We can layer them in later by adding
- * functions here — the LogFeedingScreen hook is the only call site for
- * now.
+ * Local feeding / low-stock reminders + quiet hours, plus the push token the
+ * server's daily digest is sent to (registerPushToken, `app: 'herpetoverse'`).
+ * Nothing here prompts for the OS permission except
+ * requestNotificationPermissions(), which is only called from a moment the
+ * keeper chose (NotificationAskSheet, notification settings).
  *
  * Trigger SHAPE: SDK 53+ requires `SchedulableTriggerInputTypes.TIME_INTERVAL`
  * explicitly. The older `{ seconds: N }` shorthand silently fires
@@ -21,6 +20,8 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { apiClient } from './api';
+import type { Permission } from '../lib/notification-ask';
 
 // Expo Go (SDK 53+) doesn't support remote pushes and has limited
 // scheduling fidelity. We still let local notifications run in Expo Go
@@ -92,10 +93,28 @@ export async function hasNotificationPermissions(): Promise<boolean> {
 }
 
 /**
+ * The OS notification permission, without prompting. 'denied' only when the OS
+ * will not show its dialog again (iOS after a refusal); a refusal the OS will
+ * still ask about again reads as 'undetermined'. Any failure (native module
+ * missing on an old binary) reads as 'undetermined' so callers stay quiet.
+ */
+export async function getPermissionStatus(): Promise<Permission> {
+  try {
+    const res = await Notifications.getPermissionsAsync();
+    if (res.status === 'granted') return 'granted';
+    if (res.status === 'denied') return res.canAskAgain === true ? 'undetermined' : 'denied';
+    return 'undetermined';
+  } catch {
+    return 'undetermined';
+  }
+}
+
+/**
  * Get this device's Expo push token so the server can deliver the daily
- * feeding digest (ADR-009). Without this, HV mobile only ever scheduled
- * LOCAL reminders and never registered a token — so server-sent pushes
- * had nowhere to go.
+ * feeding digest (ADR-009). NEVER prompts (HV day one, 2026-11-18): the OS
+ * dialog is only ever raised from a moment the keeper chose (the pre-ask
+ * sheet, or the notification settings screen) via
+ * requestNotificationPermissions(). Without permission this returns null.
  *
  * Push tokens aren't available in Expo Go (SDK 53+), so we no-op there.
  * The `projectId` is read from THIS app's EAS config — never hardcode the
@@ -111,8 +130,7 @@ export async function getExpoPushToken(): Promise<string | null> {
   }
 
   try {
-    const granted = await requestNotificationPermissions();
-    if (!granted) return null;
+    if (!(await hasNotificationPermissions())) return null;
 
     // Read the HV app's own EAS projectId from app.json
     // (extra.eas.projectId). Fall back to easConfig for older runtimes.
@@ -130,6 +148,31 @@ export async function getExpoPushToken(): Promise<string | null> {
   } catch (err) {
     console.warn('[notifications] getExpoPushToken failed:', err);
     return null;
+  }
+}
+
+/**
+ * Save this device's push token with the server — only when the OS permission
+ * is already granted (it never prompts). The device time zone rides along (the
+ * digest hour is this phone's hour) and `app: 'herpetoverse'`, because the
+ * server keeps one push address per app per account: without it the server
+ * files this token as Tarantuverse's. Resolves true when a token was saved;
+ * every failure (no permission, Expo Go, offline) is non-fatal and resolves
+ * false.
+ */
+export async function registerPushToken(): Promise<boolean> {
+  try {
+    if ((await getPermissionStatus()) !== 'granted') return false;
+    const token = await getExpoPushToken();
+    if (!token) return false;
+    await apiClient.post('/notification-preferences/push-token', {
+      token,
+      tz_offset_minutes: new Date().getTimezoneOffset(),
+      app: 'herpetoverse',
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -235,6 +278,33 @@ export async function cancelFeedingReminder(animalId: string): Promise<void> {
     await AsyncStorage.removeItem(FEEDING_KEY(animalId));
   } catch (err) {
     console.warn('[notifications] cancelFeedingReminder failed:', err);
+  }
+}
+
+const LEGACY_FEEDING_PREFIX = 'hv_feeding_reminder_';
+
+/**
+ * One-time cleanup: cancel every per-meal "Time to feed" notification an older
+ * build scheduled (the server digest + per-animal reminders replace them).
+ * Cancels by stored id, then drops the keys. Never throws.
+ */
+export async function cancelAllFeedingReminders(): Promise<void> {
+  try {
+    const keys = (await AsyncStorage.getAllKeys()).filter((k) =>
+      k.startsWith(LEGACY_FEEDING_PREFIX),
+    );
+    if (keys.length === 0) return;
+    for (const key of keys) {
+      try {
+        const id = await AsyncStorage.getItem(key);
+        if (id) await Notifications.cancelScheduledNotificationAsync(id);
+      } catch {
+        /* keep going: one bad id must not strand the rest */
+      }
+    }
+    await AsyncStorage.multiRemove(keys);
+  } catch (err) {
+    console.warn('[notifications] cancelAllFeedingReminders failed:', err);
   }
 }
 

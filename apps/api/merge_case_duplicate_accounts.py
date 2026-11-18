@@ -22,7 +22,7 @@ WHAT IT DOES (per group of accounts sharing lower(email), exactly as the API loo
     - plain ownership / "logged by" columns (SIMPLE_COLUMNS) -> UPDATE, and
       only when no unique index covers the column;
     - one-row-per-user tables and tables with a unique key that includes the
-      user (CONFLICT_RULES: notification_preferences, user_theme_preferences,
+      user (CONFLICT_RULES: notification_preferences, push_tokens, user_theme_preferences,
       user_achievements, species_shortlist, follows, user_blocks): move what
       does not collide; a row that duplicates one the keeper already has, or
       would point an account at itself, is DROPPED (its full contents go in
@@ -141,6 +141,8 @@ class Rule:
 
 CONFLICT_RULES: dict[tuple[str, str], Rule] = {
     ("notification_preferences", "user_id"): Rule(None),
+    # One push address per (account, app) since pta_20261118.
+    ("push_tokens", "user_id"): Rule(("app",)),
     ("user_theme_preferences", "user_id"): Rule(None),
     ("user_achievements", "user_id"): Rule(("achievement_id",)),
     ("species_shortlist", "user_id"): Rule(("species_id",)),

@@ -152,6 +152,7 @@ async def send_message(
             deeplink=f"/messages/{current_user.username}",
             data={"sender": current_user.username},
             push_category="direct_messages_enabled",
+            app="tarantuverse",  # social notifications live on Tarantuverse
         )
     except Exception:
         pass  # never block the message send on notification issues

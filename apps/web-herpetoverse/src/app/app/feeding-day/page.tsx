@@ -26,6 +26,7 @@ import {
   resumeFeeding,
 } from '@/lib/animals'
 import { LocationDialog } from '@/components/LocationPicker'
+import { FIRST_FEEDING_COPY, feedingStatusText } from '@/lib/firstFeeding'
 import {
   UNASSIGNED_KEY,
   bulkSetLocation,
@@ -141,7 +142,7 @@ export default function FeedingDayPage() {
       case 'overdue':
         return animals.filter((a) => a.is_overdue && a.status_mode !== 'daily')
       case 'never_fed':
-        return animals.filter((a) => a.days_since_last_feeding === null)
+        return animals.filter((a) => a.days_since_last_feeding === null && !a.no_schedule)
       default:
         return animals
     }
@@ -151,7 +152,7 @@ export default function FeedingDayPage() {
     () => ({
       all: animals.length,
       overdue: animals.filter((a) => a.is_overdue && a.status_mode !== 'daily').length,
-      never_fed: animals.filter((a) => a.days_since_last_feeding === null).length,
+      never_fed: animals.filter((a) => a.days_since_last_feeding === null && !a.no_schedule).length,
     }),
     [animals],
   )
@@ -761,6 +762,14 @@ function StatusPill({
       </span>
     )
   }
+  // Plant-eater with no keeper interval: listed and feedable, never due.
+  if (animal.no_schedule) {
+    return (
+      <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-800/60 text-neutral-400">
+        {FIRST_FEEDING_COPY.noSchedule}
+      </span>
+    )
+  }
   if (animal.status_mode === 'daily') {
     return animal.fed_today ? (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500/15 text-green-300">
@@ -772,17 +781,18 @@ function StatusPill({
       </span>
     )
   }
+  const noMealText = feedingStatusText(animal)
   if (animal.is_overdue) {
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-500/15 text-orange-300">
-        Overdue
+        {noMealText ?? 'Overdue'}
       </span>
     )
   }
   if (animal.days_since_last_feeding === null) {
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-300">
-        Never fed
+        {noMealText ?? 'Never fed'}
       </span>
     )
   }

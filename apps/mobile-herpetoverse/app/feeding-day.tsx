@@ -48,6 +48,7 @@ import {
 } from '../src/lib/animals';
 import { LocationSheet } from '../src/components/LocationPicker';
 import { maybeRequestReview, noteReviewBlockingError } from '../src/lib/reviewPrompt';
+import { FIRST_FEEDING_COPY, feedingStatusText } from '../src/lib/first-feeding';
 import {
   UNASSIGNED_KEY,
   bulkSetLocation,
@@ -72,6 +73,17 @@ const FOOD_CHIPS = [
   'CGD',
   'Greens',
 ];
+
+// Plant-eaters with no keeper interval ("No schedule") are listed and
+// feedable but belong to neither filter: they are never due, and a never-fed
+// one isn't a gap to chase.
+function isOverdueRow(i: AnimalFeedingStatus): boolean {
+  return i.is_overdue && i.status_mode !== 'daily' && !i.no_schedule;
+}
+
+function isNeverFedRow(i: AnimalFeedingStatus): boolean {
+  return i.days_since_last_feeding === null && !i.no_schedule;
+}
 
 function displayName(a: AnimalFeedingStatus): string {
   return a.name || a.common_name || a.scientific_name || 'Unnamed';
@@ -146,16 +158,15 @@ function FeedingDayScreen() {
   const counts = useMemo(
     () => ({
       all: items.length,
-      overdue: items.filter((i) => i.is_overdue && i.status_mode !== 'daily').length,
-      never: items.filter((i) => i.days_since_last_feeding === null).length,
+      overdue: items.filter(isOverdueRow).length,
+      never: items.filter(isNeverFedRow).length,
     }),
     [items],
   );
 
   const shown = useMemo(() => {
-    if (filter === 'overdue') return items.filter((i) => i.is_overdue && i.status_mode !== 'daily');
-    if (filter === 'never')
-      return items.filter((i) => i.days_since_last_feeding === null);
+    if (filter === 'overdue') return items.filter(isOverdueRow);
+    if (filter === 'never') return items.filter(isNeverFedRow);
     return items;
   }, [items, filter]);
 
@@ -298,6 +309,17 @@ function FeedingDayScreen() {
       return a.fed_today
         ? { label: 'Fed today', color: colors.success }
         : { label: 'Feed today', color: colors.textTertiary };
+    }
+    // Plant-eater with no keeper interval: never due, so never red.
+    if (a.no_schedule) return { label: FIRST_FEEDING_COPY.noSchedule, color: colors.textTertiary };
+    // No logged feeding: the day-one labels first ("First meal not logged",
+    // "Due · no meal logged yet"), the old "Never fed" otherwise.
+    const noMeal = feedingStatusText(a);
+    if (noMeal) {
+      return {
+        label: noMeal,
+        color: a.is_overdue && !a.needs_first_feeding ? colors.danger : colors.textTertiary,
+      };
     }
     if (a.days_since_last_feeding === null)
       return { label: 'Never fed', color: colors.danger };

@@ -106,6 +106,22 @@
   ],
   "herpetoverse": [
     {
+      "id": "2026-11-23-smart-reminders",
+      "published_on": "2026-11-23",
+      "title": "Answer feeding reminders from the notification",
+      "body": "When one to three animals are due, you get a reminder for each with Fed, Refused and Tomorrow buttons, and a refusal can restart the wait. Both are on for most keepers; change them in Settings.",
+      "premium": false,
+      "action": { "label": "Open Settings", "target": "settings" }
+    },
+    {
+      "id": "2026-11-23-feeding-reminders-from-day-one",
+      "published_on": "2026-11-23",
+      "title": "Feeding reminders from day one",
+      "body": "New animals ask when they last ate, so reminders start right away. You can also get a daily email on days something is due. Plant-eaters like uromastyx aren't nagged unless you set a schedule.",
+      "premium": false,
+      "action": { "label": "Open Feeding Day", "target": "feeding_day" }
+    },
+    {
       "id": "2026-10-23-expenses",
       "published_on": "2026-10-23",
       "title": "Track what your collection costs",

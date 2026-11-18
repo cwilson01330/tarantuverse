@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import DashboardFeedingNudge from '@/components/DashboardFeedingNudge'
 import WhatsNewCard from '@/components/WhatsNewCard'
 
 export default function AppHomePage() {
@@ -16,6 +17,8 @@ export default function AppHomePage() {
           shared with Tarantuverse.
         </p>
       </header>
+
+      <DashboardFeedingNudge />
 
       <WhatsNewCard />
 

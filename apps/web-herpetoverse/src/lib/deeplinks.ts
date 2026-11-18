@@ -16,6 +16,10 @@
  * to nothing here — the notification still reads fine as text.
  */
 
+// Per-animal feeding reminders carry /reptile/<id> (the mobile route); the web
+// animal page is /app/reptiles/<id>. Plain id characters only, one segment.
+const REPTILE_PATH = /^\/reptile\/([A-Za-z0-9-]+)$/
+
 const EXACT_MAP: Record<string, string> = {
   '/feeding-day': '/app/feeding-day',
   '/transfers': '/app/transfers',
@@ -29,6 +33,9 @@ export function resolveDeeplink(deeplink: string | null | undefined): string | n
   // Only ever navigate to in-app paths. A deeplink is server data, and an
   // absolute URL here would be an open-redirect shaped hole.
   if (!deeplink.startsWith('/') || deeplink.startsWith('//')) return null
+
+  const reptile = REPTILE_PATH.exec(deeplink)
+  if (reptile) return `/app/reptiles/${reptile[1]}`
 
   return EXACT_MAP[deeplink] ?? null
 }

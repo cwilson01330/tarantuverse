@@ -53,7 +53,7 @@ export default function NotificationsPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `${API_URL}/api/v1/notifications/?limit=50&offset=0&unread_only=false`,
+        `${API_URL}/api/v1/notifications/?app=tarantuverse&limit=50&offset=0&unread_only=false`,
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (!res.ok) throw new Error('Failed to load notifications')
@@ -110,7 +110,7 @@ export default function NotificationsPage() {
     if (!token) return
     setMarkingAll(true)
     try {
-      const res = await fetch(`${API_URL}/api/v1/notifications/read-all`, {
+      const res = await fetch(`${API_URL}/api/v1/notifications/read-all?app=tarantuverse`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -152,7 +152,7 @@ export default function NotificationsPage() {
     // Optimistic clear
     setNotifications([])
     try {
-      const res = await fetch(`${API_URL}/api/v1/notifications/`, {
+      const res = await fetch(`${API_URL}/api/v1/notifications/?app=tarantuverse`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

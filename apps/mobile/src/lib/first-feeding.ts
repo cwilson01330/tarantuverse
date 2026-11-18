@@ -98,7 +98,7 @@ export const FIRST_FEEDING_COPY = Object.freeze({
   // Push ask
   pushAskAfterSaveTitle: (name: string) => `Want a heads-up when ${name} is due to eat?`,
   pushAskWhenDueTitle: 'Want a reminder on days something is due?',
-  pushAskBody: 'At most one reminder a day, at the hour you choose in Settings.',
+  pushAskBody: 'Reminders come at the hour you choose in Settings, only on days something is due.',
   pushAskAccept: 'Turn on reminders',
   pushAskDecline: 'Not now',
 

@@ -96,7 +96,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
       if (!token) return
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        const response = await fetch(`${API_URL}/api/v1/notifications/unread-count`, {
+        const response = await fetch(`${API_URL}/api/v1/notifications/unread-count?app=tarantuverse`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (response.ok) {
@@ -121,7 +121,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(
-        `${API_URL}/api/v1/notifications/?limit=15&offset=0&unread_only=false`,
+        `${API_URL}/api/v1/notifications/?app=tarantuverse&limit=15&offset=0&unread_only=false`,
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (response.ok) {
@@ -169,7 +169,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
     setNotifUnreadCount(0)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      await fetch(`${API_URL}/api/v1/notifications/read-all`, {
+      await fetch(`${API_URL}/api/v1/notifications/read-all?app=tarantuverse`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -210,7 +210,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
     setNotifUnreadCount(0)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const res = await fetch(`${API_URL}/api/v1/notifications/`, {
+      const res = await fetch(`${API_URL}/api/v1/notifications/?app=tarantuverse`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

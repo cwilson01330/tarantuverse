@@ -9,8 +9,9 @@
  *   - daily feeding digest + hour: the server's digest (services/digest_service.py),
  *     which counts HV animals too. The hour is local, so the browser's zone is
  *     saved with it.
- *   - phone feeding reminders + delay: read by HV mobile's LogFeedingScreen,
- *     which schedules a local reminder after each accepted feeding.
+ *   - per-animal reminders + refusal restart (smart reminders, saved at once).
+ *     The old phone-side "reminder after a feeding" was removed 2026-11-18:
+ *     the server digest replaced it (HV mobile no longer schedules it).
  *   - sitter activity: server push when a sitter starts logging.
  *   - quiet hours: enforced server-side on every push (notification_service).
  *
@@ -21,17 +22,37 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiFetch, ApiError } from '@/lib/apiClient'
+import { FIRST_FEEDING_COPY } from '@/lib/firstFeeding'
 
 interface PrefsResponse {
-  feeding_reminders_enabled: boolean
-  feeding_reminder_hours: number
   quiet_hours_enabled: boolean
   quiet_hours_start: string
   quiet_hours_end: string
   sitter_activity_enabled?: boolean | null
   daily_digest_enabled?: boolean | null
+  email_digest_enabled?: boolean | null
   digest_hour?: number | null
+  /** Smart reminders. Older API builds omit them (treated as off). */
+  smart_reminders_enabled?: boolean | null
+  refusal_restarts_wait?: boolean | null
 }
+
+type ReminderSwitchKey = 'smart_reminders_enabled' | 'refusal_restarts_wait'
+
+// Same two switches as Tarantuverse, minus the post-molt one (Herpetoverse has
+// no pause around sheds).
+const REMINDER_SWITCHES: { key: ReminderSwitchKey; title: string; line: string }[] = [
+  {
+    key: 'smart_reminders_enabled',
+    title: 'Reminders for each animal',
+    line: 'When 1–3 animals are due, get a reminder for each with Fed, Refused and Tomorrow buttons. With more due, you get one summary.',
+  },
+  {
+    key: 'refusal_restarts_wait',
+    title: 'A refusal restarts the wait',
+    line: "A refused meal counts as an offer, so you're not reminded again until the next normal feeding time.",
+  },
+]
 
 const CARD_CLS = 'p-6 rounded-lg border border-neutral-800 bg-neutral-900/50'
 const SECTION_HDR_CLS = 'text-lg font-semibold text-white'
@@ -39,14 +60,6 @@ const ROW_TITLE_CLS = 'text-sm font-medium text-neutral-200'
 const ROW_HINT_CLS = 'text-sm text-neutral-500 mt-0.5'
 const INPUT_CLS =
   'px-3 py-2 rounded-md bg-neutral-950 border border-neutral-800 focus:border-herp-teal focus:outline-none focus:ring-1 focus:ring-herp-teal/50 text-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed [color-scheme:dark]'
-
-// Same choices as the mobile screen.
-const REMINDER_OPTIONS = [
-  { value: 24, label: '24 hours' },
-  { value: 48, label: '2 days' },
-  { value: 72, label: '3 days' },
-  { value: 168, label: '1 week' },
-]
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
 const HHMM_RE = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
@@ -117,9 +130,13 @@ export default function NotificationPreferencesPage() {
   const [saved, setSaved] = useState(false)
 
   const [digestEnabled, setDigestEnabled] = useState(true)
+  const [emailEnabled, setEmailEnabled] = useState(false)
   const [digestHour, setDigestHour] = useState(9)
-  const [feedingEnabled, setFeedingEnabled] = useState(true)
-  const [feedingHours, setFeedingHours] = useState(24)
+  const [reminderSwitches, setReminderSwitches] = useState<Record<ReminderSwitchKey, boolean>>({
+    smart_reminders_enabled: false,
+    refusal_restarts_wait: false,
+  })
+  const [switchError, setSwitchError] = useState<string | null>(null)
   const [sitterEnabled, setSitterEnabled] = useState(true)
   const [quietEnabled, setQuietEnabled] = useState(false)
   const [quietStart, setQuietStart] = useState('22:00')
@@ -136,9 +153,12 @@ export default function NotificationPreferencesPage() {
       const data = await apiFetch<PrefsResponse>('/api/v1/notification-preferences/')
       // Older rows can lack the newer columns — fall back to the server defaults.
       setDigestEnabled(data.daily_digest_enabled ?? true)
+      setEmailEnabled(data.email_digest_enabled === true)
       setDigestHour(typeof data.digest_hour === 'number' ? data.digest_hour : 9)
-      setFeedingEnabled(data.feeding_reminders_enabled)
-      setFeedingHours(data.feeding_reminder_hours || 24)
+      setReminderSwitches({
+        smart_reminders_enabled: data.smart_reminders_enabled === true,
+        refusal_restarts_wait: data.refusal_restarts_wait === true,
+      })
       setSitterEnabled(data.sitter_activity_enabled ?? true)
       setQuietEnabled(data.quiet_hours_enabled)
       setQuietStart(padClock(data.quiet_hours_start || '22:00'))
@@ -159,6 +179,23 @@ export default function NotificationPreferencesPage() {
     }
   }
 
+  /** Optimistic: flip now, PUT just this field (the API applies only fields
+   *  sent), revert with a short line on failure. */
+  async function toggleReminderSwitch(key: ReminderSwitchKey, value: boolean) {
+    const previous = reminderSwitches[key]
+    setSwitchError(null)
+    setReminderSwitches((p) => ({ ...p, [key]: value }))
+    try {
+      await apiFetch('/api/v1/notification-preferences/', {
+        method: 'PUT',
+        json: { [key]: value },
+      })
+    } catch {
+      setReminderSwitches((p) => ({ ...p, [key]: previous }))
+      setSwitchError("Couldn't save that change. Please try again.")
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (saving) return
@@ -175,11 +212,10 @@ export default function NotificationPreferencesPage() {
         method: 'PUT',
         json: {
           daily_digest_enabled: digestEnabled,
+          email_digest_enabled: emailEnabled,
           digest_hour: digestHour,
           // The digest hour is a local hour: save this browser's zone with it.
           tz_offset_minutes: new Date().getTimezoneOffset(),
-          feeding_reminders_enabled: feedingEnabled,
-          feeding_reminder_hours: feedingHours,
           sitter_activity_enabled: sitterEnabled,
           quiet_hours_enabled: quietEnabled,
           quiet_hours_start: quietStart,
@@ -270,6 +306,23 @@ export default function NotificationPreferencesPage() {
             </div>
 
             <div
+              className={`mt-4 flex items-start justify-between gap-4 ${
+                digestEnabled ? '' : 'opacity-50'
+              }`}
+            >
+              <div>
+                <p className={ROW_TITLE_CLS}>{FIRST_FEEDING_COPY.dailyEmailSwitch}</p>
+                <p className={ROW_HINT_CLS}>{FIRST_FEEDING_COPY.dailyEmailHelp}</p>
+              </div>
+              <Toggle
+                on={emailEnabled}
+                onChange={edit(setEmailEnabled)}
+                label={FIRST_FEEDING_COPY.dailyEmailSwitch}
+                disabled={!digestEnabled}
+              />
+            </div>
+
+            <div
               className={`mt-4 flex flex-wrap items-start justify-between gap-4 ${
                 digestEnabled ? '' : 'opacity-50'
               }`}
@@ -299,49 +352,39 @@ export default function NotificationPreferencesPage() {
               </select>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-neutral-800 flex items-start justify-between gap-4">
-              <div>
-                <p className={ROW_TITLE_CLS}>Reminder on my phone after a feeding</p>
-                <p className={ROW_HINT_CLS}>
-                  The Herpetoverse app schedules a reminder after each accepted
-                  feeding you log there.
-                </p>
-              </div>
-              <Toggle
-                on={feedingEnabled}
-                onChange={edit(setFeedingEnabled)}
-                label="Reminder on my phone after a feeding"
-              />
-            </div>
-
-            {feedingEnabled && (
-              <div className="mt-4">
-                <p className="block text-xs uppercase tracking-wider text-neutral-500 mb-2">
-                  Remind me after
-                </p>
-                <div role="radiogroup" aria-label="Remind me after" className="flex flex-wrap gap-2">
-                  {REMINDER_OPTIONS.map((opt) => {
-                    const active = feedingHours === opt.value
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => edit(setFeedingHours)(opt.value)}
-                        className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
-                          active
-                            ? 'border-herp-teal bg-herp-teal/10 text-white'
-                            : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-600'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    )
-                  })}
+            {REMINDER_SWITCHES.map((item) => {
+              // Per-animal reminders go out from the daily digest run, so that
+              // one does nothing while the digest is off.
+              const locked = item.key === 'smart_reminders_enabled' && !digestEnabled
+              return (
+                <div
+                  key={item.key}
+                  className={`mt-4 flex items-start justify-between gap-4 ${
+                    locked ? 'opacity-50' : ''
+                  }`}
+                >
+                  <div>
+                    <p className={ROW_TITLE_CLS}>{item.title}</p>
+                    <p className={ROW_HINT_CLS}>{item.line}</p>
+                  </div>
+                  <Toggle
+                    on={reminderSwitches[item.key]}
+                    onChange={(v) => void toggleReminderSwitch(item.key, v)}
+                    label={item.title}
+                    disabled={locked}
+                  />
                 </div>
-              </div>
+              )
+            })}
+            {switchError && (
+              <p className="mt-3 text-sm text-rose-400" role="alert">
+                {switchError}
+              </p>
             )}
+            <p className="mt-3 text-xs text-neutral-500">
+              These reminder and email settings also apply to Tarantuverse if you use it.
+            </p>
+
           </div>
 
           {/* ---------- Sitter links ---------- */}

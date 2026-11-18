@@ -131,6 +131,19 @@ class AnimalFeedingStatusItem(BaseModel):
     # it is never overdue. Separate from is_feeding_paused so clients can say
     # which it is.
     is_brumating: bool = False
+    # First-feeding rule (services/feeding_rule.py, same as TV): a never-fed
+    # animal with a cadence, not paused, no feeding log at all and not yet due
+    # gets the "log its first meal" nudge. `days_since_baseline` counts from
+    # the later of the owner-local created day and date_acquired (never-fed
+    # animals only).
+    needs_first_feeding: bool = False
+    days_since_baseline: Optional[int] = None
+    # Newest feeding log of either kind, set only when the owner's "refusal
+    # restarts the wait" switch is on (is_overdue then counts from it).
+    last_offered_date: Optional[datetime] = None
+    # Plant-eater (linked species diet_type "herbivore") with no keeper
+    # interval: listed and feedable, never due, labelled "No schedule".
+    no_schedule: bool = False
 
 
 class BrumationRequest(BaseModel):

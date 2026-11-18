@@ -33,6 +33,7 @@ import {
   isAppleSignInAvailable,
 } from '../src/services/google-signin';
 import { takePostAuthRoute } from '../src/lib/claim';
+import { markOnboardingPending, resolvePostAuthRoute } from '../src/lib/onboarding';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -83,13 +84,17 @@ export default function RegisterScreen() {
     try {
       const result = await register(email.trim(), username.trim(), password);
       captureEvent('signup_success');
+      // A new account is owed the welcome screen once. Parked before any
+      // navigation so it survives the "check your email" trip to /login.
+      await markOnboardingPending();
       if (result.requires_email_verification) {
         setVerificationMessage(result.message);
       } else {
         // Auto-sign-in if email verification is off (feature flag).
         await login(email.trim(), password);
-        // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
-        router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
+        // A parked transfer claim (claim/[token].tsx) wins; else the welcome
+        // screen (owed above), else the dashboard.
+        router.replace((takePostAuthRoute() ?? (await resolvePostAuthRoute())) as never);
       }
     } catch (err: any) {
       captureEvent('signup_failed');
@@ -106,14 +111,14 @@ export default function RegisterScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      if (provider === 'google') {
-        await loginWithGoogle({ allowCreate: true });
-      } else {
-        await loginWithApple({ allowCreate: true });
-      }
+      const { isNewUser } = provider === 'google'
+        ? await loginWithGoogle({ allowCreate: true })
+        : await loginWithApple({ allowCreate: true });
       captureEvent('signup_success', { method: provider });
-      // Resume a parked transfer claim (claim/[token].tsx), else the dashboard.
-      router.replace((takePostAuthRoute() ?? '/(tabs)/dashboard') as never);
+      // A parked transfer claim (claim/[token].tsx) wins; else a keeper whose
+      // account this just created gets the welcome screen, and an existing
+      // keeper who tapped Google/Apple here goes to the dashboard.
+      router.replace((takePostAuthRoute() ?? (await resolvePostAuthRoute(isNewUser))) as never);
     } catch (err: any) {
       const msg = err?.message || '';
       if (!/cancel/i.test(msg)) {

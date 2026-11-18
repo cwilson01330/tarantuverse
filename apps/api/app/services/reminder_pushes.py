@@ -4,26 +4,36 @@ Pure planning, no database: `digest_service.run_feeding_digests` gathers the
 due animals and hands them here, then writes one notification per planned push
 through `create_notification`.
 
-- Smart reminders on (the owner's `smart_reminders_enabled`), 1–3 TV animals
-  due and NO Herpetoverse animal due: one push per animal, with the Fed /
-  Refused / Tomorrow buttons (Expo `categoryId` "feeding_due"). HV has no
-  action endpoint, so any HV animal due means the summary.
+Each app is planned on its own (HV day one, spec §7): the digest calls this
+once for Tarantuverse (inverts: `id_key="invert_id"`, deeplink `/invert/<id>`,
+the defaults) and once for Herpetoverse (animals: `id_key="animal_id"`,
+deeplink `/reptile/<id>`), each with that app's due animals and snoozes.
+
+- Smart reminders on (the owner's `smart_reminders_enabled`, one set per
+  account), 1–3 animals due and `other_due == 0`: one push per animal, with
+  the Fed / Refused / Tomorrow buttons (Expo `categoryId` "feeding_due").
+  `other_due` is a count from outside this plan that forces the summary; the
+  digest passes 0 for both apps since each is planned separately.
 - Otherwise: today's summary ("N animals are due for feeding."). With the
   switch on it carries the "Open Feeding Day" button (`categoryId`
   "feeding_summary"); with it off it is exactly today's push, no category.
 
-"Tomorrow" (`inverts.reminder_snoozed_until`) only removes an animal from the
-per-animal pushes. The summary count, Feeding Day and every badge still list
-it as due. When every due TV animal is snoozed and nothing in HV is due, no
-push goes out — sending a summary about animals the keeper just put off until
-tomorrow would undo the button.
+"Tomorrow" (`inverts.reminder_snoozed_until` / `animals.reminder_snoozed_until`)
+only removes an animal from the per-animal pushes. The summary count, Feeding
+Day and every badge still list it as due. When every due animal is snoozed and
+nothing else is due, no push goes out — sending a summary about animals the
+keeper just put off until tomorrow would undo the button.
 """
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Collection, List, Optional
+from typing import Collection, List, Optional, Sequence, Union
 from uuid import UUID
 
+from app.schemas.animal import AnimalFeedingStatusItem
 from app.schemas.invert import InvertFeedingStatusItem
+
+# A due row from either app's Feeding Day rule (same fields this module reads).
+DueItem = Union[InvertFeedingStatusItem, AnimalFeedingStatusItem]
 
 # At most this many animals get a push each; more than that is one summary.
 MAX_PER_ANIMAL = 3
@@ -68,7 +78,7 @@ def animal_title(animal) -> str:
 
 
 def per_animal_body(
-    item: InvertFeedingStatusItem,
+    item: DueItem,
     tz_offset_minutes: Optional[int] = None,
     now: Optional[datetime] = None,
 ) -> str:
@@ -94,8 +104,8 @@ def per_animal_body(
 
 
 def plan_reminder_pushes(
-    due: List[InvertFeedingStatusItem],
-    hv_due: int,
+    due: Sequence[DueItem],
+    other_due: int,
     smart_on: bool,
     reminder_date: date,
     summary_body: str,
@@ -103,19 +113,26 @@ def plan_reminder_pushes(
     snoozed_ids: Collection[UUID] = (),
     tz_offset_minutes: Optional[int] = None,
     now: Optional[datetime] = None,
+    id_key: str = "invert_id",
+    deeplink_prefix: str = "/invert/",
 ) -> List[ReminderPush]:
-    """The pushes for one keeper's digest run.
+    """The pushes for one keeper's digest run, for one app.
 
-    `due` = every due TV animal (the owner's rule); `hv_due` = the HV count;
-    `snoozed_ids` = animals still snoozed on `reminder_date` (ignored with the
-    switch off). `summary_body` is today's text, built by the caller from the
-    full count. Returns [] when nothing is due.
+    `due` = every due animal of that app (the owner's rule); `other_due` = a
+    count outside this plan that forces the summary and joins its total (the
+    digest passes 0 — each app is planned on its own; kept positional, where
+    TV's `hv_due` always was); `snoozed_ids` = animals still snoozed on
+    `reminder_date` (ignored with the switch off). `summary_body` is today's
+    text, built by the caller from the full count. `id_key` names the
+    animal-id field in the push data and `deeplink_prefix` opens the animal
+    (TV defaults; HV passes "animal_id" and "/reptile/"). Returns [] when
+    nothing is due.
     """
-    overdue = len(due) + hv_due
+    overdue = len(due) + other_due
     if overdue <= 0:
         return []
 
-    if smart_on and hv_due == 0:
+    if smart_on and other_due == 0:
         snoozed = set(snoozed_ids)
         awake = [i for i in due if i.id not in snoozed]
         if not awake:
@@ -125,10 +142,10 @@ def plan_reminder_pushes(
                 ReminderPush(
                     title=animal_title(i),
                     body=per_animal_body(i, tz_offset_minutes, now),
-                    deeplink=f"/invert/{i.id}",
+                    deeplink=f"{deeplink_prefix}{i.id}",
                     data={
                         "type": "feeding_due",
-                        "invert_id": str(i.id),
+                        id_key: str(i.id),
                         "reminder_date": reminder_date.isoformat(),
                     },
                     category_id=FEEDING_DUE_CATEGORY,

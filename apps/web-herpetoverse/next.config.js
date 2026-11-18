@@ -95,6 +95,16 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'private, no-store' },
         ],
       },
+      {
+        // One-click email unsubscribe: the signed token is in the PATH. Never
+        // send it on as a Referer, never index or cache the page.
+        source: '/unsubscribe/:token*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      },
     ]
   },
   async rewrites() {

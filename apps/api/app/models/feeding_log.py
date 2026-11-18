@@ -33,6 +33,11 @@ class FeedingLog(Base):
             "uq_feeding_logs_reminder", "invert_id", "reminder_date",
             unique=True, postgresql_where=text("reminder_date IS NOT NULL"),
         ),
+        # hvr_20261118_hv_reminders: the same for Herpetoverse animals.
+        Index(
+            "uq_feeding_logs_reminder_animal", "animal_id", "reminder_date",
+            unique=True, postgresql_where=text("reminder_date IS NOT NULL"),
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -72,8 +77,9 @@ class FeedingLog(Base):
 
     fed_at = Column(DateTime(timezone=True), nullable=False)
     # Set only by a notification-button log: the local day of the reminder. The
-    # unique partial index uq_feeding_logs_reminder (invert_id, reminder_date)
-    # makes a double tap create one log.
+    # unique partial indexes uq_feeding_logs_reminder (invert_id, reminder_date)
+    # and uq_feeding_logs_reminder_animal (animal_id, reminder_date) make a
+    # double tap create one log.
     reminder_date = Column(Date, nullable=True)
     food_type = Column(String(100))  # e.g., "cricket", "roach", "mealworm"
     food_size = Column(String(50))  # e.g., "small", "medium", "large"

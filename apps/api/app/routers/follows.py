@@ -79,6 +79,7 @@ async def follow_user(
             deeplink=f"/community/{current_user.username}",
             data={"follower": current_user.username},
             push_category="new_followers_enabled",
+            app="tarantuverse",  # social notifications live on Tarantuverse
         )
     except Exception:
         pass  # never block the follow on notification issues
