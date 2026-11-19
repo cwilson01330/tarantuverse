@@ -46,7 +46,13 @@ def _fresh_limiter():
 
 
 def _uname() -> str:
-    return f"sf_{uuid.uuid4().hex[:10]}"
+    # Random hex can spell a blocked word after leetspeak normalisation
+    # (e.g. "a55"), which made this file flaky; draw until the name is allowed.
+    from app.utils.username_validation import validate_username
+    while True:
+        name = f"sf_{uuid.uuid4().hex[:10]}"
+        if validate_username(name)[0]:
+            return name
 
 
 def _make_user(db, email, *, password=PASSWORD, verified=True, active=True, legacy_provider=None):

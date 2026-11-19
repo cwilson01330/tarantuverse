@@ -45,7 +45,7 @@ class PushNotificationService:
             bool: True if sent successfully, False otherwise
         """
         if not expo_push_token or not expo_push_token.startswith('ExponentPushToken['):
-            logger.warning(f"Invalid Expo push token format: {expo_push_token}")
+            logger.warning("Invalid Expo push token format; push skipped")
             return False
 
         message = {
@@ -79,14 +79,28 @@ class PushNotificationService:
                 response.raise_for_status()
                 result = response.json()
 
-                # Check if there were any errors in the response
-                if "data" in result and len(result["data"]) > 0:
-                    ticket = result["data"][0]
-                    if ticket.get("status") == "error":
-                        logger.error(f"Expo push notification error: {ticket.get('message')}")
-                        return False
+                # One message in → Expo answers with ONE ticket object
+                # ({"data": {...}}); the list form is only for array bodies.
+                # Accept both, never index blindly (that raised KeyError after
+                # Expo had already accepted every push — 2026-11-19).
+                data = result.get("data") if isinstance(result, dict) else None
+                if isinstance(data, list):
+                    ticket = data[0] if data and isinstance(data[0], dict) else {}
+                elif isinstance(data, dict):
+                    ticket = data
+                else:
+                    ticket = {}
+                if ticket.get("status") == "error":
+                    # Ticket message/details name the error kind
+                    # (e.g. DeviceNotRegistered); never log the address.
+                    details = ticket.get("details") or {}
+                    logger.error(
+                        "Expo push ticket error: %s",
+                        details.get("error") if isinstance(details, dict) else None,
+                    )
+                    return False
 
-                logger.info(f"Push notification sent successfully to {expo_push_token[:20]}...")
+                logger.info("Push notification sent")
                 return True
 
         except httpx.HTTPError as e:
@@ -141,7 +155,11 @@ class PushNotificationService:
                             success_count += 1
                         else:
                             failed_count += 1
-                            logger.error(f"Batch notification error: {ticket.get('message')}")
+                            details = ticket.get("details") or {}
+                            logger.error(
+                                "Batch notification error: %s",
+                                details.get("error") if isinstance(details, dict) else None,
+                            )
 
                 logger.info(f"Batch push sent: {success_count} success, {failed_count} failed")
                 return {"success": success_count, "failed": failed_count}
