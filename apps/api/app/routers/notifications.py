@@ -14,6 +14,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from app.utils.memory import release_memory
+
 from app.database import get_db
 from app.models.user import User
 from app.models.notification import Notification
@@ -178,4 +180,6 @@ async def run_digests(
     except Exception:
         logger.exception("[premolt] episode pass failed during run-digests")
         result["premolt_episodes"] = {"error": True}
+    # Hand the memory the run used back to the OS (utils/memory.py).
+    release_memory()
     return result

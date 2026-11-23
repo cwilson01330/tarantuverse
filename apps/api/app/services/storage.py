@@ -12,6 +12,7 @@ import boto3
 from botocore.client import Config
 from app.config import settings
 from app.utils.image_sanitize import sanitize_image
+from app.utils.memory import release_memory
 
 
 class StorageService:
@@ -82,6 +83,18 @@ class StorageService:
         return thumb_buffer.getvalue()
     
     async def upload_avatar(
+        self,
+        file_data: bytes,
+        filename: str,
+        content_type: str = "image/jpeg"
+    ) -> str:
+        """Upload an avatar; see `_upload_avatar`. Releases decode memory after."""
+        try:
+            return await self._upload_avatar(file_data, filename, content_type)
+        finally:
+            release_memory()
+
+    async def _upload_avatar(
         self,
         file_data: bytes,
         filename: str,
@@ -159,6 +172,15 @@ class StorageService:
     async def upload_species_image(
         self, file_data: bytes, slug: str, max_edge: int = 1400,
     ) -> str:
+        """Store a catalog image; see `_upload_species_image`. Releases decode memory after."""
+        try:
+            return await self._upload_species_image(file_data, slug, max_edge)
+        finally:
+            release_memory()
+
+    async def _upload_species_image(
+        self, file_data: bytes, slug: str, max_edge: int = 1400,
+    ) -> str:
         """Store a catalog image for a species. Returns its public URL.
 
         Separate from `upload_photo` for three reasons:
@@ -198,6 +220,22 @@ class StorageService:
         )
 
     async def upload_photo(
+        self,
+        file_data: bytes,
+        filename: str,
+        content_type: str = "image/jpeg"
+    ) -> Tuple[str, str]:
+        """Upload a photo and its thumbnail; see `_upload_photo`.
+
+        Hands the decode buffers back to the OS afterwards, success or not
+        (utils/memory.py — each upload otherwise raised the process's floor).
+        """
+        try:
+            return await self._upload_photo(file_data, filename, content_type)
+        finally:
+            release_memory()
+
+    async def _upload_photo(
         self,
         file_data: bytes,
         filename: str,

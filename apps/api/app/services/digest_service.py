@@ -36,8 +36,10 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Tuple
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.notification import Notification
 from app.models.notification_preferences import NotificationPreferences
 from app.models.user import User
 from app.models.animal import Animal
@@ -242,6 +244,12 @@ def run_feeding_digests(
             )
             pushes += [(p, APP_HERPETOVERSE) for p in hv_pushes]
 
+        # Today's reminders replace earlier ones in the bell: older unread
+        # reminder rows for the same app are marked read first, so the badge
+        # counts today's state instead of every day ever sent.
+        for retire_app in {app for _, app in pushes}:
+            _retire_older_reminders(db, prefs.user_id, retire_app, before=now)
+
         for p, app in pushes:
             kwargs = dict(
                 user_id=prefs.user_id,
@@ -290,6 +298,29 @@ def run_feeding_digests(
                 )
 
     return {"checked": checked, "sent": sent, "emails": emails}
+
+
+REMINDER_TYPES = ("feeding_digest", "feeding_due")
+
+
+def _retire_older_reminders(db: Session, user_id, app: Optional[str], *, before: datetime) -> int:
+    """Mark this keeper's earlier unread feeding reminders for `app` read.
+
+    `app` None = Tarantuverse (its rows are stored with app NULL; a row tagged
+    'tarantuverse' counts too). Only reminder types, only rows created before
+    this run; nothing is deleted. Committed with the run's first new row.
+    """
+    q = db.query(Notification).filter(
+        Notification.user_id == user_id,
+        Notification.type.in_(REMINDER_TYPES),
+        Notification.is_read.is_(False),
+        Notification.created_at < before,
+    )
+    if app is None or app == APP_TARANTUVERSE:
+        q = q.filter(or_(Notification.app.is_(None), Notification.app == APP_TARANTUVERSE))
+    else:
+        q = q.filter(Notification.app == app)
+    return q.update({Notification.is_read: True}, synchronize_session=False)
 
 
 def _has_hv_address(db: Session, user_id) -> bool:
