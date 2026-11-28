@@ -36,7 +36,6 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.notification import Notification
@@ -244,11 +243,11 @@ def run_feeding_digests(
             )
             pushes += [(p, APP_HERPETOVERSE) for p in hv_pushes]
 
-        # Today's reminders replace earlier ones in the bell: older unread
-        # reminder rows for the same app are marked read first, so the badge
+        # Today's reminders replace earlier ones in the bell: the keeper's
+        # older unread reminder rows are marked read first, so the badge
         # counts today's state instead of every day ever sent.
-        for retire_app in {app for _, app in pushes}:
-            _retire_older_reminders(db, prefs.user_id, retire_app, before=now)
+        if pushes:
+            _retire_older_reminders(db, prefs.user_id, before=now)
 
         for p, app in pushes:
             kwargs = dict(
@@ -303,24 +302,26 @@ def run_feeding_digests(
 REMINDER_TYPES = ("feeding_digest", "feeding_due")
 
 
-def _retire_older_reminders(db: Session, user_id, app: Optional[str], *, before: datetime) -> int:
-    """Mark this keeper's earlier unread feeding reminders for `app` read.
+def _retire_older_reminders(db: Session, user_id, *, before: datetime) -> int:
+    """Mark this keeper's earlier unread feeding reminders read, every app's.
 
-    `app` None = Tarantuverse (its rows are stored with app NULL; a row tagged
-    'tarantuverse' counts too). Only reminder types, only rows created before
-    this run; nothing is deleted. Committed with the run's first new row.
+    Every app, not just the one being reminded today: rows written before
+    2026-11-18 were stored untagged (app NULL) even for Herpetoverse-only
+    keepers, and the Herpetoverse bell lists untagged rows, so an app filter
+    left up to 101 stale unread rows behind (found 2026-11-26). Anything still
+    due is in today's run anyway. Only reminder types, only rows created
+    before this run; nothing is deleted. Committed with the run's first row.
     """
-    q = db.query(Notification).filter(
-        Notification.user_id == user_id,
-        Notification.type.in_(REMINDER_TYPES),
-        Notification.is_read.is_(False),
-        Notification.created_at < before,
+    return (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == user_id,
+            Notification.type.in_(REMINDER_TYPES),
+            Notification.is_read.is_(False),
+            Notification.created_at < before,
+        )
+        .update({Notification.is_read: True}, synchronize_session=False)
     )
-    if app is None or app == APP_TARANTUVERSE:
-        q = q.filter(or_(Notification.app.is_(None), Notification.app == APP_TARANTUVERSE))
-    else:
-        q = q.filter(Notification.app == app)
-    return q.update({Notification.is_read: True}, synchronize_session=False)
 
 
 def _has_hv_address(db: Session, user_id) -> bool:
